@@ -13,6 +13,7 @@ tpMultiplier = input.float(1.5, "TP Multiplier", minval=0.1, step=0.1)
 showRangeBox = input.bool(true, "Show Range Box")
 showFvg = input.bool(true, "Show FVG")
 maxOneTradePerDay = input.bool(true, "Max One Trade Per Day")
+showDebugInfo = input.bool(true, "Show Debug Info (Data Window)", group="Debug")
 //#endregion
 
 //#region Constants
@@ -288,4 +289,27 @@ if tradeEndReached and strategy.position_size != 0
 //#region Plots
 plot(rangeHigh, "Range High", color=color.blue, linewidth=2, style=plot.style_linebr)
 plot(rangeLow, "Range Low", color=color.blue, linewidth=2, style=plot.style_linebr)
+//#endregion
+
+//#region Debug (Data Window)
+// These series don't draw anything on the chart - hover over any historical bar and open
+// TradingView's "Data Window" panel to read the exact internal state at that bar. This is the
+// fastest way to pinpoint exactly which condition blocked a trade you expected to see.
+plot(showDebugInfo ? (inRange ? 1 : 0) : na, "Debug: In Opening Range", display=display.data_window)
+plot(showDebugInfo ? (rangeFinalized ? 1 : 0) : na, "Debug: Range Finalized", display=display.data_window)
+plot(showDebugInfo ? rangeHigh : na, "Debug: Range High", display=display.data_window)
+plot(showDebugInfo ? rangeLow : na, "Debug: Range Low", display=display.data_window)
+plot(showDebugInfo ? (breakoutBull ? 1 : 0) : na, "Debug: Breakout Bull", display=display.data_window)
+plot(showDebugInfo ? (breakoutBear ? 1 : 0) : na, "Debug: Breakout Bear", display=display.data_window)
+plot(showDebugInfo ? (fvgFound ? 1 : 0) : na, "Debug: FVG Found", display=display.data_window)
+plot(showDebugInfo ? (fvgFound ? (fvgIsBull ? 1 : 0) : na) : na, "Debug: FVG Is Bull", display=display.data_window)
+plot(showDebugInfo ? fvgTop : na, "Debug: FVG Top", display=display.data_window)
+plot(showDebugInfo ? fvgBottom : na, "Debug: FVG Bottom", display=display.data_window)
+plot(showDebugInfo ? fvgStopLevel : na, "Debug: FVG Stop Level (1st candle low/high)", display=display.data_window)
+plot(showDebugInfo ? (mitigationDone ? 1 : 0) : na, "Debug: Mitigation Done", display=display.data_window)
+plot(showDebugInfo ? (longMitigation ? 1 : 0) : na, "Debug: Long Mitigation Triggered", display=display.data_window)
+plot(showDebugInfo ? (shortMitigation ? 1 : 0) : na, "Debug: Short Mitigation Triggered", display=display.data_window)
+plot(showDebugInfo ? (canTrade ? 1 : 0) : na, "Debug: Can Trade Now", display=display.data_window)
+plot(showDebugInfo ? (tradedToday ? 1 : 0) : na, "Debug: Traded Today", display=display.data_window)
+plot(showDebugInfo ? (inTradeSession ? 1 : 0) : na, "Debug: In Trade Session", display=display.data_window)
 //#endregion

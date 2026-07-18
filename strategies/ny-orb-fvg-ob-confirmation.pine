@@ -1,0 +1,743 @@
+//@version=6
+// pyramiding=2 and default_qty_value=50 (i.e. 50% of equity per entry) let a single FVG signal
+// fire up to 2 separate half-size entries - one immediately on the FVG's own completion candle,
+// and one more if price later retests (mitigates) the gap - while keeping the combined max
+// exposure (if both fire) equal to the original single 100%-of-equity entry.
+//
+// This strategy COMBINES two previously separate scripts:
+//   1) The "NY ORB + FVG" session-based entry system (still the ONLY thing that decides WHEN and
+//      WHETHER to actually place a trade).
+//   2) The "ICT Order Blocks, Breakers & Liquidity" indicator (order blocks/breakers, buy-side /
+//      sell-side liquidity, equal highs/lows) - kept purely as a visual "warning" layer plus a
+//      CONFIRMATION/REJECTION filter on top of the session-based signals. It never opens trades
+//      on its own and is completely independent of session timing.
+strategy("NY ORB + FVG + OB/Liquidity Confirmation", overlay=true, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=50, commission_type=strategy.commission.percent, commission_value=0.1, pyramiding=2, process_orders_on_close=true, max_lines_count=500, max_boxes_count=500, max_labels_count=500)
+
+//#region Inputs - NY ORB + FVG (session-based entry system)
+startHour = input.int(9, "NY Session Start Hour", minval=0, maxval=23, group="NY ORB + FVG")
+startMinute = input.int(30, "NY Session Start Minute", minval=0, maxval=59, group="NY ORB + FVG")
+rangeMinutes = input.int(15, "Opening Range Minutes", minval=1, maxval=240, group="NY ORB + FVG")
+endHour = input.int(16, "NY Session End Hour", minval=0, maxval=23, group="NY ORB + FVG")
+endMinute = input.int(0, "NY Session End Minute", minval=0, maxval=59, group="NY ORB + FVG")
+minFvgSizeTicks = input.int(5, "Min FVG Size (ticks)", minval=1, group="NY ORB + FVG")
+slBufferPercent = input.float(40.0, "SL Extra Buffer (% of 1st FVG Candle Range)", minval=0.0, step=5.0, group="NY ORB + FVG")
+tpMultiplier = input.float(1.5, "TP Multiplier", minval=0.1, step=0.1, group="NY ORB + FVG")
+showRangeBox = input.bool(true, "Show Range Box", group="NY ORB + FVG")
+showFvg = input.bool(true, "Show FVG", group="NY ORB + FVG")
+maxOneTradePerDay = input.bool(true, "Max One Trade Per Day", group="NY ORB + FVG")
+showDebugInfo = input.bool(true, "Show Debug Info (Data Window)", group="Debug")
+//#endregion
+
+//#region Inputs - Order Blocks & Breakers (visual "warning" layer, no entries of its own)
+int ob_pivot_len = input.int(5, "OB Structure Pivot Length", minval=2, tooltip="تعداد کندل‌ها برای تشخیص سقف و کف‌های سوئینگِ اردربلاک (مستقل از رنج نیویورک)", group="Order Blocks")
+bool show_ob_breakers = input.bool(true, "Show Breaker Blocks", group="Order Blocks")
+int max_ob_count = input.int(60, "Max Order Blocks Tracked", minval=5, group="Order Blocks")
+int ob_engulf_lookback = input.int(20, "OB Engulf Search Depth (bars)", minval=1, tooltip="بعد از پیدا کردن نزدیک‌ترین کندل مخالف، تا چند کندل دیگر به عقب بگردیم دنبال یک کندل بزرگ‌تر که آن را کاملاً پوشش داده باشد", group="Order Blocks")
+
+color bull_ob_col    = input.color(color.new(color.green, 88), "Bullish OB Fill", group="Order Blocks")
+color bull_ob_border = input.color(color.new(color.green, 50), "Bullish OB Border", group="Order Blocks")
+color bear_ob_col    = input.color(color.new(color.red, 88), "Bearish OB Fill", group="Order Blocks")
+color bear_ob_border = input.color(color.new(color.red, 50), "Bearish OB Border", group="Order Blocks")
+color bull_bb_col    = input.color(color.new(color.teal, 88), "Bullish Breaker Fill", group="Order Blocks")
+color bull_bb_border = input.color(color.new(color.teal, 50), "Bullish Breaker Border", group="Order Blocks")
+color bear_bb_col    = input.color(color.new(color.maroon, 88), "Bearish Breaker Fill", group="Order Blocks")
+color bear_bb_border = input.color(color.new(color.maroon, 50), "Bearish Breaker Border", group="Order Blocks")
+//#endregion
+
+//#region Inputs - Liquidity (BSL/SSL/EQH/EQL, visual "warning" layer, no entries of its own)
+bool show_liquidity      = input.bool(true, "Show Buy-Side / Sell-Side Liquidity (Swing)", group="Liquidity")
+bool show_equal_hl       = input.bool(true, "Show Equal Highs / Equal Lows (EQH/EQL)", group="Liquidity")
+float eq_tolerance_ticks = input.float(10, "Equal High/Low Tolerance (ticks)", minval=0, group="Liquidity")
+float eq_zone_multiplier = input.float(2.0, "Equal Zone Thickness (× Tolerance)", minval=0.1, group="Liquidity")
+int max_liq_count        = input.int(60, "Max Liquidity Levels Tracked", minval=5, group="Liquidity")
+
+color bsl_color   = input.color(color.new(color.orange, 30), "Buy-Side Liquidity (BSL) Color", group="Liquidity")
+color ssl_color   = input.color(color.new(color.blue, 30), "Sell-Side Liquidity (SSL) Color", group="Liquidity")
+color eqh_color   = input.color(color.new(color.orange, 0), "Equal Highs (EQH) Color", group="Liquidity")
+color eql_color   = input.color(color.new(color.blue, 0), "Equal Lows (EQL) Color", group="Liquidity")
+color swept_color = input.color(color.new(color.gray, 60), "Swept Liquidity Color", group="Liquidity")
+//#endregion
+
+//#region Inputs - OB/Liquidity Confirmation Filter
+// This is the ONLY place where the order-block/liquidity layer touches the session-based entry
+// system: it can VETO (reject) a signal that the FVG system already wants to take, or add an
+// optional confirmation flag for your own reference - it never generates a signal by itself.
+bool use_ob_confirmation = input.bool(true, "Use OB/Liquidity Confirmation Filter", tooltip="اگه روشن باشه، سیگنال‌های FVG با وضعیتِ اردربلاک/لیکوییدیتیِ نزدیک‌ترین ناحیه بالا/پایینِ قیمت فیلتر می‌شن", group="OB Confirmation")
+float obBreakoutPct = input.float(60.0, "Decisive Breakthrough (% of Zone)", minval=1.0, maxval=100.0, tooltip="چند درصد از ارتفاع ناحیه (اردربلاک/لیکوییدیتی) باید با کلوز پشت سر گذاشته شود تا «شکست قطعی» در نظر گرفته شود", group="OB Confirmation")
+//#endregion
+
+//#region Constants
+const string NY_TZ = "America/New_York"
+//#endregion
+
+//#region Functions - NY ORB + FVG
+//@function Returns true when the current bar is inside a session string in New York time.
+//@param sessionString Session string.
+//@returns True when the bar is in session.
+inSession(string sessionString) =>
+    not na(time(timeframe.period, sessionString, NY_TZ))
+
+//@function Returns the date key in New York time.
+//@returns Integer YYYYMMDD.
+getDateKey() =>
+    year(time, NY_TZ) * 10000 + month(time, NY_TZ) * 100 + dayofmonth(time, NY_TZ)
+//#endregion
+
+//#region Session state
+tradeSession = str.format("{0,number,00}{1,number,00}-{2,number,00}{3,number,00}", startHour, startMinute, endHour, endMinute)
+rangeSession = str.format("{0,number,00}{1,number,00}-{2,number,00}{3,number,00}", startHour, startMinute, startHour + int(math.floor((startMinute + rangeMinutes) / 60)), (startMinute + rangeMinutes) % 60)
+
+inRange = inSession(rangeSession)
+inTradeSession = inSession(tradeSession)
+rangeEndReached = not inRange and inRange[1]
+tradeEndReached = not inTradeSession and inTradeSession[1]
+currentDateKey = getDateKey()
+newDay = na(currentDateKey[1]) or currentDateKey != currentDateKey[1]
+//#endregion
+
+//#region Persistent variables - NY ORB + FVG
+var float rangeHigh = na
+var float rangeLow = na
+var int rangeLeftBar = na
+var int rangeRightBar = na
+var bool rangeFinalized = false
+var bool tradedToday = false
+var bool breakoutBull = false
+var bool breakoutBear = false
+var bool fvgFound = false
+var bool fvgIsBull = false
+var bool immediateEntryTaken = false  // whether the "enter right away on the FVG candle" entry has fired for the current FVG
+var bool mitigationDone = false  // whether the "enter on retest/mitigation" entry has fired for the current FVG
+var float fvgTop = na
+var float fvgBottom = na
+var float fvgStopLevel = na  // low (bull) / high (bear) of the FIRST of the 3 FVG candles, captured at detection time
+var float fvgFirstCandleRange = na  // high-low of the 1st FVG candle, captured at detection time (used for SL buffer)
+var float entryPrice = na
+var float stopPrice = na
+var float takeProfitPrice = na
+var box rangeBox = na
+var box fvgBox = na
+var line rangeHighLine = na
+var line rangeLowLine = na
+//#endregion
+
+//#region Daily reset - NY ORB + FVG
+// NOTE: the Order Block / Liquidity tracking below is intentionally NOT reset here. Order blocks
+// and liquidity pools are inherently multi-day structures, so they keep tracking continuously
+// across session boundaries, exactly like the standalone indicator did.
+if newDay
+    rangeHigh := na
+    rangeLow := na
+    rangeLeftBar := na
+    rangeRightBar := na
+    rangeFinalized := false
+    tradedToday := false
+    breakoutBull := false
+    breakoutBear := false
+    fvgFound := false
+    fvgIsBull := false
+    immediateEntryTaken := false
+    mitigationDone := false
+    fvgTop := na
+    fvgBottom := na
+    fvgStopLevel := na
+    fvgFirstCandleRange := na
+    entryPrice := na
+    stopPrice := na
+    takeProfitPrice := na
+    if not na(rangeBox)
+        box.delete(rangeBox)
+        rangeBox := na
+    if not na(fvgBox)
+        box.delete(fvgBox)
+        fvgBox := na
+    if not na(rangeHighLine)
+        line.delete(rangeHighLine)
+        rangeHighLine := na
+    if not na(rangeLowLine)
+        line.delete(rangeLowLine)
+        rangeLowLine := na
+//#endregion
+
+//#region Opening range build
+if inRange
+    if na(rangeHigh)
+        rangeHigh := high
+        rangeLow := low
+        rangeLeftBar := bar_index
+    else
+        rangeHigh := math.max(rangeHigh, high)
+        rangeLow := math.min(rangeLow, low)
+    rangeRightBar := bar_index
+
+if rangeEndReached and not rangeFinalized and not na(rangeHigh) and not na(rangeLow)
+    rangeFinalized := true
+    if showRangeBox
+        if not na(rangeBox)
+            box.delete(rangeBox)
+        rangeBox := box.new(rangeLeftBar, rangeHigh, rangeRightBar, rangeLow, xloc=xloc.bar_index, border_color=color.blue, bgcolor=color.new(color.blue, 85))
+    if not na(rangeHighLine)
+        line.delete(rangeHighLine)
+    if not na(rangeLowLine)
+        line.delete(rangeLowLine)
+    rangeHighLine := line.new(rangeLeftBar, rangeHigh, bar_index, rangeHigh, xloc=xloc.bar_index, extend=extend.right, color=color.blue, width=2)
+    rangeLowLine := line.new(rangeLeftBar, rangeLow, bar_index, rangeLow, xloc=xloc.bar_index, extend=extend.right, color=color.blue, width=2)
+
+if rangeFinalized and showRangeBox and not na(rangeBox)
+    box.set_right(rangeBox, bar_index)
+    box.set_top(rangeBox, rangeHigh)
+    box.set_bottom(rangeBox, rangeLow)
+
+if rangeFinalized and not na(rangeHighLine)
+    line.set_x2(rangeHighLine, bar_index)
+    line.set_y2(rangeHighLine, rangeHigh)
+if rangeFinalized and not na(rangeLowLine)
+    line.set_x2(rangeLowLine, bar_index)
+    line.set_y2(rangeLowLine, rangeLow)
+//#endregion
+
+//#region Breakout detection
+// NOTE: breakout direction can flip during the day (e.g. price sweeps below rangeLow -
+// "liquidating" that side - then reverses and closes above rangeHigh). We track the most
+// recent confirmed close-breakout as the active bias, instead of permanently locking onto
+// whichever side broke first, otherwise a real breakout in the opposite direction would
+// never be recognized (and FVGs matching it would never be validated / traded).
+bullishBreakout = rangeFinalized and not breakoutBull and close > rangeHigh and close[1] <= rangeHigh and not inRange
+bearishBreakout = rangeFinalized and not breakoutBear and close < rangeLow and close[1] >= rangeLow and not inRange
+
+if bullishBreakout
+    breakoutBull := true
+    breakoutBear := false
+    // A stale bearish FVG no longer matches the new (bullish) bias -> drop our tracking of it so
+    // the detection logic below is free to find a fresh bullish FVG. This only clears our own
+    // script-level bookkeeping; it does NOT cancel any order/bracket already placed on a prior
+    // entry for that FVG (that keeps running to its own stop/TP independently).
+    if fvgFound and not fvgIsBull
+        fvgFound := false
+        fvgIsBull := false
+        immediateEntryTaken := false
+        mitigationDone := false
+        fvgTop := na
+        fvgBottom := na
+        fvgStopLevel := na
+        fvgFirstCandleRange := na
+        if not na(fvgBox)
+            box.delete(fvgBox)
+            fvgBox := na
+
+if bearishBreakout
+    breakoutBear := true
+    breakoutBull := false
+    // Symmetric cleanup for a stale bullish FVG when the bias flips bearish.
+    if fvgFound and fvgIsBull
+        fvgFound := false
+        fvgIsBull := false
+        immediateEntryTaken := false
+        mitigationDone := false
+        fvgTop := na
+        fvgBottom := na
+        fvgStopLevel := na
+        fvgFirstCandleRange := na
+        if not na(fvgBox)
+            box.delete(fvgBox)
+            fvgBox := na
+//#endregion
+
+//#region FVG detection (validity only - immediate entries are placed further below, after the
+// OB/Liquidity confirmation gate has been computed)
+bullFvg = bar_index >= 2 and high[2] < low
+bearFvg = bar_index >= 2 and low[2] > high
+minFvgSize = minFvgSizeTicks * syminfo.mintick
+bullFvgSize = bar_index >= 2 ? low - high[2] : na
+bearFvgSize = bar_index >= 2 ? low[2] - high : na
+
+// A gap qualifies as long as AT LEAST PART of it (or all of it) falls outside the opening range -
+// it does NOT need to be fully clear of the range on both edges. For a bull gap (above the range
+// after an up-breakout) that means its top edge (fvgTop = low) must clear rangeHigh - the bottom
+// edge (fvgBottom = high[2]) is allowed to still be inside the range. Symmetrically, for a bear
+// gap (below the range after a down-breakout) it's the bottom edge (fvgBottom = low[2]) that must
+// clear rangeLow - the top edge (fvgTop = high) is allowed to still be inside the range.
+bullFvgValid = breakoutBull and bullFvg and bullFvgSize >= minFvgSize and low > rangeHigh
+bearFvgValid = breakoutBear and bearFvg and bearFvgSize >= minFvgSize and low[2] < rangeLow
+//#endregion
+
+//#region Order Blocks: market structure (Pivots & BOS) - fully independent of the NY session
+float ob_ph = ta.pivothigh(high, ob_pivot_len, ob_pivot_len)
+float ob_pl = ta.pivotlow(low, ob_pivot_len, ob_pivot_len)
+
+var float ob_last_ph = na
+var float ob_last_pl = na
+var int ob_last_ph_idx = na
+var int ob_last_pl_idx = na
+
+if not na(ob_ph)
+    ob_last_ph := ob_ph
+    ob_last_ph_idx := bar_index - ob_pivot_len
+
+if not na(ob_pl)
+    ob_last_pl := ob_pl
+    ob_last_pl_idx := bar_index - ob_pivot_len
+
+bool ob_bullish_bos = false
+bool ob_bearish_bos = false
+
+if not na(ob_last_ph) and ta.crossover(close, ob_last_ph)
+    ob_bullish_bos := true
+    ob_last_ph := na
+
+if not na(ob_last_pl) and ta.crossunder(close, ob_last_pl)
+    ob_bearish_bos := true
+    ob_last_pl := na
+//#endregion
+
+//#region Order Blocks: type + creation helper
+type OrderBlock
+    box zone_box
+    line mid_line
+    float top
+    float bottom
+    float mid
+    bool is_bullish
+    bool active
+    bool is_breaker
+
+var OrderBlock[] ob_array = array.new<OrderBlock>()
+
+create_ob(int start_idx, float top_val, float bot_val, bool is_bull) =>
+    float mid_val = (top_val + bot_val) / 2
+    color fill_col = is_bull ? bull_ob_col : bear_ob_col
+    color border_col = is_bull ? bull_ob_border : bear_ob_border
+    color line_col = is_bull ? color.green : color.red
+
+    box b = box.new(left=start_idx, top=top_val, right=bar_index, bottom=bot_val, bgcolor=fill_col, border_color=border_col, border_style=line.style_solid)
+    line l = line.new(x1=start_idx, y1=mid_val, x2=bar_index, y2=mid_val, color=line_col, style=line.style_dashed)
+
+    OrderBlock.new(b, l, top_val, bot_val, mid_val, is_bull, true, false)
+//#endregion
+
+//#region Order Blocks: candle detection (prefers the outer, engulfing candle over an inner pullback)
+if ob_bullish_bos
+    int ob_idx = na
+    float ob_high = na
+    float ob_low = na
+
+    int ob_search_depth = math.min(100, bar_index - (na(ob_last_pl_idx) ? 0 : ob_last_pl_idx))
+    for i = 1 to ob_search_depth
+        if close[i] < open[i]
+            ob_idx  := bar_index - i
+            ob_high := high[i]
+            ob_low  := low[i]
+            break
+
+    // The nearest opposite candle is often just a pullback INTO an earlier, bigger down candle
+    // (typically closing below that earlier candle's 50% mean threshold). Search up to
+    // ob_engulf_lookback bars further back for any candle that fully engulfs everything found so
+    // far - not just an immediately-contiguous chain - and adopt the widest one found.
+    if not na(ob_idx)
+        int ob_inner_i = bar_index - ob_idx
+        int ob_search_start = ob_inner_i + 1
+        int ob_engulf_end = math.min(ob_search_depth, ob_inner_i + ob_engulf_lookback)
+        if ob_search_start <= ob_engulf_end
+            for j = ob_search_start to ob_engulf_end
+                if close[j] < open[j] and high[j] >= ob_high and low[j] <= ob_low
+                    ob_idx  := bar_index - j
+                    ob_high := high[j]
+                    ob_low  := low[j]
+
+    if not na(ob_idx)
+        array.push(ob_array, create_ob(ob_idx, ob_high, ob_low, true))
+
+if ob_bearish_bos
+    int ob_idx = na
+    float ob_high = na
+    float ob_low = na
+
+    int ob_search_depth = math.min(100, bar_index - (na(ob_last_ph_idx) ? 0 : ob_last_ph_idx))
+    for i = 1 to ob_search_depth
+        if close[i] > open[i]
+            ob_idx  := bar_index - i
+            ob_high := high[i]
+            ob_low  := low[i]
+            break
+
+    if not na(ob_idx)
+        int ob_inner_i = bar_index - ob_idx
+        int ob_search_start = ob_inner_i + 1
+        int ob_engulf_end = math.min(ob_search_depth, ob_inner_i + ob_engulf_lookback)
+        if ob_search_start <= ob_engulf_end
+            for j = ob_search_start to ob_engulf_end
+                if close[j] > open[j] and high[j] >= ob_high and low[j] <= ob_low
+                    ob_idx  := bar_index - j
+                    ob_high := high[j]
+                    ob_low  := low[j]
+
+    if not na(ob_idx)
+        array.push(ob_array, create_ob(ob_idx, ob_high, ob_low, false))
+//#endregion
+
+//#region Order Blocks: mitigation / breaker management + leak-free cleanup
+if array.size(ob_array) > 0
+    for i = array.size(ob_array) - 1 to 0
+        OrderBlock ob = array.get(ob_array, i)
+
+        if ob.active
+            box.set_right(ob.zone_box, bar_index)
+            line.set_x2(ob.mid_line, bar_index)
+
+            if ob.is_bullish
+                if not ob.is_breaker
+                    if close < ob.bottom
+                        if show_ob_breakers
+                            ob.is_breaker := true
+                            box.set_bgcolor(ob.zone_box, bear_bb_col)
+                            box.set_border_color(ob.zone_box, bear_bb_border)
+                            line.set_color(ob.mid_line, bear_bb_border)
+                        else
+                            ob.active := false
+                            box.delete(ob.zone_box)
+                            line.delete(ob.mid_line)
+                else
+                    if close > ob.top
+                        ob.active := false
+            else
+                if not ob.is_breaker
+                    if close > ob.top
+                        if show_ob_breakers
+                            ob.is_breaker := true
+                            box.set_bgcolor(ob.zone_box, bull_bb_col)
+                            box.set_border_color(ob.zone_box, bull_bb_border)
+                            line.set_color(ob.mid_line, bull_bb_border)
+                        else
+                            ob.active := false
+                            box.delete(ob.zone_box)
+                            line.delete(ob.mid_line)
+                else
+                    if close < ob.bottom
+                        ob.active := false
+
+if array.size(ob_array) > max_ob_count
+    OrderBlock old_ob = array.shift(ob_array)
+    box.delete(old_ob.zone_box)
+    line.delete(old_ob.mid_line)
+//#endregion
+
+//#region Liquidity: type + registration (Equal Highs/Lows become faded zones, no labels anywhere)
+type LiquidityLevel
+    line lvl_line
+    box zone_box
+    int start_idx
+    float price       // original swing price - used for matching/sweeping single (non-equal) levels
+    float zone_top     // current top of the equal-zone (na until zone_box exists)
+    float zone_bottom  // current bottom of the equal-zone
+    bool is_high       // true = buy-side (from a swing high) / false = sell-side (from a swing low)
+    bool swept
+    bool is_equal
+
+var LiquidityLevel[] liq_array = array.new<LiquidityLevel>()
+
+//@function Registers a freshly-formed swing high/low, merging it into a nearby not-yet-swept
+//equal-level zone (widening it, no label) when within eq_tolerance_ticks, or otherwise creating a
+//fresh unlabeled BSL/SSL line.
+register_liquidity(int pivot_idx, float pivot_price, bool is_high) =>
+    float tolerance = eq_tolerance_ticks * syminfo.mintick
+    float zone_pad = tolerance * eq_zone_multiplier
+    bool matched = false
+    if show_equal_hl and array.size(liq_array) > 0
+        for i = 0 to array.size(liq_array) - 1
+            LiquidityLevel existing = array.get(liq_array, i)
+            if not matched and existing.is_high == is_high and not existing.swept and math.abs(existing.price - pivot_price) <= tolerance
+                matched := true
+                existing.is_equal := true
+                float cur_top = na(existing.zone_top) ? existing.price : existing.zone_top
+                float cur_bottom = na(existing.zone_bottom) ? existing.price : existing.zone_bottom
+                existing.zone_top := math.max(cur_top, pivot_price) + zone_pad
+                existing.zone_bottom := math.min(cur_bottom, pivot_price) - zone_pad
+                color zone_col = is_high ? eqh_color : eql_color
+                if na(existing.zone_box)
+                    if not na(existing.lvl_line)
+                        line.delete(existing.lvl_line)
+                        existing.lvl_line := na
+                    existing.zone_box := box.new(existing.start_idx, existing.zone_top, bar_index, existing.zone_bottom, bgcolor=color.new(zone_col, 85), border_color=color.new(zone_col, 70), border_style=line.style_dotted)
+                else
+                    box.set_top(existing.zone_box, existing.zone_top)
+                    box.set_bottom(existing.zone_box, existing.zone_bottom)
+                    box.set_right(existing.zone_box, bar_index)
+
+    if not matched
+        color lvl_color = is_high ? bsl_color : ssl_color
+        line new_line = line.new(pivot_idx, pivot_price, bar_index, pivot_price, extend=extend.right, color=lvl_color, style=line.style_dotted)
+        array.push(liq_array, LiquidityLevel.new(new_line, na, pivot_idx, pivot_price, na, na, is_high, false, false))
+
+if show_liquidity and not na(ob_ph)
+    register_liquidity(bar_index - ob_pivot_len, ob_ph, true)
+
+if show_liquidity and not na(ob_pl)
+    register_liquidity(bar_index - ob_pivot_len, ob_pl, false)
+//#endregion
+
+//#region Liquidity: sweep detection + leak-free cleanup
+if show_liquidity and array.size(liq_array) > 0
+    for i = array.size(liq_array) - 1 to 0
+        LiquidityLevel lvl = array.get(liq_array, i)
+        if not lvl.swept
+            if not na(lvl.zone_box)
+                box.set_right(lvl.zone_box, bar_index)
+                bool zone_swept_now = lvl.is_high ? close > lvl.zone_top : close < lvl.zone_bottom
+                if zone_swept_now
+                    lvl.swept := true
+                    box.set_bgcolor(lvl.zone_box, color.new(swept_color, 85))
+                    box.set_border_color(lvl.zone_box, swept_color)
+            else
+                bool lvl_swept_now = lvl.is_high ? close > lvl.price : close < lvl.price
+                if lvl_swept_now
+                    lvl.swept := true
+                    line.set_extend(lvl.lvl_line, extend.none)
+                    line.set_x2(lvl.lvl_line, bar_index)
+                    line.set_color(lvl.lvl_line, swept_color)
+
+if array.size(liq_array) > max_liq_count
+    LiquidityLevel old_lvl = array.shift(liq_array)
+    if not na(old_lvl.lvl_line)
+        line.delete(old_lvl.lvl_line)
+    if not na(old_lvl.zone_box)
+        box.delete(old_lvl.zone_box)
+//#endregion
+
+//#region OB/Liquidity Confirmation Gate
+// Finds the single nearest tracked zone (order block OR BSL/SSL/EQH/EQL - whichever is closest)
+// strictly ABOVE and strictly BELOW the current close, among the ones that are still
+// active/not-yet-swept, then classifies how THIS bar interacted with each one:
+//   +1 = decisive breakthrough (closed beyond the zone's far edge by >= obBreakoutPct of its own
+//        height, measured from the near edge)
+//   -1 = rejection (a wick reached into the zone, but the close bounced back to the near side
+//        without ever reaching the breakthrough threshold)
+//    0 = no clear interaction on this bar
+//@function Classifies the current bar's interaction with a zone that sits on one side of price.
+//@param zoneTop Top of the zone.
+//@param zoneBottom Bottom of the zone.
+//@param testUp True if the zone sits above price and we're testing an upward break through it;
+//false if it sits below price and we're testing a downward break through it.
+//@param breakoutFrac Fraction (0-1) of the zone's height that must be cleared, from the near
+//edge, for the interaction to count as a decisive breakthrough.
+//@returns 1 for breakthrough, -1 for rejection, 0 for no clear interaction.
+classify_zone_interaction(float zoneTop, float zoneBottom, bool testUp, float breakoutFrac) =>
+    float zoneHeight = zoneTop - zoneBottom
+    int result = 0
+    if testUp
+        bool touched = high >= zoneBottom
+        bool brokeThrough = close > zoneBottom + breakoutFrac * zoneHeight
+        bool rejectedBack = touched and close <= zoneBottom
+        if brokeThrough
+            result := 1
+        else if rejectedBack
+            result := -1
+    else
+        bool touched = low <= zoneTop
+        bool brokeThrough = close < zoneTop - breakoutFrac * zoneHeight
+        bool rejectedBack = touched and close >= zoneTop
+        if brokeThrough
+            result := 1
+        else if rejectedBack
+            result := -1
+    result
+
+float obBreakoutFrac = obBreakoutPct / 100
+
+float nearestAboveTop = na
+float nearestAboveBottom = na
+float nearestAboveDist = na
+float nearestBelowTop = na
+float nearestBelowBottom = na
+float nearestBelowDist = na
+
+if use_ob_confirmation
+    if array.size(ob_array) > 0
+        for i = 0 to array.size(ob_array) - 1
+            OrderBlock obZone = array.get(ob_array, i)
+            if obZone.active
+                if obZone.bottom > close
+                    float d = obZone.bottom - close
+                    if na(nearestAboveDist) or d < nearestAboveDist
+                        nearestAboveDist := d
+                        nearestAboveTop := obZone.top
+                        nearestAboveBottom := obZone.bottom
+                if obZone.top < close
+                    float d2 = close - obZone.top
+                    if na(nearestBelowDist) or d2 < nearestBelowDist
+                        nearestBelowDist := d2
+                        nearestBelowTop := obZone.top
+                        nearestBelowBottom := obZone.bottom
+
+    if array.size(liq_array) > 0
+        for i = 0 to array.size(liq_array) - 1
+            LiquidityLevel liqZone = array.get(liq_array, i)
+            if not liqZone.swept
+                float liqTop = na(liqZone.zone_top) ? liqZone.price : liqZone.zone_top
+                float liqBottom = na(liqZone.zone_bottom) ? liqZone.price : liqZone.zone_bottom
+                if liqBottom > close
+                    float d = liqBottom - close
+                    if na(nearestAboveDist) or d < nearestAboveDist
+                        nearestAboveDist := d
+                        nearestAboveTop := liqTop
+                        nearestAboveBottom := liqBottom
+                if liqTop < close
+                    float d2 = close - liqTop
+                    if na(nearestBelowDist) or d2 < nearestBelowDist
+                        nearestBelowDist := d2
+                        nearestBelowTop := liqTop
+                        nearestBelowBottom := liqBottom
+
+int aboveInteraction = (use_ob_confirmation and not na(nearestAboveTop)) ? classify_zone_interaction(nearestAboveTop, nearestAboveBottom, true, obBreakoutFrac) : 0
+int belowInteraction = (use_ob_confirmation and not na(nearestBelowTop)) ? classify_zone_interaction(nearestBelowTop, nearestBelowBottom, false, obBreakoutFrac) : 0
+
+// LONG: the zone ABOVE price is the obstacle that must break (+1 = confirms) or must NOT reject
+// (-1 = blocks). The zone BELOW price is support that must hold (-1 = confirms) or must NOT break
+// down (+1 = blocks). SHORT is the exact mirror image.
+obGateLongOK = not use_ob_confirmation or (aboveInteraction != -1 and belowInteraction != 1)
+obGateShortOK = not use_ob_confirmation or (aboveInteraction != 1 and belowInteraction != -1)
+//#endregion
+
+//#region Entry and exits - NY ORB + FVG (now gated by obGateLongOK / obGateShortOK)
+// canTradeNewSignal gates the FIRST (immediate) entry of a brand-new FVG signal against the
+// daily trade-limit setting and session windows. It intentionally does NOT check
+// strategy.position_size, since pyramiding=2 lets the immediate + retest entries of the SAME
+// FVG stack on top of each other.
+canTradeNewSignal = (not maxOneTradePerDay or not tradedToday) and not inRange and inTradeSession
+
+if bullFvgValid and not fvgFound
+    fvgFound := true
+    fvgIsBull := true
+    fvgTop := low
+    fvgBottom := high[2]
+    fvgStopLevel := low[2]  // low of the 1st of the 3 FVG candles -> SL goes below this
+    fvgFirstCandleRange := high[2] - low[2]
+    immediateEntryTaken := false
+    mitigationDone := false
+    if showFvg
+        if not na(fvgBox)
+            box.delete(fvgBox)
+        fvgBox := box.new(bar_index - 2, fvgTop, bar_index, fvgBottom, xloc=xloc.bar_index, border_color=color.lime, bgcolor=color.new(color.lime, 85))
+    // 1st entry: fire immediately on the FVG's own completion candle, without waiting for a
+    // retest of the gap - as long as the OB/Liquidity confirmation gate doesn't veto it.
+    if canTradeNewSignal and obGateLongOK
+        candidateEntry = close
+        riskBasis = candidateEntry - fvgStopLevel
+        if riskBasis > 0
+            immediateEntryTaken := true
+            entryPrice := candidateEntry
+            slBuffer = fvgFirstCandleRange * (slBufferPercent / 100)
+            stopPrice := fvgStopLevel - slBuffer - syminfo.mintick
+            takeProfitPrice := entryPrice + tpMultiplier * riskBasis
+            strategy.entry("Long Immediate", strategy.long)
+            strategy.exit("Long Immediate Exit", "Long Immediate", stop=stopPrice, limit=takeProfitPrice)
+            tradedToday := true
+            label.new(bar_index, low, "Long (Immediate)", style=label.style_label_up, textcolor=color.white, color=color.green)
+
+if bearFvgValid and not fvgFound
+    fvgFound := true
+    fvgIsBull := false
+    fvgTop := high
+    fvgBottom := low[2]
+    fvgStopLevel := high[2]  // high of the 1st of the 3 FVG candles -> SL goes above this
+    fvgFirstCandleRange := high[2] - low[2]
+    immediateEntryTaken := false
+    mitigationDone := false
+    if showFvg
+        if not na(fvgBox)
+            box.delete(fvgBox)
+        fvgBox := box.new(bar_index - 2, fvgBottom, bar_index, fvgTop, xloc=xloc.bar_index, border_color=color.red, bgcolor=color.new(color.red, 85))
+    if canTradeNewSignal and obGateShortOK
+        candidateEntry = close
+        riskBasis = fvgStopLevel - candidateEntry
+        if riskBasis > 0
+            immediateEntryTaken := true
+            entryPrice := candidateEntry
+            slBuffer = fvgFirstCandleRange * (slBufferPercent / 100)
+            stopPrice := fvgStopLevel + slBuffer + syminfo.mintick
+            takeProfitPrice := entryPrice - tpMultiplier * riskBasis
+            strategy.entry("Short Immediate", strategy.short)
+            strategy.exit("Short Immediate Exit", "Short Immediate", stop=stopPrice, limit=takeProfitPrice)
+            tradedToday := true
+            label.new(bar_index, high, "Short (Immediate)", style=label.style_label_down, textcolor=color.white, color=color.red)
+
+if not na(fvgBox)
+    box.set_right(fvgBox, bar_index)
+
+// Entry and exits (retest / mitigation - the 2nd possible entry per FVG). This fires
+// independently of whether the immediate entry above happened, and independently of
+// maxOneTradePerDay/tradedToday - it belongs to the SAME signal, not a new one. It IS still
+// gated by the OB/Liquidity confirmation filter, re-evaluated fresh on the retest bar.
+longMitigation = fvgFound and fvgIsBull and not mitigationDone and low < fvgTop and low[1] >= fvgTop
+shortMitigation = fvgFound and not fvgIsBull and not mitigationDone and high > fvgBottom and high[1] <= fvgBottom
+canTradeRetest = not inRange and inTradeSession
+
+if longMitigation and canTradeRetest and obGateLongOK
+    candidateEntry = close
+    // Risk used to size TP is the tight/technical distance (entry -> raw FVG-candle low),
+    // deliberately NOT inflated by the SL safety buffer, so TP stays a sane multiple of the
+    // real structural risk instead of ballooning whenever slBufferPercent is increased.
+    riskBasis = candidateEntry - fvgStopLevel
+    if riskBasis > 0
+        mitigationDone := true
+        entryPrice := candidateEntry
+        slBuffer = fvgFirstCandleRange * (slBufferPercent / 100)
+        stopPrice := fvgStopLevel - slBuffer - syminfo.mintick
+        takeProfitPrice := entryPrice + tpMultiplier * riskBasis
+        strategy.entry("Long Retest", strategy.long)
+        strategy.exit("Long Retest Exit", "Long Retest", stop=stopPrice, limit=takeProfitPrice)
+        tradedToday := true
+        label.new(bar_index, low, "Long (Retest)", style=label.style_label_up, textcolor=color.white, color=color.green)
+
+if shortMitigation and canTradeRetest and obGateShortOK
+    candidateEntry = close
+    riskBasis = fvgStopLevel - candidateEntry
+    if riskBasis > 0
+        mitigationDone := true
+        entryPrice := candidateEntry
+        slBuffer = fvgFirstCandleRange * (slBufferPercent / 100)
+        stopPrice := fvgStopLevel + slBuffer + syminfo.mintick
+        takeProfitPrice := entryPrice - tpMultiplier * riskBasis
+        strategy.entry("Short Retest", strategy.short)
+        strategy.exit("Short Retest Exit", "Short Retest", stop=stopPrice, limit=takeProfitPrice)
+        tradedToday := true
+        label.new(bar_index, high, "Short (Retest)", style=label.style_label_down, textcolor=color.white, color=color.red)
+
+if tradeEndReached and strategy.position_size != 0
+    strategy.close_all(comment="NY 16:00 Exit")
+//#endregion
+
+//#region Plots
+plot(rangeHigh, "Range High", color=color.blue, linewidth=2, style=plot.style_linebr)
+plot(rangeLow, "Range Low", color=color.blue, linewidth=2, style=plot.style_linebr)
+//#endregion
+
+//#region Debug (Data Window)
+// These series don't draw anything on the chart - hover over any historical bar and open
+// TradingView's "Data Window" panel to read the exact internal state at that bar.
+plot(showDebugInfo ? (inRange ? 1 : 0) : na, "Debug: In Opening Range", display=display.data_window)
+plot(showDebugInfo ? (rangeFinalized ? 1 : 0) : na, "Debug: Range Finalized", display=display.data_window)
+plot(showDebugInfo ? rangeHigh : na, "Debug: Range High", display=display.data_window)
+plot(showDebugInfo ? rangeLow : na, "Debug: Range Low", display=display.data_window)
+plot(showDebugInfo ? (breakoutBull ? 1 : 0) : na, "Debug: Breakout Bull", display=display.data_window)
+plot(showDebugInfo ? (breakoutBear ? 1 : 0) : na, "Debug: Breakout Bear", display=display.data_window)
+plot(showDebugInfo ? (fvgFound ? 1 : 0) : na, "Debug: FVG Found", display=display.data_window)
+plot(showDebugInfo ? (fvgFound ? (fvgIsBull ? 1 : 0) : na) : na, "Debug: FVG Is Bull", display=display.data_window)
+plot(showDebugInfo ? fvgTop : na, "Debug: FVG Top", display=display.data_window)
+plot(showDebugInfo ? fvgBottom : na, "Debug: FVG Bottom", display=display.data_window)
+plot(showDebugInfo ? fvgStopLevel : na, "Debug: FVG Stop Level (1st candle low/high)", display=display.data_window)
+plot(showDebugInfo ? (immediateEntryTaken ? 1 : 0) : na, "Debug: Immediate Entry Taken", display=display.data_window)
+plot(showDebugInfo ? (mitigationDone ? 1 : 0) : na, "Debug: Retest Entry Taken (mitigationDone)", display=display.data_window)
+plot(showDebugInfo ? (longMitigation ? 1 : 0) : na, "Debug: Long Retest Triggered", display=display.data_window)
+plot(showDebugInfo ? (shortMitigation ? 1 : 0) : na, "Debug: Short Retest Triggered", display=display.data_window)
+plot(showDebugInfo ? (canTradeNewSignal ? 1 : 0) : na, "Debug: Can Trade New Signal", display=display.data_window)
+plot(showDebugInfo ? (tradedToday ? 1 : 0) : na, "Debug: Traded Today", display=display.data_window)
+plot(showDebugInfo ? (inTradeSession ? 1 : 0) : na, "Debug: In Trade Session", display=display.data_window)
+plot(showDebugInfo ? nearestAboveTop : na, "Debug: Nearest Zone Above - Top", display=display.data_window)
+plot(showDebugInfo ? nearestAboveBottom : na, "Debug: Nearest Zone Above - Bottom", display=display.data_window)
+plot(showDebugInfo ? nearestBelowTop : na, "Debug: Nearest Zone Below - Top", display=display.data_window)
+plot(showDebugInfo ? nearestBelowBottom : na, "Debug: Nearest Zone Below - Bottom", display=display.data_window)
+plot(showDebugInfo ? aboveInteraction : na, "Debug: Above-Zone Interaction (1=break,-1=reject,0=none)", display=display.data_window)
+plot(showDebugInfo ? belowInteraction : na, "Debug: Below-Zone Interaction (1=break,-1=reject,0=none)", display=display.data_window)
+plot(showDebugInfo ? (obGateLongOK ? 1 : 0) : na, "Debug: OB Gate Long OK", display=display.data_window)
+plot(showDebugInfo ? (obGateShortOK ? 1 : 0) : na, "Debug: OB Gate Short OK", display=display.data_window)
+//#endregion

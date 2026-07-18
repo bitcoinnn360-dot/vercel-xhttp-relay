@@ -159,13 +159,44 @@ if rangeFinalized and not na(rangeLowLine)
 //#endregion
 
 //#region Breakout detection
-bullishBreakout = rangeFinalized and not breakoutBull and not breakoutBear and close > rangeHigh and close[1] <= rangeHigh and not inRange
-bearishBreakout = rangeFinalized and not breakoutBull and not breakoutBear and close < rangeLow and close[1] >= rangeLow and not inRange
+// NOTE: breakout direction can flip during the day (e.g. price sweeps below rangeLow -
+// "liquidating" that side - then reverses and closes above rangeHigh). We track the most
+// recent confirmed close-breakout as the active bias, instead of permanently locking onto
+// whichever side broke first, otherwise a real breakout in the opposite direction would
+// never be recognized (and FVGs matching it would never be validated / traded).
+bullishBreakout = rangeFinalized and not breakoutBull and close > rangeHigh and close[1] <= rangeHigh and not inRange
+bearishBreakout = rangeFinalized and not breakoutBear and close < rangeLow and close[1] >= rangeLow and not inRange
 
 if bullishBreakout
     breakoutBull := true
+    breakoutBear := false
+    // A stale, not-yet-mitigated bearish FVG no longer matches the new (bullish) bias -> drop it
+    // so the detection logic below is free to find a fresh bullish FVG.
+    if fvgFound and not fvgIsBull and not mitigationDone
+        fvgFound := false
+        fvgIsBull := false
+        fvgTop := na
+        fvgBottom := na
+        fvgStopLevel := na
+        fvgFirstCandleRange := na
+        if not na(fvgBox)
+            box.delete(fvgBox)
+            fvgBox := na
+
 if bearishBreakout
     breakoutBear := true
+    breakoutBull := false
+    // Symmetric cleanup for a stale, not-yet-mitigated bullish FVG when the bias flips bearish.
+    if fvgFound and fvgIsBull and not mitigationDone
+        fvgFound := false
+        fvgIsBull := false
+        fvgTop := na
+        fvgBottom := na
+        fvgStopLevel := na
+        fvgFirstCandleRange := na
+        if not na(fvgBox)
+            box.delete(fvgBox)
+            fvgBox := na
 //#endregion
 
 //#region FVG detection

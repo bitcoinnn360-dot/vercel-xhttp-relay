@@ -1,0 +1,240 @@
+//@version=6
+strategy("NY ORB + FVG", overlay=true, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, commission_type=strategy.commission.percent, commission_value=0.1, pyramiding=0, process_orders_on_close=true, max_lines_count=500, max_boxes_count=500, max_labels_count=500)
+
+//#region Inputs
+startHour = input.int(9, "NY Session Start Hour", minval=0, maxval=23)
+startMinute = input.int(30, "NY Session Start Minute", minval=0, maxval=59)
+rangeMinutes = input.int(15, "Opening Range Minutes", minval=1, maxval=240)
+endHour = input.int(16, "NY Session End Hour", minval=0, maxval=23)
+endMinute = input.int(0, "NY Session End Minute", minval=0, maxval=59)
+minFvgSizeTicks = input.int(5, "Min FVG Size (ticks)", minval=1)
+tpMultiplier = input.float(1.5, "TP Multiplier", minval=0.1, step=0.1)
+showRangeBox = input.bool(true, "Show Range Box")
+showFvg = input.bool(true, "Show FVG")
+maxOneTradePerDay = input.bool(true, "Max One Trade Per Day")
+//#endregion
+
+//#region Constants
+const string NY_TZ = "America/New_York"
+const string RANGE_SESSION = "0930-0945"
+const string TRADE_SESSION = "0930-1600"
+//#endregion
+
+//#region Functions
+//@function Returns true when the current bar is inside a session string in New York time.
+//@param sessionString Session string.
+//@returns True when the bar is in session.
+inSession(string sessionString) =>
+    not na(time(timeframe.period, sessionString, NY_TZ))
+
+//@function Builds a HHMM-HHMM session string from start time and duration in minutes.
+//@param h Start hour.
+//@param m Start minute.
+//@param minutes Duration in minutes.
+//@returns Session string.
+makeSession(int h, int m, int minutes) =>
+    endH = h + int(math.floor((m + minutes) / 60))
+    endM = (m + minutes) % 60
+    str.format("{0,number,00}{1,number,00}-{2,number,00}{3,number,00}", h, m, endH, endM)
+
+//@function Returns the date key in New York time.
+//@returns Integer YYYYMMDD.
+getDateKey() =>
+    year(time, NY_TZ) * 10000 + month(time, NY_TZ) * 100 + dayofmonth(time, NY_TZ)
+//#endregion
+
+//#region Session state
+tradeSession = str.format("{0,number,00}{1,number,00}-{2,number,00}{3,number,00}", startHour, startMinute, endHour, endMinute)
+rangeSession = str.format("{0,number,00}{1,number,00}-{2,number,00}{3,number,00}", startHour, startMinute, startHour + int(math.floor((startMinute + rangeMinutes) / 60)), (startMinute + rangeMinutes) % 60)
+
+inRange = inSession(rangeSession)
+inTradeSession = inSession(tradeSession)
+rangeEndReached = not inRange and inRange[1]
+tradeEndReached = not inTradeSession and inTradeSession[1]
+currentDateKey = getDateKey()
+newDay = na(currentDateKey[1]) or currentDateKey != currentDateKey[1]
+//#endregion
+
+//#region Persistent variables
+var float rangeHigh = na
+var float rangeLow = na
+var int rangeStartTime = na
+var int rangeEndTime = na
+var int rangeLeftBar = na
+var int rangeRightBar = na
+var bool rangeFinalized = false
+var bool tradedToday = false
+var bool breakoutBull = false
+var bool breakoutBear = false
+var bool fvgFound = false
+var bool fvgIsBull = false
+var bool mitigationDone = false
+var float fvgTop = na
+var float fvgBottom = na
+var float fvgStopLevel = na  // low (bull) / high (bear) of the FIRST of the 3 FVG candles, captured at detection time
+var float entryPrice = na
+var float stopPrice = na
+var float takeProfitPrice = na
+var box rangeBox = na
+var box fvgBox = na
+var line rangeHighLine = na
+var line rangeLowLine = na
+//#endregion
+
+//#region Daily reset
+if newDay
+    rangeHigh := na
+    rangeLow := na
+    rangeStartTime := na
+    rangeEndTime := na
+    rangeLeftBar := na
+    rangeRightBar := na
+    rangeFinalized := false
+    tradedToday := false
+    breakoutBull := false
+    breakoutBear := false
+    fvgFound := false
+    fvgIsBull := false
+    mitigationDone := false
+    fvgTop := na
+    fvgBottom := na
+    fvgStopLevel := na
+    entryPrice := na
+    stopPrice := na
+    takeProfitPrice := na
+    if not na(rangeBox)
+        box.delete(rangeBox)
+        rangeBox := na
+    if not na(fvgBox)
+        box.delete(fvgBox)
+        fvgBox := na
+    if not na(rangeHighLine)
+        line.delete(rangeHighLine)
+        rangeHighLine := na
+    if not na(rangeLowLine)
+        line.delete(rangeLowLine)
+        rangeLowLine := na
+//#endregion
+
+//#region Opening range build
+if inRange
+    if na(rangeHigh)
+        rangeHigh := high
+        rangeLow := low
+        rangeLeftBar := bar_index
+        rangeStartTime := time
+    else
+        rangeHigh := math.max(rangeHigh, high)
+        rangeLow := math.min(rangeLow, low)
+    rangeRightBar := bar_index
+
+if rangeEndReached and not rangeFinalized and not na(rangeHigh) and not na(rangeLow)
+    rangeFinalized := true
+    rangeEndTime := time
+    if showRangeBox
+        if not na(rangeBox)
+            box.delete(rangeBox)
+        rangeBox := box.new(rangeLeftBar, rangeHigh, rangeRightBar, rangeLow, xloc=xloc.bar_index, border_color=color.blue, bgcolor=color.new(color.blue, 85))
+    if not na(rangeHighLine)
+        line.delete(rangeHighLine)
+    if not na(rangeLowLine)
+        line.delete(rangeLowLine)
+    rangeHighLine := line.new(rangeLeftBar, rangeHigh, bar_index, rangeHigh, xloc=xloc.bar_index, extend=extend.right, color=color.blue, width=2)
+    rangeLowLine := line.new(rangeLeftBar, rangeLow, bar_index, rangeLow, xloc=xloc.bar_index, extend=extend.right, color=color.blue, width=2)
+
+if rangeFinalized and showRangeBox and not na(rangeBox)
+    box.set_right(rangeBox, bar_index)
+    box.set_top(rangeBox, rangeHigh)
+    box.set_bottom(rangeBox, rangeLow)
+
+if rangeFinalized and not na(rangeHighLine)
+    line.set_x2(rangeHighLine, bar_index)
+    line.set_y2(rangeHighLine, rangeHigh)
+if rangeFinalized and not na(rangeLowLine)
+    line.set_x2(rangeLowLine, bar_index)
+    line.set_y2(rangeLowLine, rangeLow)
+//#endregion
+
+//#region Breakout detection
+bullishBreakout = rangeFinalized and not breakoutBull and not breakoutBear and close > rangeHigh and close[1] <= rangeHigh and not inRange
+bearishBreakout = rangeFinalized and not breakoutBull and not breakoutBear and close < rangeLow and close[1] >= rangeLow and not inRange
+
+if bullishBreakout
+    breakoutBull := true
+if bearishBreakout
+    breakoutBear := true
+//#endregion
+
+//#region FVG detection
+bullFvg = bar_index >= 2 and high[2] < low
+bearFvg = bar_index >= 2 and low[2] > high
+minFvgSize = minFvgSizeTicks * syminfo.mintick
+bullFvgSize = bar_index >= 2 ? low - high[2] : na
+bearFvgSize = bar_index >= 2 ? low[2] - high : na
+
+bullFvgValid = breakoutBull and bullFvg and bullFvgSize >= minFvgSize and low > rangeHigh
+bearFvgValid = breakoutBear and bearFvg and bearFvgSize >= minFvgSize and high < rangeLow
+
+if bullFvgValid and not fvgFound
+    fvgFound := true
+    fvgIsBull := true
+    fvgTop := low
+    fvgBottom := high[2]
+    fvgStopLevel := low[2]  // low of the 1st of the 3 FVG candles -> SL goes below this
+    mitigationDone := false
+    if showFvg
+        if not na(fvgBox)
+            box.delete(fvgBox)
+        fvgBox := box.new(bar_index - 2, fvgTop, bar_index, fvgBottom, xloc=xloc.bar_index, border_color=color.lime, bgcolor=color.new(color.lime, 85))
+
+if bearFvgValid and not fvgFound
+    fvgFound := true
+    fvgIsBull := false
+    fvgTop := high
+    fvgBottom := low[2]
+    fvgStopLevel := high[2]  // high of the 1st of the 3 FVG candles -> SL goes above this
+    mitigationDone := false
+    if showFvg
+        if not na(fvgBox)
+            box.delete(fvgBox)
+        fvgBox := box.new(bar_index - 2, fvgBottom, bar_index, fvgTop, xloc=xloc.bar_index, border_color=color.red, bgcolor=color.new(color.red, 85))
+
+if not na(fvgBox)
+    box.set_right(fvgBox, bar_index)
+//#endregion
+
+//#region Entry and exits
+longMitigation = fvgFound and fvgIsBull and not mitigationDone and low < fvgTop and low[1] >= fvgTop
+shortMitigation = fvgFound and not fvgIsBull and not mitigationDone and high > fvgBottom and high[1] <= fvgBottom
+canTrade = (not maxOneTradePerDay or not tradedToday) and strategy.position_size == 0 and not inRange and inTradeSession
+
+if longMitigation and canTrade
+    mitigationDone := true
+    entryPrice := close
+    stopPrice := fvgStopLevel - syminfo.mintick
+    risk = entryPrice - stopPrice
+    takeProfitPrice := entryPrice + tpMultiplier * risk
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Long Exit", "Long", stop=stopPrice, limit=takeProfitPrice)
+    tradedToday := true
+    label.new(bar_index, low, "Long Entry", style=label.style_label_up, textcolor=color.white, color=color.green)
+
+if shortMitigation and canTrade
+    mitigationDone := true
+    entryPrice := close
+    stopPrice := fvgStopLevel + syminfo.mintick
+    risk = stopPrice - entryPrice
+    takeProfitPrice := entryPrice - tpMultiplier * risk
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Short Exit", "Short", stop=stopPrice, limit=takeProfitPrice)
+    tradedToday := true
+    label.new(bar_index, high, "Short Entry", style=label.style_label_down, textcolor=color.white, color=color.red)
+
+if tradeEndReached and strategy.position_size != 0
+    strategy.close_all(comment="NY 16:00 Exit")
+//#endregion
+
+//#region Plots
+plot(rangeHigh, "Range High", color=color.blue, linewidth=2, style=plot.style_linebr)
+plot(rangeLow, "Range Low", color=color.blue, linewidth=2, style=plot.style_linebr)
+//#endregion

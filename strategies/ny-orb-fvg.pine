@@ -8,6 +8,7 @@ rangeMinutes = input.int(15, "Opening Range Minutes", minval=1, maxval=240)
 endHour = input.int(16, "NY Session End Hour", minval=0, maxval=23)
 endMinute = input.int(0, "NY Session End Minute", minval=0, maxval=59)
 minFvgSizeTicks = input.int(5, "Min FVG Size (ticks)", minval=1)
+slBufferPercent = input.float(40.0, "SL Extra Buffer (% of 1st FVG Candle Range)", minval=0.0, step=5.0)
 tpMultiplier = input.float(1.5, "TP Multiplier", minval=0.1, step=0.1)
 showRangeBox = input.bool(true, "Show Range Box")
 showFvg = input.bool(true, "Show FVG")
@@ -72,6 +73,7 @@ var bool mitigationDone = false
 var float fvgTop = na
 var float fvgBottom = na
 var float fvgStopLevel = na  // low (bull) / high (bear) of the FIRST of the 3 FVG candles, captured at detection time
+var float fvgFirstCandleRange = na  // high-low of the 1st FVG candle, captured at detection time (used for SL buffer)
 var float entryPrice = na
 var float stopPrice = na
 var float takeProfitPrice = na
@@ -99,6 +101,7 @@ if newDay
     fvgTop := na
     fvgBottom := na
     fvgStopLevel := na
+    fvgFirstCandleRange := na
     entryPrice := na
     stopPrice := na
     takeProfitPrice := na
@@ -181,6 +184,7 @@ if bullFvgValid and not fvgFound
     fvgTop := low
     fvgBottom := high[2]
     fvgStopLevel := low[2]  // low of the 1st of the 3 FVG candles -> SL goes below this
+    fvgFirstCandleRange := high[2] - low[2]
     mitigationDone := false
     if showFvg
         if not na(fvgBox)
@@ -193,6 +197,7 @@ if bearFvgValid and not fvgFound
     fvgTop := high
     fvgBottom := low[2]
     fvgStopLevel := high[2]  // high of the 1st of the 3 FVG candles -> SL goes above this
+    fvgFirstCandleRange := high[2] - low[2]
     mitigationDone := false
     if showFvg
         if not na(fvgBox)
@@ -211,7 +216,8 @@ canTrade = (not maxOneTradePerDay or not tradedToday) and strategy.position_size
 if longMitigation and canTrade
     mitigationDone := true
     entryPrice := close
-    stopPrice := fvgStopLevel - syminfo.mintick
+    slBuffer = fvgFirstCandleRange * (slBufferPercent / 100)
+    stopPrice := fvgStopLevel - slBuffer - syminfo.mintick
     risk = entryPrice - stopPrice
     takeProfitPrice := entryPrice + tpMultiplier * risk
     strategy.entry("Long", strategy.long)
@@ -222,7 +228,8 @@ if longMitigation and canTrade
 if shortMitigation and canTrade
     mitigationDone := true
     entryPrice := close
-    stopPrice := fvgStopLevel + syminfo.mintick
+    slBuffer = fvgFirstCandleRange * (slBufferPercent / 100)
+    stopPrice := fvgStopLevel + slBuffer + syminfo.mintick
     risk = stopPrice - entryPrice
     takeProfitPrice := entryPrice - tpMultiplier * risk
     strategy.entry("Short", strategy.short)

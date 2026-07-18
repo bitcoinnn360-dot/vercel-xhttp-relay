@@ -214,28 +214,35 @@ shortMitigation = fvgFound and not fvgIsBull and not mitigationDone and high > f
 canTrade = (not maxOneTradePerDay or not tradedToday) and strategy.position_size == 0 and not inRange and inTradeSession
 
 if longMitigation and canTrade
-    mitigationDone := true
-    entryPrice := close
-    slBuffer = fvgFirstCandleRange * (slBufferPercent / 100)
-    stopPrice := fvgStopLevel - slBuffer - syminfo.mintick
-    risk = entryPrice - stopPrice
-    takeProfitPrice := entryPrice + tpMultiplier * risk
-    strategy.entry("Long", strategy.long)
-    strategy.exit("Long Exit", "Long", stop=stopPrice, limit=takeProfitPrice)
-    tradedToday := true
-    label.new(bar_index, low, "Long Entry", style=label.style_label_up, textcolor=color.white, color=color.green)
+    candidateEntry = close
+    // Risk used to size TP is the tight/technical distance (entry -> raw FVG-candle low),
+    // deliberately NOT inflated by the SL safety buffer, so TP stays a sane multiple of the
+    // real structural risk instead of ballooning whenever slBufferPercent is increased.
+    riskBasis = candidateEntry - fvgStopLevel
+    if riskBasis > 0
+        mitigationDone := true
+        entryPrice := candidateEntry
+        slBuffer = fvgFirstCandleRange * (slBufferPercent / 100)
+        stopPrice := fvgStopLevel - slBuffer - syminfo.mintick
+        takeProfitPrice := entryPrice + tpMultiplier * riskBasis
+        strategy.entry("Long", strategy.long)
+        strategy.exit("Long Exit", "Long", stop=stopPrice, limit=takeProfitPrice)
+        tradedToday := true
+        label.new(bar_index, low, "Long Entry", style=label.style_label_up, textcolor=color.white, color=color.green)
 
 if shortMitigation and canTrade
-    mitigationDone := true
-    entryPrice := close
-    slBuffer = fvgFirstCandleRange * (slBufferPercent / 100)
-    stopPrice := fvgStopLevel + slBuffer + syminfo.mintick
-    risk = stopPrice - entryPrice
-    takeProfitPrice := entryPrice - tpMultiplier * risk
-    strategy.entry("Short", strategy.short)
-    strategy.exit("Short Exit", "Short", stop=stopPrice, limit=takeProfitPrice)
-    tradedToday := true
-    label.new(bar_index, high, "Short Entry", style=label.style_label_down, textcolor=color.white, color=color.red)
+    candidateEntry = close
+    riskBasis = fvgStopLevel - candidateEntry
+    if riskBasis > 0
+        mitigationDone := true
+        entryPrice := candidateEntry
+        slBuffer = fvgFirstCandleRange * (slBufferPercent / 100)
+        stopPrice := fvgStopLevel + slBuffer + syminfo.mintick
+        takeProfitPrice := entryPrice - tpMultiplier * riskBasis
+        strategy.entry("Short", strategy.short)
+        strategy.exit("Short Exit", "Short", stop=stopPrice, limit=takeProfitPrice)
+        tradedToday := true
+        label.new(bar_index, high, "Short Entry", style=label.style_label_down, textcolor=color.white, color=color.red)
 
 if tradeEndReached and strategy.position_size != 0
     strategy.close_all(comment="NY 16:00 Exit")

@@ -1,5 +1,9 @@
 //@version=6
-strategy("NY ORB + FVG", overlay=true, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, commission_type=strategy.commission.percent, commission_value=0.1, pyramiding=0, process_orders_on_close=true, max_lines_count=500, max_boxes_count=500, max_labels_count=500)
+// pyramiding=2 and default_qty_value=50 (i.e. 50% of equity per entry) let a single FVG signal
+// fire up to 2 separate half-size entries - one immediately on the FVG's own completion candle,
+// and one more if price later retests (mitigates) the gap - while keeping the combined max
+// exposure (if both fire) equal to the original single 100%-of-equity entry.
+strategy("NY ORB + FVG", overlay=true, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=50, commission_type=strategy.commission.percent, commission_value=0.1, pyramiding=2, process_orders_on_close=true, max_lines_count=500, max_boxes_count=500, max_labels_count=500)
 
 //#region Inputs
 startHour = input.int(9, "NY Session Start Hour", minval=0, maxval=23)
@@ -70,7 +74,8 @@ var bool breakoutBull = false
 var bool breakoutBear = false
 var bool fvgFound = false
 var bool fvgIsBull = false
-var bool mitigationDone = false
+var bool immediateEntryTaken = false  // whether the "enter right away on the FVG candle" entry has fired for the current FVG
+var bool mitigationDone = false  // whether the "enter on retest/mitigation" entry has fired for the current FVG
 var float fvgTop = na
 var float fvgBottom = na
 var float fvgStopLevel = na  // low (bull) / high (bear) of the FIRST of the 3 FVG candles, captured at detection time
@@ -98,6 +103,7 @@ if newDay
     breakoutBear := false
     fvgFound := false
     fvgIsBull := false
+    immediateEntryTaken := false
     mitigationDone := false
     fvgTop := na
     fvgBottom := na
@@ -171,11 +177,15 @@ bearishBreakout = rangeFinalized and not breakoutBear and close < rangeLow and c
 if bullishBreakout
     breakoutBull := true
     breakoutBear := false
-    // A stale, not-yet-mitigated bearish FVG no longer matches the new (bullish) bias -> drop it
-    // so the detection logic below is free to find a fresh bullish FVG.
-    if fvgFound and not fvgIsBull and not mitigationDone
+    // A stale bearish FVG no longer matches the new (bullish) bias -> drop our tracking of it so
+    // the detection logic below is free to find a fresh bullish FVG. This only clears our own
+    // script-level bookkeeping; it does NOT cancel any order/bracket already placed on a prior
+    // entry for that FVG (that keeps running to its own stop/TP independently).
+    if fvgFound and not fvgIsBull
         fvgFound := false
         fvgIsBull := false
+        immediateEntryTaken := false
+        mitigationDone := false
         fvgTop := na
         fvgBottom := na
         fvgStopLevel := na
@@ -187,10 +197,12 @@ if bullishBreakout
 if bearishBreakout
     breakoutBear := true
     breakoutBull := false
-    // Symmetric cleanup for a stale, not-yet-mitigated bullish FVG when the bias flips bearish.
-    if fvgFound and fvgIsBull and not mitigationDone
+    // Symmetric cleanup for a stale bullish FVG when the bias flips bearish.
+    if fvgFound and fvgIsBull
         fvgFound := false
         fvgIsBull := false
+        immediateEntryTaken := false
+        mitigationDone := false
         fvgTop := na
         fvgBottom := na
         fvgStopLevel := na
@@ -216,6 +228,12 @@ bearFvgSize = bar_index >= 2 ? low[2] - high : na
 bullFvgValid = breakoutBull and bullFvg and bullFvgSize >= minFvgSize and low > rangeHigh
 bearFvgValid = breakoutBear and bearFvg and bearFvgSize >= minFvgSize and low[2] < rangeLow
 
+// canTradeNewSignal gates the FIRST (immediate) entry of a brand-new FVG signal against the
+// daily trade-limit setting and session windows. It intentionally does NOT check
+// strategy.position_size, since pyramiding=2 lets the immediate + retest entries of the SAME
+// FVG stack on top of each other.
+canTradeNewSignal = (not maxOneTradePerDay or not tradedToday) and not inRange and inTradeSession
+
 if bullFvgValid and not fvgFound
     fvgFound := true
     fvgIsBull := true
@@ -223,11 +241,28 @@ if bullFvgValid and not fvgFound
     fvgBottom := high[2]
     fvgStopLevel := low[2]  // low of the 1st of the 3 FVG candles -> SL goes below this
     fvgFirstCandleRange := high[2] - low[2]
+    immediateEntryTaken := false
     mitigationDone := false
     if showFvg
         if not na(fvgBox)
             box.delete(fvgBox)
         fvgBox := box.new(bar_index - 2, fvgTop, bar_index, fvgBottom, xloc=xloc.bar_index, border_color=color.lime, bgcolor=color.new(color.lime, 85))
+    // 1st entry: fire immediately on the FVG's own completion candle, without waiting for a
+    // retest of the gap. A 2nd, independent entry can still happen later if price comes back
+    // and mitigates the gap (see the "Entry and exits" region below).
+    if canTradeNewSignal
+        candidateEntry = close
+        riskBasis = candidateEntry - fvgStopLevel
+        if riskBasis > 0
+            immediateEntryTaken := true
+            entryPrice := candidateEntry
+            slBuffer = fvgFirstCandleRange * (slBufferPercent / 100)
+            stopPrice := fvgStopLevel - slBuffer - syminfo.mintick
+            takeProfitPrice := entryPrice + tpMultiplier * riskBasis
+            strategy.entry("Long Immediate", strategy.long)
+            strategy.exit("Long Immediate Exit", "Long Immediate", stop=stopPrice, limit=takeProfitPrice)
+            tradedToday := true
+            label.new(bar_index, low, "Long (Immediate)", style=label.style_label_up, textcolor=color.white, color=color.green)
 
 if bearFvgValid and not fvgFound
     fvgFound := true
@@ -236,22 +271,40 @@ if bearFvgValid and not fvgFound
     fvgBottom := low[2]
     fvgStopLevel := high[2]  // high of the 1st of the 3 FVG candles -> SL goes above this
     fvgFirstCandleRange := high[2] - low[2]
+    immediateEntryTaken := false
     mitigationDone := false
     if showFvg
         if not na(fvgBox)
             box.delete(fvgBox)
         fvgBox := box.new(bar_index - 2, fvgBottom, bar_index, fvgTop, xloc=xloc.bar_index, border_color=color.red, bgcolor=color.new(color.red, 85))
+    if canTradeNewSignal
+        candidateEntry = close
+        riskBasis = fvgStopLevel - candidateEntry
+        if riskBasis > 0
+            immediateEntryTaken := true
+            entryPrice := candidateEntry
+            slBuffer = fvgFirstCandleRange * (slBufferPercent / 100)
+            stopPrice := fvgStopLevel + slBuffer + syminfo.mintick
+            takeProfitPrice := entryPrice - tpMultiplier * riskBasis
+            strategy.entry("Short Immediate", strategy.short)
+            strategy.exit("Short Immediate Exit", "Short Immediate", stop=stopPrice, limit=takeProfitPrice)
+            tradedToday := true
+            label.new(bar_index, high, "Short (Immediate)", style=label.style_label_down, textcolor=color.white, color=color.red)
 
 if not na(fvgBox)
     box.set_right(fvgBox, bar_index)
 //#endregion
 
-//#region Entry and exits
+//#region Entry and exits (retest / mitigation - the 2nd possible entry per FVG)
+// This fires independently of whether the immediate entry above happened, and independently of
+// maxOneTradePerDay/tradedToday - it belongs to the SAME signal, not a new one, so the daily
+// trade-limit setting only gates whether a brand-new FVG can start a new signal, not whether an
+// already-tracked FVG can take its 2nd entry.
 longMitigation = fvgFound and fvgIsBull and not mitigationDone and low < fvgTop and low[1] >= fvgTop
 shortMitigation = fvgFound and not fvgIsBull and not mitigationDone and high > fvgBottom and high[1] <= fvgBottom
-canTrade = (not maxOneTradePerDay or not tradedToday) and strategy.position_size == 0 and not inRange and inTradeSession
+canTradeRetest = not inRange and inTradeSession
 
-if longMitigation and canTrade
+if longMitigation and canTradeRetest
     candidateEntry = close
     // Risk used to size TP is the tight/technical distance (entry -> raw FVG-candle low),
     // deliberately NOT inflated by the SL safety buffer, so TP stays a sane multiple of the
@@ -263,12 +316,12 @@ if longMitigation and canTrade
         slBuffer = fvgFirstCandleRange * (slBufferPercent / 100)
         stopPrice := fvgStopLevel - slBuffer - syminfo.mintick
         takeProfitPrice := entryPrice + tpMultiplier * riskBasis
-        strategy.entry("Long", strategy.long)
-        strategy.exit("Long Exit", "Long", stop=stopPrice, limit=takeProfitPrice)
+        strategy.entry("Long Retest", strategy.long)
+        strategy.exit("Long Retest Exit", "Long Retest", stop=stopPrice, limit=takeProfitPrice)
         tradedToday := true
-        label.new(bar_index, low, "Long Entry", style=label.style_label_up, textcolor=color.white, color=color.green)
+        label.new(bar_index, low, "Long (Retest)", style=label.style_label_up, textcolor=color.white, color=color.green)
 
-if shortMitigation and canTrade
+if shortMitigation and canTradeRetest
     candidateEntry = close
     riskBasis = fvgStopLevel - candidateEntry
     if riskBasis > 0
@@ -277,10 +330,10 @@ if shortMitigation and canTrade
         slBuffer = fvgFirstCandleRange * (slBufferPercent / 100)
         stopPrice := fvgStopLevel + slBuffer + syminfo.mintick
         takeProfitPrice := entryPrice - tpMultiplier * riskBasis
-        strategy.entry("Short", strategy.short)
-        strategy.exit("Short Exit", "Short", stop=stopPrice, limit=takeProfitPrice)
+        strategy.entry("Short Retest", strategy.short)
+        strategy.exit("Short Retest Exit", "Short Retest", stop=stopPrice, limit=takeProfitPrice)
         tradedToday := true
-        label.new(bar_index, high, "Short Entry", style=label.style_label_down, textcolor=color.white, color=color.red)
+        label.new(bar_index, high, "Short (Retest)", style=label.style_label_down, textcolor=color.white, color=color.red)
 
 if tradeEndReached and strategy.position_size != 0
     strategy.close_all(comment="NY 16:00 Exit")
@@ -306,10 +359,11 @@ plot(showDebugInfo ? (fvgFound ? (fvgIsBull ? 1 : 0) : na) : na, "Debug: FVG Is 
 plot(showDebugInfo ? fvgTop : na, "Debug: FVG Top", display=display.data_window)
 plot(showDebugInfo ? fvgBottom : na, "Debug: FVG Bottom", display=display.data_window)
 plot(showDebugInfo ? fvgStopLevel : na, "Debug: FVG Stop Level (1st candle low/high)", display=display.data_window)
-plot(showDebugInfo ? (mitigationDone ? 1 : 0) : na, "Debug: Mitigation Done", display=display.data_window)
-plot(showDebugInfo ? (longMitigation ? 1 : 0) : na, "Debug: Long Mitigation Triggered", display=display.data_window)
-plot(showDebugInfo ? (shortMitigation ? 1 : 0) : na, "Debug: Short Mitigation Triggered", display=display.data_window)
-plot(showDebugInfo ? (canTrade ? 1 : 0) : na, "Debug: Can Trade Now", display=display.data_window)
+plot(showDebugInfo ? (immediateEntryTaken ? 1 : 0) : na, "Debug: Immediate Entry Taken", display=display.data_window)
+plot(showDebugInfo ? (mitigationDone ? 1 : 0) : na, "Debug: Retest Entry Taken (mitigationDone)", display=display.data_window)
+plot(showDebugInfo ? (longMitigation ? 1 : 0) : na, "Debug: Long Retest Triggered", display=display.data_window)
+plot(showDebugInfo ? (shortMitigation ? 1 : 0) : na, "Debug: Short Retest Triggered", display=display.data_window)
+plot(showDebugInfo ? (canTradeNewSignal ? 1 : 0) : na, "Debug: Can Trade New Signal", display=display.data_window)
 plot(showDebugInfo ? (tradedToday ? 1 : 0) : na, "Debug: Traded Today", display=display.data_window)
 plot(showDebugInfo ? (inTradeSession ? 1 : 0) : na, "Debug: In Trade Session", display=display.data_window)
 //#endregion

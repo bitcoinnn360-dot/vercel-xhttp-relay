@@ -220,13 +220,12 @@ if array.size(ob_array) > max_ob_count
 // ==========================================
 // لیکوییدیتی: بای‌ساید/سل‌ساید سوئینگ + ایکوال های/لو (EQH/EQL)
 // ==========================================
-// یک سقف/کف سوئینگِ تنها (هنوز هم‌ترازی برایش پیدا نشده) با یک خطِ نقطه‌چین + لیبل BSL/SSL نشان
-// داده می‌شود. به‌محض اینکه یک سقف/کفِ دیگر در فاصله‌ی eq_tolerance_ticks از آن پیدا شود، خط و لیبل
-// حذف می‌شوند و به‌جایش یک محدوده (باکس) کم‌رنگ و بدون لیبل، به پهنای eq_zone_multiplier برابر
+// هیچ لیبلی روی چارت گذاشته نمی‌شود. یک سقف/کف سوئینگِ تنها (هنوز هم‌ترازی برایش پیدا نشده) فقط با
+// یک خطِ نقطه‌چین نشان داده می‌شود. به‌محض اینکه یک سقف/کفِ دیگر در فاصله‌ی eq_tolerance_ticks از آن
+// پیدا شود، آن خط حذف می‌شود و به‌جایش یک محدوده (باکس) کم‌رنگ، به پهنای eq_zone_multiplier برابر
 // tolerance، کشیده می‌شود - این محدوده با هر ایکوالِ جدید در همان ناحیه، عریض‌تر می‌شود.
 type LiquidityLevel
     line lvl_line
-    label lvl_label
     box zone_box
     int start_idx
     float price       // قیمت سوئینگ اصلی - برای تطبیق/لیکویید شدنِ سطوحِ تک (غیر ایکوال) استفاده می‌شود
@@ -239,8 +238,8 @@ type LiquidityLevel
 var LiquidityLevel[] liq_array = array.new<LiquidityLevel>()
 
 //@function برای یک سقف/کف سوئینگ تازه تشکیل‌شده، یا آن را با یک سطحِ هم‌جهت و هنوز لمس‌نشده در
-//فاصله‌ی eq_tolerance_ticks ادغام می‌کند (و محدوده‌ی EQH/EQL آن را کم‌رنگ و بدون لیبل رسم/گسترش
-//می‌دهد)، یا اگر هم‌ترازی پیدا نشد، یک خط+لیبل BSL/SSL تازه می‌سازد.
+//فاصله‌ی eq_tolerance_ticks ادغام می‌کند (و محدوده‌ی EQH/EQL آن را کم‌رنگ رسم/گسترش می‌دهد)، یا اگر
+//هم‌ترازی پیدا نشد، یک خطِ BSL/SSL تازه (بدون لیبل) می‌سازد.
 register_liquidity(int pivot_idx, float pivot_price, bool is_high) =>
     float tolerance = eq_tolerance_ticks * syminfo.mintick
     float zone_pad = tolerance * eq_zone_multiplier
@@ -257,14 +256,11 @@ register_liquidity(int pivot_idx, float pivot_price, bool is_high) =>
                 existing.zone_bottom := math.min(cur_bottom, pivot_price) - zone_pad
                 color zone_col = is_high ? eqh_color : eql_color
                 if na(existing.zone_box)
-                    // اولین باری که این سطح به یک گروهِ ایکوال ملحق می‌شود: خط/لیبل قبلی‌اش حذف و
-                    // به‌جایش یک محدوده‌ی کم‌رنگ و بدون لیبل ساخته می‌شود.
+                    // اولین باری که این سطح به یک گروهِ ایکوال ملحق می‌شود: خط قبلی‌اش حذف و
+                    // به‌جایش یک محدوده‌ی کم‌رنگ (بدون لیبل) ساخته می‌شود.
                     if not na(existing.lvl_line)
                         line.delete(existing.lvl_line)
                         existing.lvl_line := na
-                    if not na(existing.lvl_label)
-                        label.delete(existing.lvl_label)
-                        existing.lvl_label := na
                     existing.zone_box := box.new(existing.start_idx, existing.zone_top, bar_index, existing.zone_bottom, bgcolor=color.new(zone_col, 85), border_color=color.new(zone_col, 70), border_style=line.style_dotted)
                 else
                     box.set_top(existing.zone_box, existing.zone_top)
@@ -273,10 +269,8 @@ register_liquidity(int pivot_idx, float pivot_price, bool is_high) =>
 
     if not matched
         color lvl_color = is_high ? bsl_color : ssl_color
-        string lvl_text = is_high ? "BSL" : "SSL"
         line new_line = line.new(pivot_idx, pivot_price, bar_index, pivot_price, extend=extend.right, color=lvl_color, style=line.style_dotted)
-        label new_label = label.new(bar_index, pivot_price, lvl_text, xloc=xloc.bar_index, style=is_high ? label.style_label_down : label.style_label_up, textcolor=lvl_color, color=color.new(color.black, 100), size=size.small)
-        array.push(liq_array, LiquidityLevel.new(new_line, new_label, na, pivot_idx, pivot_price, na, na, is_high, false, false))
+        array.push(liq_array, LiquidityLevel.new(new_line, na, pivot_idx, pivot_price, na, na, is_high, false, false))
 
 if show_liquidity and not na(ph)
     register_liquidity(bar_index - pivot_len, ph, true)
@@ -304,13 +298,10 @@ if show_liquidity and array.size(liq_array) > 0
                     line.set_extend(lvl.lvl_line, extend.none)
                     line.set_x2(lvl.lvl_line, bar_index)
                     line.set_color(lvl.lvl_line, swept_color)
-                    label.set_color(lvl.lvl_label, swept_color)
 
 if array.size(liq_array) > max_liq_count
     LiquidityLevel old_lvl = array.shift(liq_array)
     if not na(old_lvl.lvl_line)
         line.delete(old_lvl.lvl_line)
-    if not na(old_lvl.lvl_label)
-        label.delete(old_lvl.lvl_label)
     if not na(old_lvl.zone_box)
         box.delete(old_lvl.zone_box)

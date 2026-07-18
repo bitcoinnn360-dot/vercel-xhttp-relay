@@ -1,0 +1,278 @@
+//@version=5
+indicator("ICT Order Blocks, Breakers & Liquidity", overlay=true, max_boxes_count=500, max_lines_count=500, max_labels_count=500)
+
+// ==========================================
+// تنظیمات ورودی (Inputs)
+// ==========================================
+int pivot_len       = input.int(5, "Structure Period (Pivot Length)", minval=2, tooltip="تعداد کندل‌ها برای تشخیص سقف و کف‌های سوئینگ", group="Structure")
+bool show_breakers   = input.bool(true, "Show Breaker Blocks", tooltip="فعال‌سازی تبدیل اوردر بلاک‌های شکسته‌شده به بریکر بلاک", group="Order Blocks")
+int max_ob_count     = input.int(60, "Max Order Blocks Tracked", minval=5, group="Order Blocks")
+
+bool show_liquidity      = input.bool(true, "Show Buy-Side / Sell-Side Liquidity (Swing)", group="Liquidity")
+bool show_equal_hl       = input.bool(true, "Show Equal Highs / Equal Lows (EQH/EQL)", group="Liquidity")
+float eq_tolerance_ticks = input.float(10, "Equal High/Low Tolerance (ticks)", minval=0, tooltip="دو سقف/کف تا این فاصله (بر حسب تیک) از هم، «مساوی» در نظر گرفته می‌شن", group="Liquidity")
+int max_liq_count        = input.int(60, "Max Liquidity Levels Tracked", minval=5, group="Liquidity")
+
+// رنگ‌بندی نواحی
+color bull_ob_col    = input.color(color.new(color.green, 88), "Bullish OB Fill", group="Order Blocks")
+color bull_ob_border = input.color(color.new(color.green, 50), "Bullish OB Border", group="Order Blocks")
+color bear_ob_col    = input.color(color.new(color.red, 88), "Bearish OB Fill", group="Order Blocks")
+color bear_ob_border = input.color(color.new(color.red, 50), "Bearish OB Border", group="Order Blocks")
+
+color bull_bb_col    = input.color(color.new(color.teal, 88), "Bullish Breaker Fill", group="Order Blocks")
+color bull_bb_border = input.color(color.new(color.teal, 50), "Bullish Breaker Border", group="Order Blocks")
+color bear_bb_col    = input.color(color.new(color.maroon, 88), "Bearish Breaker Fill", group="Order Blocks")
+color bear_bb_border = input.color(color.new(color.maroon, 50), "Bearish Breaker Border", group="Order Blocks")
+
+color bsl_color      = input.color(color.new(color.orange, 30), "Buy-Side Liquidity (BSL) Color", group="Liquidity")
+color ssl_color      = input.color(color.new(color.blue, 30), "Sell-Side Liquidity (SSL) Color", group="Liquidity")
+color eqh_color      = input.color(color.new(color.orange, 0), "Equal Highs (EQH) Color", group="Liquidity")
+color eql_color      = input.color(color.new(color.blue, 0), "Equal Lows (EQL) Color", group="Liquidity")
+color swept_color    = input.color(color.new(color.gray, 60), "Swept Liquidity Color", group="Liquidity")
+
+// ==========================================
+// تشخیص ساختار بازار (Pivots & BOS)
+// ==========================================
+float ph = ta.pivothigh(high, pivot_len, pivot_len)
+float pl = ta.pivotlow(low, pivot_len, pivot_len)
+
+var float last_ph = na
+var float last_pl = na
+var int last_ph_idx = na
+var int last_pl_idx = na
+
+if not na(ph)
+    last_ph := ph
+    last_ph_idx := bar_index - pivot_len
+
+if not na(pl)
+    last_pl := pl
+    last_pl_idx := bar_index - pivot_len
+
+// بررسی رخ دادن شکست ساختار (BOS)
+bool bullish_bos = false
+bool bearish_bos = false
+
+if not na(last_ph) and ta.crossover(close, last_ph)
+    bullish_bos := true
+    last_ph := na // ریست کردن برای جلوگیری از تکرار روی یک سطح
+
+if not na(last_pl) and ta.crossunder(close, last_pl)
+    bearish_bos := true
+    last_pl := na
+
+// ==========================================
+// تعریف ساختار داده (User Defined Type) برای اوردر بلاک‌ها
+// ==========================================
+type OrderBlock
+    box zone_box
+    line mid_line
+    float top
+    float bottom
+    float mid
+    bool is_bullish
+    bool active
+    bool is_breaker
+
+var OrderBlock[] ob_array = array.new<OrderBlock>()
+
+// تابع کمکی برای ایجاد اوردر بلاک جدید بر روی نمودار
+create_ob(int start_idx, float top_val, float bot_val, bool is_bull) =>
+    float mid_val = (top_val + bot_val) / 2
+    color fill_col = is_bull ? bull_ob_col : bear_ob_col
+    color border_col = is_bull ? bull_ob_border : bear_ob_border
+    color line_col = is_bull ? color.green : color.red
+
+    box b = box.new(left=start_idx, top=top_val, right=bar_index, bottom=bot_val, bgcolor=fill_col, border_color=border_col, border_style=line.style_solid)
+    // ترسیم خط ۵۰ درصد (Mean Threshold) به صورت خط‌چین
+    line l = line.new(x1=start_idx, y1=mid_val, x2=bar_index, y2=mid_val,
+                      color=line_col, style=line.style_dashed)
+
+    OrderBlock.new(b, l, top_val, bot_val, mid_val, is_bull, true, false)
+
+// ==========================================
+// منطق شناسایی کندل اوردر بلاک
+// ==========================================
+if bullish_bos
+    // اوردر بلاک صعودی: آخرین کندل نزولی (Close < Open) قبل از شروع حرکت صعودی منجر به شکست
+    int ob_idx = na
+    float ob_high = na
+    float ob_low = na
+
+    // جستجو به عقب در گام حرکتی (محدود به کف ساختار قبلی)
+    int search_depth = math.min(100, bar_index - (na(last_pl_idx) ? 0 : last_pl_idx))
+    for i = 1 to search_depth
+        if close[i] < open[i]
+            ob_idx  := bar_index - i
+            ob_high := high[i]
+            ob_low  := low[i]
+            break
+
+    // نکته‌ی مهم: کندلِ نزدیک‌ترین که بالا پیدا شد، خیلی وقت‌ها فقط یه پول‌بکِ کوچیک داخل یه کندل
+    // نزولیِ بزرگ‌تر و قبلی‌تره (و معمولاً زیر ۵۰٪ همون کندل بزرگ‌تر بسته می‌شه) - نه یه اوردر بلاکِ
+    // مستقل. اینجا به عقب‌تر ادامه می‌دیم و هر کندل نزولیِ متوالی که کندلِ فعلی رو کاملاً پوشش بده
+    // (high بیشتر و low کمتر) رو به‌عنوان اوردر بلاکِ اصلی (بیرونی‌تر) در نظر می‌گیریم.
+    if not na(ob_idx)
+        int inner_i = bar_index - ob_idx
+        int search_start = inner_i + 1
+        if search_start <= search_depth
+            for j = search_start to search_depth
+                if close[j] < open[j] and high[j] >= ob_high and low[j] <= ob_low
+                    ob_idx  := bar_index - j
+                    ob_high := high[j]
+                    ob_low  := low[j]
+                else
+                    break
+
+    if not na(ob_idx)
+        array.push(ob_array, create_ob(ob_idx, ob_high, ob_low, true))
+
+if bearish_bos
+    // اوردر بلاک نزولی: آخرین کندل صعودی (Close > Open) قبل از شروع حرکت نزولی منجر به شکست
+    int ob_idx = na
+    float ob_high = na
+    float ob_low = na
+
+    int search_depth = math.min(100, bar_index - (na(last_ph_idx) ? 0 : last_ph_idx))
+    for i = 1 to search_depth
+        if close[i] > open[i]
+            ob_idx  := bar_index - i
+            ob_high := high[i]
+            ob_low  := low[i]
+            break
+
+    // همان منطقِ پیدا کردن کندلِ اصلی/پوشش‌دهنده، به‌صورت قرینه برای سمتِ نزولی.
+    if not na(ob_idx)
+        int inner_i = bar_index - ob_idx
+        int search_start = inner_i + 1
+        if search_start <= search_depth
+            for j = search_start to search_depth
+                if close[j] > open[j] and high[j] >= ob_high and low[j] <= ob_low
+                    ob_idx  := bar_index - j
+                    ob_high := high[j]
+                    ob_low  := low[j]
+                else
+                    break
+
+    if not na(ob_idx)
+        array.push(ob_array, create_ob(ob_idx, ob_high, ob_low, false))
+
+// ==========================================
+// به‌روزرسانی و مدیریت برخورد قیمت با نواحی (Mitigation & Breakers)
+// ==========================================
+if array.size(ob_array) > 0
+    for i = array.size(ob_array) - 1 to 0
+        OrderBlock ob = array.get(ob_array, i)
+
+        if ob.active
+            // امتداد دادن باکس و خط ۵۰ درصد به کندل جاری
+            box.set_right(ob.zone_box, bar_index)
+            line.set_x2(ob.mid_line, bar_index)
+
+            // بررسی تعامل قیمت با نواحی
+            if ob.is_bullish
+                if not ob.is_breaker
+                    // اگر قیمت زیر کف اوردر بلاک صعودی بسته شود -> به بریکر بلاک نزولی تبدیل می‌شود
+                    if close < ob.bottom
+                        if show_breakers
+                            ob.is_breaker := true
+                            box.set_bgcolor(ob.zone_box, bear_bb_col)
+                            box.set_border_color(ob.zone_box, bear_bb_border)
+                            line.set_color(ob.mid_line, bear_bb_border)
+                        else
+                            ob.active := false
+                            box.delete(ob.zone_box)
+                            line.delete(ob.mid_line)
+                else
+                    // اگر بریکر بلاک با بسته شدن قیمت بالای سقف آن بی‌اعتبار شود، آپدیت آن متوقف می‌شود
+                    if close > ob.top
+                        ob.active := false
+            else // اوردر بلاک نزولی
+                if not ob.is_breaker
+                    // اگر قیمت بالای سقف اوردر بلاک نزولی بسته شود -> به بریکر بلاک صعودی تبدیل می‌شود
+                    if close > ob.top
+                        if show_breakers
+                            ob.is_breaker := true
+                            box.set_bgcolor(ob.zone_box, bull_bb_col)
+                            box.set_border_color(ob.zone_box, bull_bb_border)
+                            line.set_color(ob.mid_line, bull_bb_border)
+                        else
+                            ob.active := false
+                            box.delete(ob.zone_box)
+                            line.delete(ob.mid_line)
+                else
+                    // اگر بریکر بلاک صعودی با بسته شدن قیمت زیر کف آن بی‌اعتبار شود، آپدیت آن متوقف می‌شود
+                    if close < ob.bottom
+                        ob.active := false
+
+// برای جلوگیری از سنگین شدن چارت، آرایه را محدود نگه می‌داریم
+if array.size(ob_array) > max_ob_count
+    OrderBlock old_ob = array.shift(ob_array)
+    // نکته: قبلاً باکس/خطِ اوردر بلاکِ حذف‌شده از آرایه هیچ‌وقت delete نمی‌شد و برای همیشه روی چارت
+    // باقی می‌ماند (فقط سقفِ کلیِ max_boxes_count/max_lines_count خودِ پاین، که به کل ایندیکیتور
+    // مربوط می‌شه نه به همین آرایه، در نهایت قدیمی‌ترین آبجکت‌های کل چارت رو حذف می‌کرد). این نشتی
+    // حافظه/گرافیک رو اینجا با delete صریح برطرف کردیم.
+    box.delete(old_ob.zone_box)
+    line.delete(old_ob.mid_line)
+
+// ==========================================
+// لیکوییدیتی: بای‌ساید/سل‌ساید سوئینگ + ایکوال های/لو (EQH/EQL)
+// ==========================================
+type LiquidityLevel
+    line lvl_line
+    label lvl_label
+    float price
+    bool is_high   // true = بای‌ساید (از سقف سوئینگ) / false = سل‌ساید (از کف سوئینگ)
+    bool swept
+    bool is_equal
+
+var LiquidityLevel[] liq_array = array.new<LiquidityLevel>()
+
+//@function برای یک سقف/کف سوئینگ تازه تشکیل‌شده، یک خط+لیبل لیکوییدیتی می‌سازد. اگر یک سطحِ
+//هم‌جهت و هنوز لمس‌نشده در فاصله‌ی eq_tolerance_ticks از این سطح وجود داشته باشد، هر دو را به‌عنوان
+//Equal High/Low (EQH/EQL) علامت‌گذاری می‌کند.
+register_liquidity(int pivot_idx, float pivot_price, bool is_high) =>
+    float tolerance = eq_tolerance_ticks * syminfo.mintick
+    bool matched = false
+    if show_equal_hl and array.size(liq_array) > 0
+        for i = 0 to array.size(liq_array) - 1
+            LiquidityLevel existing = array.get(liq_array, i)
+            if not matched and existing.is_high == is_high and not existing.swept and math.abs(existing.price - pivot_price) <= tolerance
+                matched := true
+                existing.is_equal := true
+                label.set_text(existing.lvl_label, is_high ? "EQH" : "EQL")
+                label.set_color(existing.lvl_label, is_high ? eqh_color : eql_color)
+                line.set_color(existing.lvl_line, is_high ? eqh_color : eql_color)
+
+    color lvl_color = matched ? (is_high ? eqh_color : eql_color) : (is_high ? bsl_color : ssl_color)
+    string lvl_text = matched ? (is_high ? "EQH" : "EQL") : (is_high ? "BSL" : "SSL")
+
+    line new_line = line.new(pivot_idx, pivot_price, bar_index, pivot_price, extend=extend.right, color=lvl_color, style=line.style_dotted)
+    label new_label = label.new(bar_index, pivot_price, lvl_text, xloc=xloc.bar_index, style=is_high ? label.style_label_down : label.style_label_up, textcolor=lvl_color, color=color.new(color.black, 100), size=size.small)
+
+    array.push(liq_array, LiquidityLevel.new(new_line, new_label, pivot_price, is_high, false, matched))
+
+if show_liquidity and not na(ph)
+    register_liquidity(bar_index - pivot_len, ph, true)
+
+if show_liquidity and not na(pl)
+    register_liquidity(bar_index - pivot_len, pl, false)
+
+// شناسایی لیکویید شدن سطح: به‌محض اینکه قیمت با کلوز از یک سطح لیکوییدیتیِ در انتظار رد شد، خط آن
+// را در همان کندل منجمد می‌کنیم (به‌جای امتداد بی‌پایان) و رنگش را خاکستری می‌کنیم.
+if show_liquidity and array.size(liq_array) > 0
+    for i = array.size(liq_array) - 1 to 0
+        LiquidityLevel lvl = array.get(liq_array, i)
+        if not lvl.swept
+            bool swept_now = lvl.is_high ? close > lvl.price : close < lvl.price
+            if swept_now
+                lvl.swept := true
+                line.set_extend(lvl.lvl_line, extend.none)
+                line.set_x2(lvl.lvl_line, bar_index)
+                line.set_color(lvl.lvl_line, swept_color)
+                label.set_color(lvl.lvl_label, swept_color)
+
+if array.size(liq_array) > max_liq_count
+    LiquidityLevel old_lvl = array.shift(liq_array)
+    line.delete(old_lvl.lvl_line)
+    label.delete(old_lvl.lvl_label)

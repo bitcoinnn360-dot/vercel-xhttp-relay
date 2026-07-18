@@ -206,8 +206,14 @@ minFvgSize = minFvgSizeTicks * syminfo.mintick
 bullFvgSize = bar_index >= 2 ? low - high[2] : na
 bearFvgSize = bar_index >= 2 ? low[2] - high : na
 
+// A gap qualifies as long as AT LEAST PART of it (or all of it) falls outside the opening range -
+// it does NOT need to be fully clear of the range on both edges. For a bull gap (above the range
+// after an up-breakout) that means its top edge (fvgTop = low) must clear rangeHigh - the bottom
+// edge (fvgBottom = high[2]) is allowed to still be inside the range. Symmetrically, for a bear
+// gap (below the range after a down-breakout) it's the bottom edge (fvgBottom = low[2]) that must
+// clear rangeLow - the top edge (fvgTop = high) is allowed to still be inside the range.
 bullFvgValid = breakoutBull and bullFvg and bullFvgSize >= minFvgSize and low > rangeHigh
-bearFvgValid = breakoutBear and bearFvg and bearFvgSize >= minFvgSize and high < rangeLow
+bearFvgValid = breakoutBear and bearFvg and bearFvgSize >= minFvgSize and low[2] < rangeLow
 
 if bullFvgValid and not fvgFound
     fvgFound := true

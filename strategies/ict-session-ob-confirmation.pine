@@ -1585,7 +1585,7 @@ sync_h1_obs(box[] boxes, int[] times, float[] newTops, float[] newBottoms, int[]
             if not matched
                 for s = 0 to slotCount - 1
                     if na(array.get(times, s))
-                        box newBox = box.new(t, array.get(newTops, k), time, array.get(newBottoms, k), xloc=xloc.bar_time, bgcolor=fillCol, border_color=borderCol, border_style=line.style_dashed, text="H1", text_color=borderCol, text_size=size.tiny, text_valign=text.align_top, text_halign=text.align_left)
+                        box newBox = box.new(t, array.get(newTops, k), time, array.get(newBottoms, k), xloc=xloc.bar_time, bgcolor=fillCol, border_color=borderCol, border_style=line.style_dashed, text="H1 OB", text_color=borderCol, text_size=size.small, text_valign=text.align_top, text_halign=text.align_left)
                         array.set(boxes, s, newBox)
                         array.set(times, s, t)
                         break

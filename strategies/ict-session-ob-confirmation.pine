@@ -1,10 +1,12 @@
 //@version=5
-// این اسکریپت ترکیبی از دو ایندیکاتور جداست:
+// این اسکریپت ترکیبی از چند بخش است:
 //   ۱) سیستم معاملاتی بر اساس سشن‌های نیویورک (PDH/PDL sweep، LQR، BSG breakout) - عیناً و بدون
 //      هیچ تغییری در منطق خودش (طبق درخواست: «کاری به سیستم معاملات بر اساس سشن نداشته باشه»).
 //   ۲) اردربلاک‌ها/بریکرها + لیکوییدیتی (BSL/SSL/EQH/EQL) - که اینجا صرفاً در حد یک لایه‌ی
 //      هشدار/تایید عمل می‌کند، نه یک سیستم معاملاتی مستقل.
-// علاوه بر این دو، یک «موتور تایید/رد» جدید اضافه شده که سیگنال‌های خرید/فروش سیستم سشن را،
+//   ۲ب) اردربلاک‌های تایم‌فریمِ بالاتر (پیش‌فرض H1) - با request.security روی دیتای H1 محاسبه و با
+//      مبنای زمانی روی همین چارت (مثلاً ۵ دقیقه) رسم می‌شوند؛ بدون بریکر، فقط با برچسبِ "H1".
+// علاوه بر این‌ها، یک «موتور تایید/رد» جدید اضافه شده که سیگنال‌های خرید/فروش سیستم سشن را،
 // بر اساس تعامل بعدیِ قیمت با اردربلاک‌ها/BSL/SSL/EQH/EQL، تایید یا رد می‌کند:
 //   - شکست (Breakthrough): وقتی کلوز بیش از X درصد (پیش‌فرض ۶۰٪) از ارتفاع ناحیه را رد کرده و
 //     پایین‌تر/بالاتر از آن بسته شده باشد.
@@ -1394,6 +1396,203 @@ if array.size(obl_liq_array) > obl_max_liq_count
         line.delete(obl_old_lvl.lvl_line)
     if not na(obl_old_lvl.zone_box)
         box.delete(obl_old_lvl.zone_box)
+
+//#############################################################################
+// بخش ۲ب: اردربلاک‌های تایم‌فریمِ بالاتر (پیش‌فرض H1) روی تایم‌فریم فعلی - بدون بریکر، فقط باکس با
+// برچسبِ "H1" روی خودش. با request.security دقیقاً همان الگوریتم تشخیص اردربلاکِ بخش ۲ (پیدا کردن
+// نزدیک‌ترین کندلِ مخالف + جستجوی کندلِ اصلی/پوشش‌دهنده) را روی دیتای H1 اجرا می‌کنیم و ۳ اردربلاکِ
+// فعال/لمس‌نشده‌ی آخر هر جهت را با مبنای زمانی (xloc.bar_time) روی همین چارت (۵ دقیقه یا هر تایم‌فریمِ
+// پایین‌تر از H1) رسم می‌کنیم.
+//#############################################################################
+show_h1_ob         = input.bool(true, "Show Higher-Timeframe Order Blocks", group="اردربلاک تایم‌فریم بالاتر")
+h1_ob_timeframe    = input.timeframe("60", "Higher Timeframe (پیش‌فرض H1)", group="اردربلاک تایم‌فریم بالاتر")
+h1_ob_pivot_len    = input.int(5, "H1 Pivot Length", minval=2, group="اردربلاک تایم‌فریم بالاتر")
+h1_ob_engulf_lookback = input.int(20, "H1 OB Engulf Search Depth (H1 bars)", minval=1, group="اردربلاک تایم‌فریم بالاتر")
+h1_bull_ob_col     = input.color(color.new(color.aqua, 82), "H1 Bullish OB Fill", group="اردربلاک تایم‌فریم بالاتر")
+h1_bull_ob_border  = input.color(color.new(color.aqua, 20), "H1 Bullish OB Border", group="اردربلاک تایم‌فریم بالاتر")
+h1_bear_ob_col     = input.color(color.new(color.fuchsia, 82), "H1 Bearish OB Fill", group="اردربلاک تایم‌فریم بالاتر")
+h1_bear_ob_border  = input.color(color.new(color.fuchsia, 20), "H1 Bearish OB Border", group="اردربلاک تایم‌فریم بالاتر")
+
+//@function این تابع، از طریق request.security، روی دیتای تایم‌فریمِ بالاتر اجرا می‌شود: همان منطقِ
+//تشخیصِ اردربلاکِ بخش ۲ (بدون بریکر/بدون لیکوییدیتی) را پیاده می‌کند و بالاترین ۳ اردربلاکِ صعودی و
+//۳ اردربلاکِ نزولیِ فعال/لمس‌نشده را به‌صورت (top, bottom, زمانِ شروعِ کندلِ اول) برمی‌گرداند.
+h1_ob_calc() =>
+    var float[] h1b_tops = array.new_float()
+    var float[] h1b_bots = array.new_float()
+    var int[] h1b_times = array.new_int()
+    var float[] h1r_tops = array.new_float()
+    var float[] h1r_bots = array.new_float()
+    var int[] h1r_times = array.new_int()
+
+    float h1_ph = ta.pivothigh(high, h1_ob_pivot_len, h1_ob_pivot_len)
+    float h1_pl = ta.pivotlow(low, h1_ob_pivot_len, h1_ob_pivot_len)
+    var float h1_last_ph = na
+    var float h1_last_pl = na
+    var int h1_last_ph_idx = na
+    var int h1_last_pl_idx = na
+
+    if not na(h1_ph)
+        h1_last_ph := h1_ph
+        h1_last_ph_idx := bar_index - h1_ob_pivot_len
+    if not na(h1_pl)
+        h1_last_pl := h1_pl
+        h1_last_pl_idx := bar_index - h1_ob_pivot_len
+
+    bool h1_bull_bos = false
+    bool h1_bear_bos = false
+    if not na(h1_last_ph) and ta.crossover(close, h1_last_ph)
+        h1_bull_bos := true
+        h1_last_ph := na
+    if not na(h1_last_pl) and ta.crossunder(close, h1_last_pl)
+        h1_bear_bos := true
+        h1_last_pl := na
+
+    if h1_bull_bos
+        int ob_idx = na
+        float ob_high = na
+        float ob_low = na
+        int search_depth = math.min(100, bar_index - (na(h1_last_pl_idx) ? 0 : h1_last_pl_idx))
+        for i = 1 to search_depth
+            if close[i] < open[i]
+                ob_idx := bar_index - i
+                ob_high := high[i]
+                ob_low := low[i]
+                break
+        if not na(ob_idx)
+            int inner_i = bar_index - ob_idx
+            int search_start = inner_i + 1
+            int engulf_end = math.min(search_depth, inner_i + h1_ob_engulf_lookback)
+            if search_start <= engulf_end
+                for j = search_start to engulf_end
+                    if close[j] < open[j] and high[j] >= ob_high and low[j] <= ob_low
+                        ob_idx := bar_index - j
+                        ob_high := high[j]
+                        ob_low := low[j]
+        if not na(ob_idx)
+            int found_offset = bar_index - ob_idx
+            array.unshift(h1b_tops, ob_high)
+            array.unshift(h1b_bots, ob_low)
+            array.unshift(h1b_times, time[found_offset])
+            if array.size(h1b_tops) > 3
+                array.pop(h1b_tops)
+                array.pop(h1b_bots)
+                array.pop(h1b_times)
+
+    if h1_bear_bos
+        int ob_idx = na
+        float ob_high = na
+        float ob_low = na
+        int search_depth = math.min(100, bar_index - (na(h1_last_ph_idx) ? 0 : h1_last_ph_idx))
+        for i = 1 to search_depth
+            if close[i] > open[i]
+                ob_idx := bar_index - i
+                ob_high := high[i]
+                ob_low := low[i]
+                break
+        if not na(ob_idx)
+            int inner_i = bar_index - ob_idx
+            int search_start = inner_i + 1
+            int engulf_end = math.min(search_depth, inner_i + h1_ob_engulf_lookback)
+            if search_start <= engulf_end
+                for j = search_start to engulf_end
+                    if close[j] > open[j] and high[j] >= ob_high and low[j] <= ob_low
+                        ob_idx := bar_index - j
+                        ob_high := high[j]
+                        ob_low := low[j]
+        if not na(ob_idx)
+            int found_offset = bar_index - ob_idx
+            array.unshift(h1r_tops, ob_high)
+            array.unshift(h1r_bots, ob_low)
+            array.unshift(h1r_times, time[found_offset])
+            if array.size(h1r_tops) > 3
+                array.pop(h1r_tops)
+                array.pop(h1r_bots)
+                array.pop(h1r_times)
+
+    // حذف اردربلاک‌هایی که با کلوز رد شده‌اند (لمس/بی‌اعتبار شده) - بدون تبدیل به بریکر
+    if array.size(h1b_tops) > 0
+        for k = array.size(h1b_tops) - 1 to 0
+            if close < array.get(h1b_bots, k)
+                array.remove(h1b_tops, k)
+                array.remove(h1b_bots, k)
+                array.remove(h1b_times, k)
+    if array.size(h1r_tops) > 0
+        for k = array.size(h1r_tops) - 1 to 0
+            if close > array.get(h1r_tops, k)
+                array.remove(h1r_tops, k)
+                array.remove(h1r_bots, k)
+                array.remove(h1r_times, k)
+
+    float bt1 = array.size(h1b_tops) > 0 ? array.get(h1b_tops, 0) : na
+    float bb1 = array.size(h1b_bots) > 0 ? array.get(h1b_bots, 0) : na
+    int   btm1 = array.size(h1b_times) > 0 ? array.get(h1b_times, 0) : na
+    float bt2 = array.size(h1b_tops) > 1 ? array.get(h1b_tops, 1) : na
+    float bb2 = array.size(h1b_bots) > 1 ? array.get(h1b_bots, 1) : na
+    int   btm2 = array.size(h1b_times) > 1 ? array.get(h1b_times, 1) : na
+    float bt3 = array.size(h1b_tops) > 2 ? array.get(h1b_tops, 2) : na
+    float bb3 = array.size(h1b_bots) > 2 ? array.get(h1b_bots, 2) : na
+    int   btm3 = array.size(h1b_times) > 2 ? array.get(h1b_times, 2) : na
+
+    float rt1 = array.size(h1r_tops) > 0 ? array.get(h1r_tops, 0) : na
+    float rb1 = array.size(h1r_bots) > 0 ? array.get(h1r_bots, 0) : na
+    int   rtm1 = array.size(h1r_times) > 0 ? array.get(h1r_times, 0) : na
+    float rt2 = array.size(h1r_tops) > 1 ? array.get(h1r_tops, 1) : na
+    float rb2 = array.size(h1r_bots) > 1 ? array.get(h1r_bots, 1) : na
+    int   rtm2 = array.size(h1r_times) > 1 ? array.get(h1r_times, 1) : na
+    float rt3 = array.size(h1r_tops) > 2 ? array.get(h1r_tops, 2) : na
+    float rb3 = array.size(h1r_bots) > 2 ? array.get(h1r_bots, 2) : na
+    int   rtm3 = array.size(h1r_times) > 2 ? array.get(h1r_times, 2) : na
+
+    [bt1, bb1, btm1, bt2, bb2, btm2, bt3, bb3, btm3, rt1, rb1, rtm1, rt2, rb2, rtm2, rt3, rb3, rtm3]
+
+[h1_bt1, h1_bb1, h1_btm1, h1_bt2, h1_bb2, h1_btm2, h1_bt3, h1_bb3, h1_btm3, h1_rt1, h1_rb1, h1_rtm1, h1_rt2, h1_rb2, h1_rtm2, h1_rt3, h1_rb3, h1_rtm3] = request.security(syminfo.tickerid, h1_ob_timeframe, h1_ob_calc(), lookahead=barmerge.lookahead_off)
+
+var box[] h1_bull_boxes = array.new_box(3, na)
+var int[] h1_bull_times = array.new_int(3, na)
+var box[] h1_bear_boxes = array.new_box(3, na)
+var int[] h1_bear_times = array.new_int(3, na)
+
+//@function اردربلاک‌های تایم‌فریمِ بالاترِ دریافت‌شده (تا ۳ مورد) را با باکس‌های موجود - بر اساس
+//زمانِ یکتای شروعِ هرکدام، نه موقعیتِ اسلات - هماهنگ می‌کند: باکسِ همان اردربلاکِ قبلی فقط امتداد
+//می‌یابد، باکسِ اردربلاکی که دیگر در لیست نیست (لمس شده) حذف می‌شود، و اردربلاکِ واقعاً تازه در یک
+//جای خالی ساخته می‌شود - این‌طوری باکس‌ها حتی اگر بین ۳ اسلات جابه‌جا شوند، بی‌دلیل بازسازی نمی‌شوند.
+sync_h1_obs(box[] boxes, int[] times, float[] newTops, float[] newBottoms, int[] newTimes, color fillCol, color borderCol) =>
+    int slotCount = array.size(boxes)
+    for s = 0 to slotCount - 1
+        int existingTime = array.get(times, s)
+        if not na(existingTime)
+            bool stillPresent = false
+            for k = 0 to array.size(newTimes) - 1
+                int candidateTime = array.get(newTimes, k)
+                if not na(candidateTime) and candidateTime == existingTime
+                    stillPresent := true
+            if not stillPresent
+                box existingBox = array.get(boxes, s)
+                if not na(existingBox)
+                    box.delete(existingBox)
+                array.set(boxes, s, na)
+                array.set(times, s, na)
+
+    for k = 0 to array.size(newTimes) - 1
+        int t = array.get(newTimes, k)
+        if not na(t)
+            bool matched = false
+            for s = 0 to slotCount - 1
+                int slotTime = array.get(times, s)
+                if not na(slotTime) and slotTime == t
+                    matched := true
+                    box.set_right(array.get(boxes, s), time)
+            if not matched
+                for s = 0 to slotCount - 1
+                    if na(array.get(times, s))
+                        box newBox = box.new(t, array.get(newTops, k), time, array.get(newBottoms, k), xloc=xloc.bar_time, bgcolor=fillCol, border_color=borderCol, border_style=line.style_dashed, text="H1", text_color=borderCol, text_size=size.tiny, text_valign=text.align_top, text_halign=text.align_left)
+                        array.set(boxes, s, newBox)
+                        array.set(times, s, t)
+                        break
+
+if show_h1_ob
+    sync_h1_obs(h1_bull_boxes, h1_bull_times, array.from(h1_bt1, h1_bt2, h1_bt3), array.from(h1_bb1, h1_bb2, h1_bb3), array.from(h1_btm1, h1_btm2, h1_btm3), h1_bull_ob_col, h1_bull_ob_border)
+    sync_h1_obs(h1_bear_boxes, h1_bear_times, array.from(h1_rt1, h1_rt2, h1_rt3), array.from(h1_rb1, h1_rb2, h1_rb3), array.from(h1_rtm1, h1_rtm2, h1_rtm3), h1_bear_ob_col, h1_bear_ob_border)
 
 //#############################################################################
 // بخش ۳: موتور تایید/رد سیگنال - سیگنال‌های سشن را بر اساس تعامل بعدیِ قیمت با اردربلاک/BSL/

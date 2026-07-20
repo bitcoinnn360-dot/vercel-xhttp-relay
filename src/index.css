@@ -1,0 +1,204 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-display: 'Vazirmatn', 'Outfit', sans-serif;
+  --font-body: 'Vazirmatn', 'Outfit', sans-serif;
+  --font-num: 'Outfit', 'Vazirmatn', sans-serif;
+
+  --color-ink: #15202b;
+  --color-ink-soft: #3d4f5f;
+  --color-muted: #6b7c8a;
+  --color-paper: #f3f1ec;
+  --color-paper-2: #e8e4db;
+  --color-panel: #ffffffcc;
+  --color-line: #d4cfc4;
+  --color-copper: #b86b2e;
+  --color-copper-deep: #8f4e1c;
+  --color-steel: #2f5d7a;
+  --color-steel-soft: #4a7a96;
+  --color-pos: #1f7a4d;
+  --color-neg: #b42318;
+  --color-accent: #c87941;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: var(--font-body);
+    color: var(--color-ink);
+    background:
+      radial-gradient(1200px 600px at 100% -10%, rgba(200, 121, 65, 0.18), transparent 55%),
+      radial-gradient(900px 500px at -10% 20%, rgba(47, 93, 122, 0.14), transparent 50%),
+      linear-gradient(165deg, #f7f4ee 0%, #ebe6dc 42%, #e2e8ec 100%);
+    background-attachment: fixed;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.35;
+    background-image:
+      linear-gradient(rgba(21, 32, 43, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(21, 32, 43, 0.03) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+  }
+
+  #root {
+    position: relative;
+    min-height: 100vh;
+  }
+
+  .num {
+    font-family: var(--font-num);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    direction: ltr;
+    unicode-bidi: plaintext;
+  }
+
+  .pos {
+    color: var(--color-pos);
+  }
+
+  .neg {
+    color: var(--color-neg);
+  }
+
+  .flat {
+    color: var(--color-muted);
+  }
+}
+
+@layer components {
+  .shell {
+    width: min(1280px, calc(100% - 2rem));
+    margin-inline: auto;
+  }
+
+  .panel {
+    background: color-mix(in oklab, white 82%, transparent);
+    border: 1px solid color-mix(in oklab, var(--color-line) 80%, white);
+    border-radius: 18px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.65) inset;
+  }
+
+  .section-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--color-ink);
+  }
+
+  .section-sub {
+    font-size: 0.82rem;
+    color: var(--color-muted);
+    margin-top: 0.2rem;
+  }
+
+  .kpi-label {
+    font-size: 0.78rem;
+    color: var(--color-muted);
+    font-weight: 500;
+  }
+
+  .kpi-value {
+    font-size: clamp(1.35rem, 2.4vw, 1.85rem);
+    font-weight: 700;
+    line-height: 1.15;
+    margin-top: 0.35rem;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    border: 1px solid var(--color-line);
+    background: color-mix(in oklab, white 70%, transparent);
+  }
+
+  .chip-live {
+    border-color: color-mix(in oklab, var(--color-pos) 35%, var(--color-line));
+    color: var(--color-pos);
+    background: color-mix(in oklab, var(--color-pos) 8%, white);
+  }
+
+  .chip-blocked {
+    border-color: color-mix(in oklab, var(--color-neg) 30%, var(--color-line));
+    color: var(--color-neg);
+    background: color-mix(in oklab, var(--color-neg) 7%, white);
+  }
+
+  .chip-seed {
+    border-color: color-mix(in oklab, var(--color-steel) 30%, var(--color-line));
+    color: var(--color-steel);
+    background: color-mix(in oklab, var(--color-steel) 7%, white);
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+  }
+
+  .data-table th {
+    text-align: right;
+    padding: 0.65rem 0.55rem;
+    color: var(--color-muted);
+    font-weight: 600;
+    border-bottom: 1px solid var(--color-line);
+    white-space: nowrap;
+  }
+
+  .data-table td {
+    padding: 0.6rem 0.55rem;
+    border-bottom: 1px solid color-mix(in oklab, var(--color-line) 70%, transparent);
+    vertical-align: middle;
+  }
+
+  .data-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .data-table tr.industry td {
+    background: color-mix(in oklab, var(--color-steel) 6%, transparent);
+    font-weight: 600;
+  }
+
+  .nav-pill {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .nav-pill::after {
+    content: '';
+    position: absolute;
+    inset-inline-start: 0;
+    bottom: 0;
+    height: 2px;
+    width: 100%;
+    background: linear-gradient(90deg, transparent, var(--color-copper), transparent);
+    transform: scaleX(0);
+    transition: transform 0.35s ease;
+  }
+
+  .nav-pill[data-active='true']::after {
+    transform: scaleX(1);
+  }
+}

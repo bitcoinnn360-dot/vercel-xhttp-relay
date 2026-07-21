@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { loadDashboard, REFRESH_MS } from '../data/fetchers'
+import { loadDashboardBundle, REFRESH_MS, type FredBundle, type HistoryPoint } from '../data/fetchers'
 import type { DashboardData } from '../data/types'
 import { seedDashboard } from '../data/seed'
 
 export function useMarketData() {
   const [data, setData] = useState<DashboardData>(seedDashboard)
+  const [histories, setHistories] = useState<Record<string, HistoryPoint[]>>({})
+  const [fred, setFred] = useState<Record<string, FredBundle>>({})
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -13,9 +15,11 @@ export function useMarketData() {
   const refresh = useCallback(async (silent = false) => {
     if (!silent) setRefreshing(true)
     try {
-      const next = await loadDashboard()
+      const bundle = await loadDashboardBundle()
       if (!mounted.current) return
-      setData(next)
+      setData(bundle.data)
+      setHistories(bundle.histories)
+      setFred(bundle.fred)
       setError(null)
     } catch (e) {
       if (!mounted.current) return
@@ -38,5 +42,5 @@ export function useMarketData() {
     }
   }, [refresh])
 
-  return { data, loading, refreshing, error, refresh }
+  return { data, histories, fred, loading, refreshing, error, refresh }
 }

@@ -22,7 +22,7 @@ export function SteelSection({ data }: { data: DashboardData }) {
       <div>
         <h2 className="section-title">زنجیره فولاد — چین و ایران</h2>
         <p className="section-sub">
-          نرخ‌های Custeel / Trading Economics به‌صورت seed؛ بورس کالا از گزارش روزانه
+          نرخ‌های چین موقت از TGJU و FRED (جایگزین Custeel) · بورس کالا از گزارش روزانه
         </p>
       </div>
 

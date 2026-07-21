@@ -17,10 +17,10 @@ const chipClass: Record<SourceStatus['status'], string> = {
 export function SourceBar({ sources }: { sources: SourceStatus[] }) {
   return (
     <div className="panel px-4 py-3">
-      <div className="mb-2 flex items-center justify-between gap-2">
+      <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
         <h2 className="section-title text-sm">وضعیت منابع داده</h2>
         <p className="section-sub m-0 text-[0.72rem]">
-          TSETMC و Custeel معمولاً به دسترسی سازمانی نیاز دارند؛ TGJU همین الان وصل می‌شود.
+          بورس از TGJU · کلان از FRED · فولاد چین موقت از TGJU/FRED تا Custeel
         </p>
       </div>
       <div className="flex flex-wrap gap-2">

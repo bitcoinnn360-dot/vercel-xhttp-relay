@@ -1,28 +1,31 @@
 {
-  "updatedAt": "2026-07-21T14:46:24.046365+00:00",
+  "updatedAt": "2026-07-21T15:21:16.065643+00:00",
   "tgjuBourse": {
-    "tedpix": 4887551.7,
+    "value": 4887551.7,
     "change": 74048.3,
     "changePct": 1.54,
+    "high": 4887748.8,
+    "low": 4873381.3,
+    "time": "۱۲:۳۹:۰۴",
     "source": "tgju"
   },
   "tsetmc": {
-    "error": "<urlopen error [Errno 104] Connection reset by peer>",
+    "ok": false,
     "source": "tsetmc",
-    "status": "blocked"
+    "status": "blocked",
+    "error": "<urlopen error [Errno 104] Connection reset by peer>"
   },
   "ime": {
-    "error": "<urlopen error [Errno 104] Connection reset by peer>",
+    "ok": false,
     "source": "ime",
-    "status": "blocked"
+    "status": "blocked",
+    "error": "<urlopen error [Errno 104] Connection reset by peer>"
   },
   "custeelAlternative": {
-    "note": "Use TGJU base-us-iron-ore + base-us-steel-coil and FRED PIORECRUSDM until Custeel is available.",
     "providers": [
-      "tgju",
-      "fred",
-      "mysteel(paid)",
-      "steelhome(paid)"
+      "tgju:base-us-iron-ore",
+      "tgju:base-us-steel-coil",
+      "fred:PIORECRUSDM"
     ]
   }
 }

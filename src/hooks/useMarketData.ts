@@ -7,6 +7,15 @@ export function useMarketData() {
   const [data, setData] = useState<DashboardData>(seedDashboard)
   const [histories, setHistories] = useState<Record<string, HistoryPoint[]>>({})
   const [fred, setFred] = useState<Record<string, FredBundle>>({})
+  const [sectors, setSectors] = useState<
+    { name: string; color: string; count: number; avgChangePct: number; members: string[] }[]
+  >([])
+  const [scrapeMeta, setScrapeMeta] = useState<{
+    updatedAt?: string
+    tsetmcOk?: boolean
+    imeOk?: boolean
+    infra?: Record<string, string>
+  }>({})
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -20,6 +29,8 @@ export function useMarketData() {
       setData(bundle.data)
       setHistories(bundle.histories)
       setFred(bundle.fred)
+      setSectors(bundle.sectors)
+      setScrapeMeta(bundle.scrapeMeta)
       setError(null)
     } catch (e) {
       if (!mounted.current) return
@@ -42,5 +53,5 @@ export function useMarketData() {
     }
   }, [refresh])
 
-  return { data, histories, fred, loading, refreshing, error, refresh }
+  return { data, histories, fred, sectors, scrapeMeta, loading, refreshing, error, refresh }
 }

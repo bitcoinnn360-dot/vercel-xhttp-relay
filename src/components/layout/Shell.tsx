@@ -4,6 +4,7 @@ import { timeFa } from '../../lib/format'
 
 const NAV = [
   { id: 'overview', label: 'نمای بازار' },
+  { id: 'market-asia', label: 'مرکز بازارها' },
   { id: 'charts', label: 'نمودار قیمت‌ها' },
   { id: 'stocks', label: 'سهام معدنی' },
   { id: 'nav', label: 'NAV پرتفو' },

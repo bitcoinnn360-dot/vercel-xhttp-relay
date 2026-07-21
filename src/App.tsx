@@ -8,9 +8,10 @@ import { NavSection } from './components/NavSection'
 import { CommoditiesSection } from './components/CommoditiesSection'
 import { SteelSection } from './components/SteelSection'
 import { PeriodicSection } from './components/PeriodicSection'
+import { GuruMarketTabs } from './components/GuruMarketTabs'
 import { useMarketData } from './hooks/useMarketData'
 
-const SECTION_IDS = ['overview', 'charts', 'stocks', 'nav', 'commodities', 'steel', 'periodic', 'macro']
+const SECTION_IDS = ['overview', 'market-asia', 'charts', 'stocks', 'nav', 'commodities', 'steel', 'periodic', 'macro']
 
 function useActiveSection() {
   const [active, setActive] = useState('overview')
@@ -33,7 +34,7 @@ function useActiveSection() {
 }
 
 export default function App() {
-  const { data, histories, fred, loading, refreshing, error, refresh } = useMarketData()
+  const { data, histories, fred, sectors, scrapeMeta, loading, refreshing, error, refresh } = useMarketData()
   const active = useActiveSection()
 
   return (
@@ -49,7 +50,16 @@ export default function App() {
           )}
           <div className="space-y-10">
             <SourceBar sources={data.sources} />
+            {scrapeMeta.infra && (
+              <div className="panel px-4 py-3 text-xs text-[var(--color-muted)]">
+                اسکرپر پایتون: TGJU فعال
+                {scrapeMeta.tsetmcOk ? ' · TSETMC وصل' : ' · TSETMC نیاز به اینترنت ایران'}
+                {scrapeMeta.imeOk ? ' · IME وصل' : ' · IME نیاز به اینترنت ایران'}
+                {scrapeMeta.updatedAt ? ` · آخرین فایل اسکرپر: ${new Date(scrapeMeta.updatedAt).toLocaleString('fa-IR')}` : ''}
+              </div>
+            )}
             <MarketOverview data={data} histories={histories} />
+            <GuruMarketTabs data={data} histories={histories} fred={fred} sectors={sectors} />
             <ChartsHub data={data} histories={histories} fred={fred} />
             <StocksSection data={data} />
             <NavSection data={data} />
@@ -60,7 +70,8 @@ export default function App() {
             <footer className="border-t border-[var(--color-line)] pt-5 text-center text-xs text-[var(--color-muted)]">
               <p>معاونت مالی و اقتصادی — واحد سرمایه‌گذاری · توسعه معادن و فلزات</p>
               <p className="mt-1">
-                منابع: TGJU (بورس/کامودیتی) · FRED (کلان) · گزارش روزانه (NAV/IME) · جایگزین موقت Custeel تا اشتراک
+                برای TSETMC و IME یک سیستم همیشه روشن داخل ایران (حتی یک VPS ارزان) با cron روی
+                scripts/scrape_market.py کافی است.
               </p>
             </footer>
           </div>

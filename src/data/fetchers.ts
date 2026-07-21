@@ -65,6 +65,13 @@ export interface LiveBundle {
   data: DashboardData
   histories: Record<string, HistoryPoint[]>
   fred: Record<string, FredBundle>
+  sectors: { name: string; color: string; count: number; avgChangePct: number; members: string[] }[]
+  scrapeMeta: {
+    updatedAt?: string
+    tsetmcOk?: boolean
+    imeOk?: boolean
+    infra?: Record<string, string>
+  }
 }
 
 async function fetchTgjuAjax(): Promise<Record<string, { p: string; d: string; dp: string; dt: string; h?: string; l?: string; t?: string }>> {
@@ -250,18 +257,50 @@ function markSources(base: DashboardData, liveCount: number, fredOk: number, now
   return sources
 }
 
+async function fetchScrapedMarket(): Promise<{
+  histories: Record<string, HistoryPoint[]>
+  sectors: LiveBundle['sectors']
+  meta: LiveBundle['scrapeMeta']
+} | null> {
+  try {
+    const res = await fetch('/data/market.json', { cache: 'no-store' })
+    if (!res.ok) return null
+    const json = (await res.json()) as {
+      updatedAt?: string
+      histories?: Record<string, HistoryPoint[]>
+      sectors?: LiveBundle['sectors']
+      tsetmc?: { ok?: boolean }
+      ime?: { ok?: boolean }
+      infra?: Record<string, string>
+    }
+    return {
+      histories: json.histories || {},
+      sectors: json.sectors || [],
+      meta: {
+        updatedAt: json.updatedAt,
+        tsetmcOk: Boolean(json.tsetmc?.ok),
+        imeOk: Boolean(json.ime?.ok),
+        infra: json.infra,
+      },
+    }
+  } catch {
+    return null
+  }
+}
+
 export async function loadDashboardBundle(): Promise<LiveBundle> {
   const base: DashboardData = structuredClone(seedDashboard)
   const now = new Date().toISOString()
 
-  const [current, histEntries, fredEntries] = await Promise.all([
+  const [current, histEntries, fredEntries, scraped] = await Promise.all([
     fetchTgjuAjax(),
     Promise.all(HIST_KEYS.map(async (k) => [k, await fetchTgjuHistory(k)] as const)),
     Promise.all(FRED_SERIES.map(async (s) => [s.mapTo || s.id, await fetchFred(s.id, s.label)] as const)),
+    fetchScrapedMarket(),
   ])
 
   const liveCount = applyLiveQuotes(base, current)
-  const histories: Record<string, HistoryPoint[]> = {}
+  const histories: Record<string, HistoryPoint[]> = { ...(scraped?.histories || {}) }
   for (const [k, pts] of histEntries) {
     if (pts.length) histories[k] = pts
   }
@@ -313,9 +352,36 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   }
 
   base.sources = markSources(base, liveCount, fredOk, now)
+  if (scraped?.meta) {
+    base.sources = base.sources.map((s) => {
+      if (s.id === 'tsetmc') {
+        return {
+          ...s,
+          status: scraped.meta.tsetmcOk ? 'live' : liveCount > 0 ? 'live' : 'seed',
+          note: scraped.meta.tsetmcOk
+            ? 'اسکرپر TSETMC موفق'
+            : 'جزئیات TSETMC نیاز به IP ایران — شاخص از TGJU',
+        }
+      }
+      if (s.id === 'ime') {
+        return {
+          ...s,
+          status: scraped.meta.imeOk ? 'live' : 'seed',
+          note: scraped.meta.imeOk ? 'اسکرپر IME موفق' : 'IME از گزارش؛ اسکرپر کامل با IP ایران',
+        }
+      }
+      return s
+    })
+  }
   base.updatedAt = now
 
-  return { data: base, histories, fred }
+  return {
+    data: base,
+    histories,
+    fred,
+    sectors: scraped?.sectors || [],
+    scrapeMeta: scraped?.meta || {},
+  }
 }
 
 export const REFRESH_MS = 3 * 60 * 1000

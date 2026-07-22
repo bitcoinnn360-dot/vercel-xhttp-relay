@@ -62,12 +62,14 @@ def attach_usd(df: pd.DataFrame, usd: pd.DataFrame, date_col: str = "gregorian")
     if df.empty or usd.empty:
         return df
     u = usd.copy()
-    u["date"] = pd.to_datetime(u["date"])
-    u = u.sort_values("date")
+    u["date"] = pd.to_datetime(u["date"], utc=False).astype("datetime64[ns]")
+    u = u.dropna(subset=["date", "usd_irr"]).sort_values("date")
     out = df.copy()
-    out["_dt"] = pd.to_datetime(out[date_col])
-    out = out.sort_values("_dt")
-    out = pd.merge_asof(out, u[["date", "usd_irr"]], left_on="_dt", right_on="date", direction="backward")
+    out["_dt"] = pd.to_datetime(out[date_col], utc=False).astype("datetime64[ns]")
+    out = out.dropna(subset=["_dt"]).sort_values("_dt")
+    out = pd.merge_asof(
+        out, u[["date", "usd_irr"]], left_on="_dt", right_on="date", direction="backward"
+    )
     out = out.drop(columns=["_dt", "date"], errors="ignore")
     return out
 

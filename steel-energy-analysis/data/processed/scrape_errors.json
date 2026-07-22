@@ -250,5 +250,77 @@
     "is_revision": false,
     "excel_url": "https://excel.codal.ir/service/Excel/GetAll/A9OOObOOO5se7TDHZNngPT1tfOQQQaQQQw%3d%3d/0",
     "error": "list index out of range"
+  },
+  {
+    "symbol": "ارفع",
+    "company": "آهن و فولاد ارفع",
+    "group": "steel",
+    "period_end": "1400/01/31",
+    "title": "گزارش فعالیت ماهانه دوره ۱ ماهه منتهی به ۱۴۰۰/۰۱/۳۱",
+    "publish_dt": "۱۴۰۰/۰۲/۰۵ ۱۵:۵۳:۴۶",
+    "tracing_no": 740296,
+    "is_revision": false,
+    "excel_url": "https://excel.codal.ir/service/Excel/GetAll/NF8m9AB6YdqsabhOOObOOOJ8JEfQ%3d%3d/0",
+    "error": "list index out of range"
+  },
+  {
+    "symbol": "ارفع",
+    "company": "آهن و فولاد ارفع",
+    "group": "steel",
+    "period_end": "1401/01/31",
+    "title": "گزارش فعالیت ماهانه دوره ۱ ماهه منتهی به  ۱۴۰۱/۰۱/۳۱(اصلاحیه)",
+    "publish_dt": "۱۴۰۱/۰۲/۰۸ ۱۶:۲۶:۱۰",
+    "tracing_no": 876306,
+    "is_revision": true,
+    "excel_url": "https://excel.codal.ir/service/Excel/GetAll/s3FrQwyYW8cuAN3h6s7tIg%3d%3d/0",
+    "error": "list index out of range"
+  },
+  {
+    "symbol": "ارفع",
+    "company": "آهن و فولاد ارفع",
+    "group": "steel",
+    "period_end": "1402/01/31",
+    "title": "گزارش فعالیت ماهانه دوره ۱ ماهه منتهی به  ۱۴۰۲/۰۱/۳۱",
+    "publish_dt": "۱۴۰۲/۰۲/۰۹ ۱۲:۴۲:۳۰",
+    "tracing_no": 1018306,
+    "is_revision": false,
+    "excel_url": "https://excel.codal.ir/service/Excel/GetAll/Kn6cUhmOOObOOOUhno9eZV7LyBGw%3d%3d/0",
+    "error": "list index out of range"
+  },
+  {
+    "symbol": "ارفع",
+    "company": "آهن و فولاد ارفع",
+    "group": "steel",
+    "period_end": "1403/01/31",
+    "title": "گزارش فعالیت ماهانه دوره ۱ ماهه منتهی به  ۱۴۰۳/۰۱/۳۱",
+    "publish_dt": "۱۴۰۳/۰۲/۰۳ ۱۵:۱۷:۰۴",
+    "tracing_no": 1180304,
+    "is_revision": false,
+    "excel_url": "https://excel.codal.ir/service/Excel/GetAll/CeJZYRRvGSKb1DvND0g47A%3d%3d/0",
+    "error": "list index out of range"
+  },
+  {
+    "symbol": "ارفع",
+    "company": "آهن و فولاد ارفع",
+    "group": "steel",
+    "period_end": "1404/01/31",
+    "title": "گزارش فعالیت ماهانه دوره ۱ ماهه منتهی به  ۱۴۰۴/۰۱/۳۱",
+    "publish_dt": "۱۴۰۴/۰۲/۰۶ ۱۶:۳۸:۵۱",
+    "tracing_no": 1335302,
+    "is_revision": false,
+    "excel_url": "https://excel.codal.ir/service/Excel/GetAll/hPKGKmedYJCbRjj8iFJyBg%3d%3d/0",
+    "error": "list index out of range"
+  },
+  {
+    "symbol": "ارفع",
+    "company": "آهن و فولاد ارفع",
+    "group": "steel",
+    "period_end": "1405/01/31",
+    "title": "گزارش فعالیت ماهانه دوره ۱ ماهه منتهی به  ۱۴۰۵/۰۱/۳۱(اصلاحیه)",
+    "publish_dt": "۱۴۰۵/۰۳/۱۷ ۱۰:۳۵:۲۹",
+    "tracing_no": 1544658,
+    "is_revision": true,
+    "excel_url": "https://excel.codal.ir/service/Excel/GetAll/tRjlEYGMFvmo6OOObOOO5OOObOOOJusH6w%3d%3d/0",
+    "error": "list index out of range"
   }
 ]

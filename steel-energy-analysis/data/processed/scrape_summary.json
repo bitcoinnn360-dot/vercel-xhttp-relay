@@ -26,5 +26,12 @@
     "n_energy_rows": 24,
     "n_product_rows": 282,
     "n_errors": 5
+  },
+  {
+    "symbol": "ارفع",
+    "n_periods": 63,
+    "n_energy_rows": 102,
+    "n_product_rows": 206,
+    "n_errors": 6
   }
 ]

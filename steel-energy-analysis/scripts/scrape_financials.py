@@ -100,16 +100,25 @@ def collect_fin_letters(client: CodalClient, symbol: str) -> list[dict]:
 
 
 def select_best(letters: list[dict]) -> list[dict]:
-    """One statement per (period_end, months, consolidated). Prefer audited+revision latest."""
+    """Prefer annual 12-month separate statements; keep one per period_end."""
+    # First pass: annual non-consolidated
+    annual = [L for L in letters if L.get("_months") == 12 and not L.get("_consolidated")]
+    if not annual:
+        annual = [L for L in letters if L.get("_months") == 12]
+    # Fallback: 6-month if almost no annual
+    pool = annual if len(annual) >= 3 else [L for L in letters if L.get("_months") in {6, 12}]
+
     groups: dict[tuple, list[dict]] = {}
-    for L in letters:
-        key = (L.get("_period_end"), L.get("_months"), bool(L.get("_consolidated")))
+    for L in pool:
+        # collapse cons/sep by preferring separate later via sort
+        key = (L.get("_period_end"), L.get("_months"))
         groups.setdefault(key, []).append(L)
     selected = []
     for key, items in groups.items():
         items_sorted = sorted(
             items,
             key=lambda x: (
+                0 if x.get("_consolidated") else 1,
                 1 if x.get("_audited") else 0,
                 1 if x.get("_revision") else 0,
                 to_english_digits(x.get("PublishDateTime") or ""),

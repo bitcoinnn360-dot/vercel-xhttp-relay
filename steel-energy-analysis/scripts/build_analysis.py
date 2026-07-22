@@ -204,18 +204,20 @@ def summarize(energy: pd.DataFrame, products: pd.DataFrame, fins: pd.DataFrame, 
 
     if not fins.empty:
         f = pd.DataFrame(fins)
-        f = f[f.get("net_income_mrial").notna()] if "net_income_mrial" in f.columns else f
-        if not f.empty and "months" in f.columns:
-            # prefer 12-month statements
-            annual_f = f[f["months"] == 12].copy()
-            if annual_f.empty:
-                annual_f = f.copy()
+        if "net_income_mrial" in f.columns:
+            f = f[f["net_income_mrial"].notna()]
+        if not f.empty:
+            annual_f = f.copy()
+            if "months" in annual_f.columns:
+                tmp = annual_f[annual_f["months"] == 12]
+                if not tmp.empty:
+                    annual_f = tmp
             annual_f["year"] = annual_f["period_end"].astype(str).str.slice(0, 4)
-            # prefer non-consolidated if both? keep both separately
             lines.append("## سود خالص از صورت‌های مالی (میلیون ریال)")
             lines.append("")
+            idx = ["symbol", "consolidated"] if "consolidated" in annual_f.columns else "symbol"
             piv = annual_f.pivot_table(
-                index=["symbol", "consolidated"] if "consolidated" in annual_f.columns else "symbol",
+                index=idx,
                 columns="year",
                 values="net_income_mrial",
                 aggfunc="last",
@@ -225,18 +227,27 @@ def summarize(energy: pd.DataFrame, products: pd.DataFrame, fins: pd.DataFrame, 
             if not usd.empty:
                 u = usd.copy()
                 u["date"] = pd.to_datetime(u["date"])
-                u["jy"] = u["date"].apply(
+                u["year"] = u["date"].apply(
                     lambda d: str(jdatetime.date.fromgregorian(date=d.date()).year)
                 )
-                usd_year = u.groupby("jy", as_index=False)["usd_irr"].mean().rename(
-                    columns={"jy": "year", "usd_irr": "usd_irr_avg"}
+                usd_year = (
+                    u.groupby("year", as_index=False)["usd_irr"]
+                    .mean()
+                    .rename(columns={"usd_irr": "usd_irr_avg"})
                 )
-                af = annual_f.merge(usd_year, on="year", how="left")
-                af["net_income_usd_mn"] = af["net_income_mrial"] * 1_000_000 / af["usd_irr_avg"] / 1_000_000
+                usd_year["year"] = usd_year["year"].astype(str)
+                af = annual_f.copy()
+                af["year"] = af["year"].astype(str)
+                af = af.merge(usd_year, on="year", how="left")
+                af["net_income_usd_mn"] = (
+                    af["net_income_mrial"] * 1_000_000 / af["usd_irr_avg"] / 1_000_000
+                )
                 af.to_csv(PROC / "net_income_usd.csv", index=False)
                 lines.append("## سود خالص تقریبی دلاری (میلیون دلار)")
                 lines.append("")
-                pivu = af.pivot_table(index="symbol", columns="year", values="net_income_usd_mn", aggfunc="last")
+                pivu = af.pivot_table(
+                    index="symbol", columns="year", values="net_income_usd_mn", aggfunc="last"
+                )
                 lines.append(pivu.round(1).to_markdown())
                 lines.append("")
 

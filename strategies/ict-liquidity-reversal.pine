@@ -1,0 +1,580 @@
+//@version=5
+indicator("ICT Liquidity Reversal (Mitigation / Breaker)", overlay=true, max_boxes_count=500, max_lines_count=500, max_labels_count=500)
+
+// =============================================================================
+// هدف: دنبال کردن BSL/SSL + EQH/EQL + اردربلاک‌ها
+// سیگنال ریورس وقتی:
+//   A) Mitigation: آخرین نقدینگی سمت روند زده نمی‌شود، ولی آخرین OB هم‌جهت می‌شکند
+//   B) Breaker کلاسیک: آخرین نقدینگی زده می‌شود + همان OB می‌شکند + MSS
+// SL: بالای BSL آخر (شورت) / زیر SSL آخر (لانگ)
+// TP: نزدیک‌ترین FVG تاچ‌نشده مخالف + نزدیک‌ترین نقدینگی مخالف
+// =============================================================================
+
+//#region Inputs
+string GRP_STR = "Structure"
+string GRP_OB  = "Order Blocks"
+string GRP_LIQ = "Liquidity"
+string GRP_FVG = "Fair Value Gaps"
+string GRP_SIG = "Signals"
+string GRP_VIS = "Visuals"
+
+int pivot_len = input.int(5, "Pivot Length", minval=2, group=GRP_STR)
+int mss_lookback = input.int(50, "MSS Lookback (bars)", minval=10, group=GRP_STR, tooltip="برای تأیید شیفت ساختار، آخرین سوینگ مخالف در این بازه چک می‌شود")
+
+int max_ob_count = input.int(40, "Max OBs Tracked", minval=5, group=GRP_OB)
+int ob_engulf_lookback = input.int(20, "OB Engulf Search Depth", minval=1, group=GRP_OB)
+bool show_obs = input.bool(true, "Show Order Blocks / Breakers", group=GRP_OB)
+
+bool show_liquidity = input.bool(true, "Show BSL / SSL", group=GRP_LIQ)
+bool show_equal_hl = input.bool(true, "Show EQH / EQL Zones", group=GRP_LIQ)
+float eq_tolerance_ticks = input.float(10, "Equal High/Low Tolerance (ticks)", minval=0, group=GRP_LIQ)
+float eq_zone_multiplier = input.float(2.0, "Equal Zone Thickness (× Tol)", minval=0.1, group=GRP_LIQ)
+int max_liq_count = input.int(60, "Max Liquidity Levels", minval=5, group=GRP_LIQ)
+
+bool show_fvg = input.bool(true, "Show Untouched FVGs", group=GRP_FVG)
+int min_fvg_ticks = input.int(5, "Min FVG Size (ticks)", minval=1, group=GRP_FVG)
+int max_fvg_count = input.int(40, "Max FVGs Tracked", minval=5, group=GRP_FVG)
+
+bool enable_mitigation = input.bool(true, "Enable Mitigation Reversal", group=GRP_SIG)
+bool enable_breaker = input.bool(true, "Enable Classic Breaker Reversal", group=GRP_SIG)
+bool require_mss = input.bool(true, "Require MSS / CHoCH", group=GRP_SIG)
+bool enter_on_break = input.bool(true, "Signal on OB Break Candle", group=GRP_SIG, tooltip="اگر خاموش باشد فقط وقتی زون بریکر دوباره لمس شود سیگنال می‌دهد")
+float sl_buffer_ticks = input.float(5, "SL Buffer (ticks)", minval=0, group=GRP_SIG)
+int signal_cooldown = input.int(10, "Cooldown Between Signals (bars)", minval=0, group=GRP_SIG)
+bool show_tp_ssl_bsl = input.bool(true, "TP1 = Opposing Liquidity", group=GRP_SIG)
+bool show_tp_fvg = input.bool(true, "TP2 = Untouched Opposing FVG", group=GRP_SIG)
+
+color bull_ob_col = input.color(color.new(color.green, 88), "Bullish OB", group=GRP_VIS)
+color bear_ob_col = input.color(color.new(color.red, 88), "Bearish OB", group=GRP_VIS)
+color bull_bb_col = input.color(color.new(color.teal, 82), "Bullish Breaker", group=GRP_VIS)
+color bear_bb_col = input.color(color.new(color.maroon, 82), "Bearish Breaker", group=GRP_VIS)
+color bsl_color = input.color(color.new(color.orange, 30), "BSL", group=GRP_VIS)
+color ssl_color = input.color(color.new(color.blue, 30), "SSL", group=GRP_VIS)
+color eqh_color = input.color(color.new(color.orange, 0), "EQH", group=GRP_VIS)
+color eql_color = input.color(color.new(color.blue, 0), "EQL", group=GRP_VIS)
+color swept_color = input.color(color.new(color.gray, 55), "Swept Liquidity", group=GRP_VIS)
+color bull_fvg_col = input.color(color.new(#26a69a, 85), "Bullish FVG", group=GRP_VIS)
+color bear_fvg_col = input.color(color.new(#ef5350, 85), "Bearish FVG", group=GRP_VIS)
+color mit_short_col = input.color(color.new(#ff7043, 0), "Mitigation Short", group=GRP_VIS)
+color mit_long_col = input.color(color.new(#66bb6a, 0), "Mitigation Long", group=GRP_VIS)
+color brk_short_col = input.color(color.new(#c62828, 0), "Breaker Short", group=GRP_VIS)
+color brk_long_col = input.color(color.new(#2e7d32, 0), "Breaker Long", group=GRP_VIS)
+//#endregion
+
+//#region Types
+type OrderBlock
+    box zone_box
+    line mid_line
+    float top
+    float bottom
+    float mid
+    int start_idx
+    bool is_bullish
+    bool active
+    bool is_breaker
+    bool just_broke
+    bool signal_armed
+
+type LiquidityLevel
+    line lvl_line
+    box zone_box
+    int start_idx
+    float price
+    float zone_top
+    float zone_bottom
+    bool is_high
+    bool swept
+    bool is_equal
+    int swept_bar
+
+type FVGZone
+    box zone_box
+    float top
+    float bottom
+    int start_idx
+    bool is_bull
+    bool touched
+
+type SwingMem
+    float price
+    int bar_idx
+//#endregion
+
+//#region Structure pivots / BOS / swing memory
+float ph = ta.pivothigh(high, pivot_len, pivot_len)
+float pl = ta.pivotlow(low, pivot_len, pivot_len)
+
+var float last_ph = na
+var float last_pl = na
+var int last_ph_idx = na
+var int last_pl_idx = na
+
+var SwingMem[] swing_highs = array.new<SwingMem>()
+var SwingMem[] swing_lows = array.new<SwingMem>()
+
+push_swing(SwingMem[] arr, float px, int bi, int max_keep) =>
+    array.push(arr, SwingMem.new(px, bi))
+    while array.size(arr) > max_keep
+        array.shift(arr)
+
+if not na(ph)
+    last_ph := ph
+    last_ph_idx := bar_index - pivot_len
+    push_swing(swing_highs, ph, last_ph_idx, 20)
+
+if not na(pl)
+    last_pl := pl
+    last_pl_idx := bar_index - pivot_len
+    push_swing(swing_lows, pl, last_pl_idx, 20)
+
+bool bullish_bos = false
+bool bearish_bos = false
+
+if not na(last_ph) and ta.crossover(close, last_ph)
+    bullish_bos := true
+    last_ph := na
+
+if not na(last_pl) and ta.crossunder(close, last_pl)
+    bearish_bos := true
+    last_pl := na
+
+// روند تقریبی از آخرین دو سقف/کف تأییدشده
+bool struct_bull = false
+bool struct_bear = false
+if array.size(swing_highs) >= 2 and array.size(swing_lows) >= 2
+    SwingMem sh1 = array.get(swing_highs, array.size(swing_highs) - 1)
+    SwingMem sh0 = array.get(swing_highs, array.size(swing_highs) - 2)
+    SwingMem sl1 = array.get(swing_lows, array.size(swing_lows) - 1)
+    SwingMem sl0 = array.get(swing_lows, array.size(swing_lows) - 2)
+    struct_bull := sh1.price > sh0.price and sl1.price > sl0.price
+    struct_bear := sh1.price < sh0.price and sl1.price < sl0.price
+
+// MSS: کلوز زیر آخرین کف سوئینگ (برای شورت) / بالای آخرین سقف (برای لانگ)
+float mss_low = na
+float mss_high = na
+if array.size(swing_lows) > 0
+    for i = array.size(swing_lows) - 1 to 0
+        SwingMem s = array.get(swing_lows, i)
+        if bar_index - s.bar_idx <= mss_lookback
+            mss_low := s.price
+            break
+if array.size(swing_highs) > 0
+    for i = array.size(swing_highs) - 1 to 0
+        SwingMem s = array.get(swing_highs, i)
+        if bar_index - s.bar_idx <= mss_lookback
+            mss_high := s.price
+            break
+
+bool mss_bear = not na(mss_low) and close < mss_low
+bool mss_bull = not na(mss_high) and close > mss_high
+//#endregion
+
+//#region Order Blocks
+var OrderBlock[] ob_array = array.new<OrderBlock>()
+
+create_ob(int start_idx, float top_val, float bot_val, bool is_bull) =>
+    float mid_val = (top_val + bot_val) / 2.0
+    color fill_col = is_bull ? bull_ob_col : bear_ob_col
+    color border_col = is_bull ? color.new(color.green, 40) : color.new(color.red, 40)
+    box b = na
+    line l = na
+    if show_obs
+        b := box.new(start_idx, top_val, bar_index, bot_val, bgcolor=fill_col, border_color=border_col)
+        l := line.new(start_idx, mid_val, bar_index, mid_val, color=border_col, style=line.style_dashed)
+    OrderBlock.new(b, l, top_val, bot_val, mid_val, start_idx, is_bull, true, false, false, false)
+
+find_ob_candle(bool want_bearish_candle, int search_depth) =>
+    int ob_idx = na
+    float ob_high = na
+    float ob_low = na
+    for i = 1 to search_depth
+        bool match = want_bearish_candle ? close[i] < open[i] : close[i] > open[i]
+        if match
+            ob_idx := bar_index - i
+            ob_high := high[i]
+            ob_low := low[i]
+            break
+    if not na(ob_idx)
+        int inner_i = bar_index - ob_idx
+        int search_start = inner_i + 1
+        int engulf_end = math.min(search_depth, inner_i + ob_engulf_lookback)
+        if search_start <= engulf_end
+            for j = search_start to engulf_end
+                bool engulf_match = want_bearish_candle ? close[j] < open[j] : close[j] > open[j]
+                if engulf_match and high[j] >= ob_high and low[j] <= ob_low
+                    ob_idx := bar_index - j
+                    ob_high := high[j]
+                    ob_low := low[j]
+    [ob_idx, ob_high, ob_low]
+
+if bullish_bos
+    int depth = math.min(100, bar_index - (na(last_pl_idx) ? 0 : last_pl_idx))
+    [ob_idx, ob_high, ob_low] = find_ob_candle(true, math.max(depth, 1))
+    if not na(ob_idx)
+        array.push(ob_array, create_ob(ob_idx, ob_high, ob_low, true))
+
+if bearish_bos
+    int depth = math.min(100, bar_index - (na(last_ph_idx) ? 0 : last_ph_idx))
+    [ob_idx, ob_high, ob_low] = find_ob_candle(false, math.max(depth, 1))
+    if not na(ob_idx)
+        array.push(ob_array, create_ob(ob_idx, ob_high, ob_low, false))
+
+// آپدیت OB / تبدیل به بریکر
+if array.size(ob_array) > 0
+    for i = 0 to array.size(ob_array) - 1
+        OrderBlock ob = array.get(ob_array, i)
+        ob.just_broke := false
+        if ob.active
+            if show_obs and not na(ob.zone_box)
+                box.set_right(ob.zone_box, bar_index)
+            if show_obs and not na(ob.mid_line)
+                line.set_x2(ob.mid_line, bar_index)
+
+            if ob.is_bullish
+                if not ob.is_breaker
+                    if close < ob.bottom
+                        ob.is_breaker := true
+                        ob.just_broke := true
+                        ob.signal_armed := true
+                        if show_obs and not na(ob.zone_box)
+                            box.set_bgcolor(ob.zone_box, bear_bb_col)
+                            box.set_border_color(ob.zone_box, color.new(color.maroon, 30))
+                        if show_obs and not na(ob.mid_line)
+                            line.set_color(ob.mid_line, color.new(color.maroon, 30))
+                else
+                    if close > ob.top
+                        ob.active := false
+            else
+                if not ob.is_breaker
+                    if close > ob.top
+                        ob.is_breaker := true
+                        ob.just_broke := true
+                        ob.signal_armed := true
+                        if show_obs and not na(ob.zone_box)
+                            box.set_bgcolor(ob.zone_box, bull_bb_col)
+                            box.set_border_color(ob.zone_box, color.new(color.teal, 30))
+                        if show_obs and not na(ob.mid_line)
+                            line.set_color(ob.mid_line, color.new(color.teal, 30))
+                else
+                    if close < ob.bottom
+                        ob.active := false
+
+while array.size(ob_array) > max_ob_count
+    OrderBlock old_ob = array.shift(ob_array)
+    if not na(old_ob.zone_box)
+        box.delete(old_ob.zone_box)
+    if not na(old_ob.mid_line)
+        line.delete(old_ob.mid_line)
+//#endregion
+
+//#region Liquidity BSL/SSL + EQH/EQL
+var LiquidityLevel[] liq_array = array.new<LiquidityLevel>()
+
+register_liquidity(int pivot_idx, float pivot_price, bool is_high) =>
+    float tolerance = eq_tolerance_ticks * syminfo.mintick
+    float zone_pad = tolerance * eq_zone_multiplier
+    bool matched = false
+    if array.size(liq_array) > 0
+        for i = 0 to array.size(liq_array) - 1
+            LiquidityLevel existing = array.get(liq_array, i)
+            if not matched and existing.is_high == is_high and not existing.swept and math.abs(existing.price - pivot_price) <= tolerance
+                matched := true
+                existing.is_equal := true
+                float cur_top = na(existing.zone_top) ? existing.price : existing.zone_top
+                float cur_bottom = na(existing.zone_bottom) ? existing.price : existing.zone_bottom
+                existing.zone_top := math.max(cur_top, pivot_price) + zone_pad
+                existing.zone_bottom := math.min(cur_bottom, pivot_price) - zone_pad
+                color zone_col = is_high ? eqh_color : eql_color
+                if na(existing.zone_box)
+                    if not na(existing.lvl_line)
+                        line.delete(existing.lvl_line)
+                        existing.lvl_line := na
+                    if show_equal_hl
+                        existing.zone_box := box.new(existing.start_idx, existing.zone_top, bar_index, existing.zone_bottom, bgcolor=color.new(zone_col, 85), border_color=color.new(zone_col, 70), border_style=line.style_dotted)
+                else if show_equal_hl
+                    box.set_top(existing.zone_box, existing.zone_top)
+                    box.set_bottom(existing.zone_box, existing.zone_bottom)
+                    box.set_right(existing.zone_box, bar_index)
+
+    if not matched
+        color lvl_color = is_high ? bsl_color : ssl_color
+        line new_line = show_liquidity ? line.new(pivot_idx, pivot_price, bar_index, pivot_price, extend=extend.right, color=lvl_color, style=line.style_dotted) : na
+        array.push(liq_array, LiquidityLevel.new(new_line, na, pivot_idx, pivot_price, na, na, is_high, false, false, na))
+
+// همیشه برای منطق سیگنال ثبت می‌شود؛ رسم فقط با show_liquidity / show_equal_hl
+if not na(ph)
+    register_liquidity(bar_index - pivot_len, ph, true)
+
+if not na(pl)
+    register_liquidity(bar_index - pivot_len, pl, false)
+
+if array.size(liq_array) > 0
+    for i = 0 to array.size(liq_array) - 1
+        LiquidityLevel lvl = array.get(liq_array, i)
+        if not lvl.swept
+            if not na(lvl.zone_box)
+                box.set_right(lvl.zone_box, bar_index)
+                bool zone_swept_now = lvl.is_high ? close > lvl.zone_top : close < lvl.zone_bottom
+                if zone_swept_now
+                    lvl.swept := true
+                    lvl.swept_bar := bar_index
+                    box.set_bgcolor(lvl.zone_box, color.new(swept_color, 85))
+                    box.set_border_color(lvl.zone_box, swept_color)
+            else
+                // سطح تک یا EQ بدون باکس رسم‌شده: سوئیپ منطقی همچنان ثبت می‌شود
+                if not na(lvl.zone_top) and not na(lvl.zone_bottom)
+                    bool zone_swept_logic = lvl.is_high ? close > lvl.zone_top : close < lvl.zone_bottom
+                    if zone_swept_logic
+                        lvl.swept := true
+                        lvl.swept_bar := bar_index
+                else
+                    bool lvl_swept_now = lvl.is_high ? close > lvl.price : close < lvl.price
+                    if lvl_swept_now
+                        lvl.swept := true
+                        lvl.swept_bar := bar_index
+                        if not na(lvl.lvl_line)
+                            line.set_extend(lvl.lvl_line, extend.none)
+                            line.set_x2(lvl.lvl_line, bar_index)
+                            line.set_color(lvl.lvl_line, swept_color)
+
+while array.size(liq_array) > max_liq_count
+    LiquidityLevel old_lvl = array.shift(liq_array)
+    if not na(old_lvl.lvl_line)
+        line.delete(old_lvl.lvl_line)
+    if not na(old_lvl.zone_box)
+        box.delete(old_lvl.zone_box)
+
+// آخرین BSL / SSL (نزده یا زده‌شده‌ی اخیر)
+liq_edge(LiquidityLevel lvl) =>
+    float edge = lvl.price
+    if not na(lvl.zone_top) and not na(lvl.zone_bottom)
+        edge := lvl.is_high ? lvl.zone_top : lvl.zone_bottom
+    edge
+
+find_last_bsl() =>
+    float px = na
+    bool swept = false
+    int sbar = na
+    int sidx = na
+    if array.size(liq_array) > 0
+        for i = array.size(liq_array) - 1 to 0
+            LiquidityLevel lvl = array.get(liq_array, i)
+            if lvl.is_high
+                px := liq_edge(lvl)
+                swept := lvl.swept
+                sbar := lvl.swept_bar
+                sidx := lvl.start_idx
+                break
+    [px, swept, sbar, sidx]
+
+find_last_ssl() =>
+    float px = na
+    bool swept = false
+    int sbar = na
+    int sidx = na
+    if array.size(liq_array) > 0
+        for i = array.size(liq_array) - 1 to 0
+            LiquidityLevel lvl = array.get(liq_array, i)
+            if not lvl.is_high
+                px := liq_edge(lvl)
+                swept := lvl.swept
+                sbar := lvl.swept_bar
+                sidx := lvl.start_idx
+                break
+    [px, swept, sbar, sidx]
+
+find_nearest_unswept(bool want_high, bool below_price) =>
+    float best = na
+    float ref = close
+    if array.size(liq_array) > 0
+        for i = 0 to array.size(liq_array) - 1
+            LiquidityLevel lvl = array.get(liq_array, i)
+            if lvl.is_high == want_high and not lvl.swept
+                float edge = liq_edge(lvl)
+                bool side_ok = below_price ? edge < ref : edge > ref
+                if side_ok
+                    if na(best)
+                        best := edge
+                    else if below_price
+                        best := math.max(best, edge)
+                    else
+                        best := math.min(best, edge)
+    best
+//#endregion
+
+//#region FVGs
+var FVGZone[] fvg_array = array.new<FVGZone>()
+
+float min_fvg_size = min_fvg_ticks * syminfo.mintick
+bool bull_fvg_now = low > high[2] and (low - high[2]) >= min_fvg_size
+bool bear_fvg_now = high < low[2] and (low[2] - high) >= min_fvg_size
+
+if bull_fvg_now
+    box b = show_fvg ? box.new(bar_index - 2, low, bar_index, high[2], bgcolor=bull_fvg_col, border_color=color.new(#26a69a, 50)) : na
+    array.push(fvg_array, FVGZone.new(b, low, high[2], bar_index - 2, true, false))
+
+if bear_fvg_now
+    box b = show_fvg ? box.new(bar_index - 2, low[2], bar_index, high, bgcolor=bear_fvg_col, border_color=color.new(#ef5350, 50)) : na
+    array.push(fvg_array, FVGZone.new(b, low[2], high, bar_index - 2, false, false))
+
+if array.size(fvg_array) > 0
+    for i = 0 to array.size(fvg_array) - 1
+        FVGZone f = array.get(fvg_array, i)
+        if not f.touched
+            if show_fvg and not na(f.zone_box)
+                box.set_right(f.zone_box, bar_index)
+            bool hit = f.is_bull ? low <= f.top : high >= f.bottom
+            if hit
+                f.touched := true
+                if show_fvg and not na(f.zone_box)
+                    box.set_bgcolor(f.zone_box, color.new(color.gray, 90))
+                    box.set_border_color(f.zone_box, swept_color)
+
+while array.size(fvg_array) > max_fvg_count
+    FVGZone old_f = array.shift(fvg_array)
+    if not na(old_f.zone_box)
+        box.delete(old_f.zone_box)
+
+find_nearest_untouched_fvg(bool want_bull, bool below_price) =>
+    float best_edge = na
+    if array.size(fvg_array) > 0
+        for i = 0 to array.size(fvg_array) - 1
+            FVGZone f = array.get(fvg_array, i)
+            if f.is_bull == want_bull and not f.touched
+                float edge = want_bull ? f.top : f.bottom
+                bool side_ok = below_price ? edge < close : edge > close
+                if side_ok
+                    if na(best_edge)
+                        best_edge := edge
+                    else if below_price
+                        best_edge := math.max(best_edge, edge)
+                    else
+                        best_edge := math.min(best_edge, edge)
+    best_edge
+//#endregion
+
+//#region Signal engine
+var int last_signal_bar = na
+var line sl_line = na
+var line tp1_line = na
+var line tp2_line = na
+var label sig_label = na
+
+can_signal() =>
+    na(last_signal_bar) or (bar_index - last_signal_bar) >= signal_cooldown
+
+clear_trade_drawings() =>
+    if not na(sl_line)
+        line.delete(sl_line)
+        sl_line := na
+    if not na(tp1_line)
+        line.delete(tp1_line)
+        tp1_line := na
+    if not na(tp2_line)
+        line.delete(tp2_line)
+        tp2_line := na
+    if not na(sig_label)
+        label.delete(sig_label)
+        sig_label := na
+
+draw_signal(bool is_long, bool is_mitigation, float entry, float sl, float tp1, float tp2) =>
+    clear_trade_drawings()
+    color c = is_mitigation ? (is_long ? mit_long_col : mit_short_col) : (is_long ? brk_long_col : brk_short_col)
+    string kind = is_mitigation ? "MITIGATION" : "BREAKER"
+    string side = is_long ? "LONG" : "SHORT"
+    string txt = kind + " " + side + "\nEntry " + str.tostring(entry, format.mintick) + "\nSL " + str.tostring(sl, format.mintick)
+    if not na(tp1)
+        txt += "\nTP1 Liq " + str.tostring(tp1, format.mintick)
+    if not na(tp2)
+        txt += "\nTP2 FVG " + str.tostring(tp2, format.mintick)
+    sig_label := label.new(bar_index, is_long ? low : high, txt, style=is_long ? label.style_label_up : label.style_label_down, color=c, textcolor=color.white, size=size.small)
+    sl_line := line.new(bar_index, sl, bar_index + 20, sl, color=color.red, style=line.style_solid, width=2)
+    if not na(tp1)
+        tp1_line := line.new(bar_index, tp1, bar_index + 20, tp1, color=color.orange, style=line.style_dotted, width=2)
+    if not na(tp2)
+        tp2_line := line.new(bar_index, tp2, bar_index + 20, tp2, color=color.teal, style=line.style_dotted, width=2)
+
+float sl_pad = sl_buffer_ticks * syminfo.mintick
+[last_bsl, last_bsl_swept, last_bsl_swept_bar, last_bsl_start] = find_last_bsl()
+[last_ssl, last_ssl_swept, last_ssl_swept_bar, last_ssl_start] = find_last_ssl()
+
+// آیا شکست OB با لمس دوباره زون بریکر هم‌زمان است؟
+ob_retest_ready(OrderBlock ob) =>
+    if enter_on_break
+        ob.just_broke
+    else
+        ob.is_breaker and ob.signal_armed and not ob.just_broke and high >= ob.bottom and low <= ob.top
+
+bool fired = false
+
+if can_signal() and array.size(ob_array) > 0
+    // از جدیدترین OB به عقب
+    for i = array.size(ob_array) - 1 to 0
+        if not fired
+            OrderBlock ob = array.get(ob_array, i)
+            bool ready = ob_retest_ready(ob)
+            if ready and ob.active
+                // ----- SHORT: شکست OB صعودی -----
+                if ob.is_bullish and ob.is_breaker
+                    bool mss_ok = not require_mss or mss_bear or close < ob.bottom
+                    bool trend_ok = struct_bull or close > nz(last_ssl, close)
+                    if mss_ok and trend_ok and not na(last_bsl)
+                        bool mitigation_case = not last_bsl_swept
+                        // سوئیپ اخیرِ همان BSL قبل/همراه شکست = بریکر کلاسیک
+                        bool breaker_case = last_bsl_swept and not na(last_bsl_swept_bar) and last_bsl_swept_bar <= bar_index and (bar_index - last_bsl_swept_bar) <= mss_lookback
+
+                        float entry = close
+                        float sl = last_bsl + sl_pad
+                        float tp1 = show_tp_ssl_bsl ? find_nearest_unswept(false, true) : na
+                        float tp2 = show_tp_fvg ? find_nearest_untouched_fvg(false, true) : na
+
+                        if mitigation_case and enable_mitigation and sl > entry
+                            draw_signal(false, true, entry, sl, tp1, tp2)
+                            last_signal_bar := bar_index
+                            ob.signal_armed := false
+                            fired := true
+                        else if breaker_case and enable_breaker and sl > entry
+                            draw_signal(false, false, entry, sl, tp1, tp2)
+                            last_signal_bar := bar_index
+                            ob.signal_armed := false
+                            fired := true
+
+                // ----- LONG: شکست OB نزولی -----
+                if not fired and not ob.is_bullish and ob.is_breaker
+                    bool mss_ok = not require_mss or mss_bull or close > ob.top
+                    bool trend_ok = struct_bear or close < nz(last_bsl, close)
+                    if mss_ok and trend_ok and not na(last_ssl)
+                        bool mitigation_case = not last_ssl_swept
+                        bool breaker_case = last_ssl_swept and not na(last_ssl_swept_bar) and last_ssl_swept_bar <= bar_index and (bar_index - last_ssl_swept_bar) <= mss_lookback
+
+                        float entry = close
+                        float sl = last_ssl - sl_pad
+                        float tp1 = show_tp_ssl_bsl ? find_nearest_unswept(true, false) : na
+                        float tp2 = show_tp_fvg ? find_nearest_untouched_fvg(true, false) : na
+
+                        if mitigation_case and enable_mitigation and sl < entry
+                            draw_signal(true, true, entry, sl, tp1, tp2)
+                            last_signal_bar := bar_index
+                            ob.signal_armed := false
+                            fired := true
+                        else if breaker_case and enable_breaker and sl < entry
+                            draw_signal(true, false, entry, sl, tp1, tp2)
+                            last_signal_bar := bar_index
+                            ob.signal_armed := false
+                            fired := true
+//#endregion
+
+//#region Debug / status plots (Data Window)
+plotchar(struct_bull, "Struct Bull", "", location.top, color=color.new(color.green, 100))
+plotchar(struct_bear, "Struct Bear", "", location.top, color=color.new(color.red, 100))
+plotchar(mss_bear, "MSS Bear", "", location.top, color=color.new(color.red, 100))
+plotchar(mss_bull, "MSS Bull", "", location.top, color=color.new(color.green, 100))
+plot(last_bsl, "Last BSL", display=display.data_window)
+plot(last_ssl, "Last SSL", display=display.data_window)
+plotchar(last_bsl_swept, "Last BSL Swept", "", location.top, color=color.new(color.orange, 100))
+plotchar(last_ssl_swept, "Last SSL Swept", "", location.top, color=color.new(color.blue, 100))
+
+// آلرت‌ها: لیبل آخرین سیگنال روی همین بار ساخته شده باشد
+bool alert_now = not na(sig_label) and not na(last_signal_bar) and last_signal_bar == bar_index
+alertcondition(alert_now, title="Liquidity Reversal Signal", message="ICT Liquidity Reversal signal fired")
+//#endregion

@@ -1,5 +1,5 @@
 //@version=5
-indicator("ICT Liquidity Reversal (Mitigation / Breaker)", overlay=true, max_boxes_count=500, max_lines_count=500, max_labels_count=500)
+strategy("ICT Liquidity Reversal (Mitigation / Breaker)", overlay=true, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, commission_type=strategy.commission.percent, commission_value=0.1, pyramiding=0, process_orders_on_close=true, max_boxes_count=500, max_lines_count=500, max_labels_count=500)
 
 // =============================================================================
 // هدف: دنبال کردن BSL/SSL + EQH/EQL + اردربلاک‌ها
@@ -8,6 +8,7 @@ indicator("ICT Liquidity Reversal (Mitigation / Breaker)", overlay=true, max_box
 //   B) Breaker کلاسیک: آخرین نقدینگی زده می‌شود + همان OB می‌شکند + MSS
 // SL: بالای BSL آخر (شورت) / زیر SSL آخر (لانگ)
 // TP: نزدیک‌ترین FVG تاچ‌نشده مخالف + نزدیک‌ترین نقدینگی مخالف
+// استراتژی: همهٔ سیگنال‌های تاریخی وارد Strategy Tester می‌شوند (بکتست)
 // =============================================================================
 
 //#region Inputs
@@ -16,10 +17,12 @@ string GRP_OB  = "Order Blocks"
 string GRP_LIQ = "Liquidity"
 string GRP_FVG = "Fair Value Gaps"
 string GRP_SIG = "Signals"
+string GRP_BT  = "Backtest / Exits"
 string GRP_VIS = "Visuals"
 
 int pivot_len = input.int(5, "Pivot Length", minval=2, group=GRP_STR)
 int mss_lookback = input.int(50, "MSS Lookback (bars)", minval=10, group=GRP_STR, tooltip="برای تأیید شیفت ساختار، آخرین سوینگ مخالف در این بازه چک می‌شود")
+bool require_structure = input.bool(false, "Require HH/HL or LH/LL Structure", group=GRP_STR, tooltip="اگر خاموش باشد فقط شکست OB + نقدینگی کافی است (سیگنال تاریخی بیشتر)")
 
 int max_ob_count = input.int(40, "Max OBs Tracked", minval=5, group=GRP_OB)
 int ob_engulf_lookback = input.int(20, "OB Engulf Search Depth", minval=1, group=GRP_OB)
@@ -41,8 +44,13 @@ bool require_mss = input.bool(true, "Require MSS / CHoCH", group=GRP_SIG)
 bool enter_on_break = input.bool(true, "Signal on OB Break Candle", group=GRP_SIG, tooltip="اگر خاموش باشد فقط وقتی زون بریکر دوباره لمس شود سیگنال می‌دهد")
 float sl_buffer_ticks = input.float(5, "SL Buffer (ticks)", minval=0, group=GRP_SIG)
 int signal_cooldown = input.int(10, "Cooldown Between Signals (bars)", minval=0, group=GRP_SIG)
-bool show_tp_ssl_bsl = input.bool(true, "TP1 = Opposing Liquidity", group=GRP_SIG)
-bool show_tp_fvg = input.bool(true, "TP2 = Untouched Opposing FVG", group=GRP_SIG)
+bool show_tp_ssl_bsl = input.bool(true, "Prefer TP = Opposing Liquidity", group=GRP_SIG)
+bool show_tp_fvg = input.bool(true, "Else TP = Untouched Opposing FVG", group=GRP_SIG)
+
+float rr_fallback = input.float(2.0, "Fallback RR if no TP target", minval=0.5, step=0.1, group=GRP_BT)
+bool one_trade_at_a_time = input.bool(true, "One Trade at a Time", group=GRP_BT)
+bool keep_history_labels = input.bool(true, "Keep Historical Signal Labels", group=GRP_BT)
+int max_history_labels = input.int(80, "Max Historical Labels", minval=10, maxval=400, group=GRP_BT)
 
 color bull_ob_col = input.color(color.new(color.green, 88), "Bullish OB", group=GRP_VIS)
 color bear_ob_col = input.color(color.new(color.red, 88), "Bearish OB", group=GRP_VIS)
@@ -453,14 +461,13 @@ find_nearest_untouched_fvg(bool want_bull, bool below_price) =>
     best_edge
 //#endregion
 
-//#region Signal engine
-// نکته Pine: داخل فانکشن نمی‌شود به var گلوبال (مثل sl_line) مقدار داد.
-// رسم کاملاً در اسکوپ اصلی انجام می‌شود.
+//#region Signal engine + strategy entries (historical backtest)
+// نکته Pine: داخل فانکشن نمی‌شود به var گلوبال مقدار داد.
+// لیبل‌های تاریخی پاک نمی‌شوند تا روی چارت بکتست دیده شوند.
 var int last_signal_bar = na
-var line sl_line = na
-var line tp1_line = na
-var line tp2_line = na
-var label sig_label = na
+var label[] hist_labels = array.new_label()
+var line[] hist_sl_lines = array.new_line()
+var line[] hist_tp_lines = array.new_line()
 
 can_signal() =>
     na(last_signal_bar) or (bar_index - last_signal_bar) >= signal_cooldown
@@ -472,15 +479,31 @@ float sl_pad = sl_buffer_ticks * syminfo.mintick
 ob_retest_ready(OrderBlock ob) =>
     enter_on_break ? ob.just_broke : ob.is_breaker and ob.signal_armed and not ob.just_broke and high >= ob.bottom and low <= ob.top
 
+pick_tp(bool is_long, float entry, float sl, float liq_tp, float fvg_tp) =>
+    float tp = na
+    if show_tp_ssl_bsl and not na(liq_tp)
+        bool ok = is_long ? liq_tp > entry : liq_tp < entry
+        if ok
+            tp := liq_tp
+    if na(tp) and show_tp_fvg and not na(fvg_tp)
+        bool ok = is_long ? fvg_tp > entry : fvg_tp < entry
+        if ok
+            tp := fvg_tp
+    if na(tp)
+        float risk = math.abs(entry - sl)
+        tp := is_long ? entry + risk * rr_fallback : entry - risk * rr_fallback
+    tp
+
 bool fired = false
 bool sig_is_long = false
 bool sig_is_mitigation = false
 float sig_entry = na
 float sig_sl = na
-float sig_tp1 = na
-float sig_tp2 = na
+float sig_tp = na
 
-if can_signal() and array.size(ob_array) > 0
+bool flat_or_ok = not one_trade_at_a_time or strategy.position_size == 0
+
+if can_signal() and flat_or_ok and array.size(ob_array) > 0
     for i = array.size(ob_array) - 1 to 0
         if not fired
             OrderBlock ob = array.get(ob_array, i)
@@ -489,33 +512,32 @@ if can_signal() and array.size(ob_array) > 0
                 // ----- SHORT: شکست OB صعودی -----
                 if ob.is_bullish and ob.is_breaker
                     bool mss_ok = not require_mss or mss_bear or close < ob.bottom
-                    bool trend_ok = struct_bull or close > nz(last_ssl, close)
+                    bool trend_ok = not require_structure or struct_bull
                     if mss_ok and trend_ok and not na(last_bsl)
                         bool mitigation_case = not last_bsl_swept
                         bool breaker_case = last_bsl_swept and not na(last_bsl_swept_bar) and last_bsl_swept_bar <= bar_index and (bar_index - last_bsl_swept_bar) <= mss_lookback
 
                         float entry = close
                         float sl = last_bsl + sl_pad
-                        float tp1 = show_tp_ssl_bsl ? find_nearest_unswept(false, true) : na
-                        float tp2 = show_tp_fvg ? find_nearest_untouched_fvg(false, true) : na
+                        float liq_tp = find_nearest_unswept(false, true)
+                        float fvg_tp = find_nearest_untouched_fvg(false, true)
+                        float tp = pick_tp(false, entry, sl, liq_tp, fvg_tp)
 
-                        if mitigation_case and enable_mitigation and sl > entry
+                        if mitigation_case and enable_mitigation and sl > entry and tp < entry
                             sig_is_long := false
                             sig_is_mitigation := true
                             sig_entry := entry
                             sig_sl := sl
-                            sig_tp1 := tp1
-                            sig_tp2 := tp2
+                            sig_tp := tp
                             last_signal_bar := bar_index
                             ob.signal_armed := false
                             fired := true
-                        else if breaker_case and enable_breaker and sl > entry
+                        else if breaker_case and enable_breaker and sl > entry and tp < entry
                             sig_is_long := false
                             sig_is_mitigation := false
                             sig_entry := entry
                             sig_sl := sl
-                            sig_tp1 := tp1
-                            sig_tp2 := tp2
+                            sig_tp := tp
                             last_signal_bar := bar_index
                             ob.signal_armed := false
                             fired := true
@@ -523,70 +545,69 @@ if can_signal() and array.size(ob_array) > 0
                 // ----- LONG: شکست OB نزولی -----
                 if not fired and not ob.is_bullish and ob.is_breaker
                     bool mss_ok = not require_mss or mss_bull or close > ob.top
-                    bool trend_ok = struct_bear or close < nz(last_bsl, close)
+                    bool trend_ok = not require_structure or struct_bear
                     if mss_ok and trend_ok and not na(last_ssl)
                         bool mitigation_case = not last_ssl_swept
                         bool breaker_case = last_ssl_swept and not na(last_ssl_swept_bar) and last_ssl_swept_bar <= bar_index and (bar_index - last_ssl_swept_bar) <= mss_lookback
 
                         float entry = close
                         float sl = last_ssl - sl_pad
-                        float tp1 = show_tp_ssl_bsl ? find_nearest_unswept(true, false) : na
-                        float tp2 = show_tp_fvg ? find_nearest_untouched_fvg(true, false) : na
+                        float liq_tp = find_nearest_unswept(true, false)
+                        float fvg_tp = find_nearest_untouched_fvg(true, false)
+                        float tp = pick_tp(true, entry, sl, liq_tp, fvg_tp)
 
-                        if mitigation_case and enable_mitigation and sl < entry
+                        if mitigation_case and enable_mitigation and sl < entry and tp > entry
                             sig_is_long := true
                             sig_is_mitigation := true
                             sig_entry := entry
                             sig_sl := sl
-                            sig_tp1 := tp1
-                            sig_tp2 := tp2
+                            sig_tp := tp
                             last_signal_bar := bar_index
                             ob.signal_armed := false
                             fired := true
-                        else if breaker_case and enable_breaker and sl < entry
+                        else if breaker_case and enable_breaker and sl < entry and tp > entry
                             sig_is_long := true
                             sig_is_mitigation := false
                             sig_entry := entry
                             sig_sl := sl
-                            sig_tp1 := tp1
-                            sig_tp2 := tp2
+                            sig_tp := tp
                             last_signal_bar := bar_index
                             ob.signal_armed := false
                             fired := true
 
-// رسم در اسکوپ اصلی — بدون tuple برگشتی از فانکشن
+// ورود تاریخی + لیبل‌های ماندگار روی چارت
 if fired
-    if not na(sl_line)
-        line.delete(sl_line)
-        sl_line := na
-    if not na(tp1_line)
-        line.delete(tp1_line)
-        tp1_line := na
-    if not na(tp2_line)
-        line.delete(tp2_line)
-        tp2_line := na
-    if not na(sig_label)
-        label.delete(sig_label)
-        sig_label := na
+    string tag = sig_is_mitigation ? "MIT" : "BRK"
+    if sig_is_long
+        strategy.entry("L-" + tag, strategy.long)
+        strategy.exit("LX-" + tag, from_entry="L-" + tag, stop=sig_sl, limit=sig_tp)
+    else
+        strategy.entry("S-" + tag, strategy.short)
+        strategy.exit("SX-" + tag, from_entry="S-" + tag, stop=sig_sl, limit=sig_tp)
 
-    color sig_col = sig_is_mitigation ? (sig_is_long ? mit_long_col : mit_short_col) : (sig_is_long ? brk_long_col : brk_short_col)
-    string sig_kind = sig_is_mitigation ? "MITIGATION" : "BREAKER"
-    string sig_side = sig_is_long ? "LONG" : "SHORT"
-    string sig_txt = sig_kind + " " + sig_side + "\nEntry " + str.tostring(sig_entry, format.mintick) + "\nSL " + str.tostring(sig_sl, format.mintick)
-    if not na(sig_tp1)
-        sig_txt += "\nTP1 Liq " + str.tostring(sig_tp1, format.mintick)
-    if not na(sig_tp2)
-        sig_txt += "\nTP2 FVG " + str.tostring(sig_tp2, format.mintick)
-
-    sig_label := label.new(bar_index, sig_is_long ? low : high, sig_txt, style=sig_is_long ? label.style_label_up : label.style_label_down, color=sig_col, textcolor=color.white, size=size.small)
-    sl_line := line.new(bar_index, sig_sl, bar_index + 20, sig_sl, color=color.red, style=line.style_solid, width=2)
-    if not na(sig_tp1)
-        tp1_line := line.new(bar_index, sig_tp1, bar_index + 20, sig_tp1, color=color.orange, style=line.style_dotted, width=2)
-    if not na(sig_tp2)
-        tp2_line := line.new(bar_index, sig_tp2, bar_index + 20, sig_tp2, color=color.teal, style=line.style_dotted, width=2)
+    if keep_history_labels
+        color sig_col = sig_is_mitigation ? (sig_is_long ? mit_long_col : mit_short_col) : (sig_is_long ? brk_long_col : brk_short_col)
+        string sig_kind = sig_is_mitigation ? "MITIGATION" : "BREAKER"
+        string sig_side = sig_is_long ? "LONG" : "SHORT"
+        string sig_txt = sig_kind + " " + sig_side + "\nEntry " + str.tostring(sig_entry, format.mintick) + "\nSL " + str.tostring(sig_sl, format.mintick) + "\nTP " + str.tostring(sig_tp, format.mintick)
+        label lbl = label.new(bar_index, sig_is_long ? low : high, sig_txt, style=sig_is_long ? label.style_label_up : label.style_label_down, color=sig_col, textcolor=color.white, size=size.tiny)
+        line sln = line.new(bar_index, sig_sl, bar_index + 15, sig_sl, color=color.red, style=line.style_solid, width=1)
+        line tpn = line.new(bar_index, sig_tp, bar_index + 15, sig_tp, color=color.teal, style=line.style_dotted, width=1)
+        array.push(hist_labels, lbl)
+        array.push(hist_sl_lines, sln)
+        array.push(hist_tp_lines, tpn)
+        while array.size(hist_labels) > max_history_labels
+            label.delete(array.shift(hist_labels))
+            line.delete(array.shift(hist_sl_lines))
+            line.delete(array.shift(hist_tp_lines))
 //#endregion
 
-//#region Debug / status plots (Data Window)
+//#region Markers + debug (همهٔ سیگنال‌های تاریخی روی چارت می‌مانند)
+plotshape(fired and sig_is_long and sig_is_mitigation, title="Mit Long", style=shape.triangleup, location=location.belowbar, color=mit_long_col, size=size.small, text="MIT")
+plotshape(fired and not sig_is_long and sig_is_mitigation, title="Mit Short", style=shape.triangledown, location=location.abovebar, color=mit_short_col, size=size.small, text="MIT")
+plotshape(fired and sig_is_long and not sig_is_mitigation, title="Brk Long", style=shape.triangleup, location=location.belowbar, color=brk_long_col, size=size.small, text="BRK")
+plotshape(fired and not sig_is_long and not sig_is_mitigation, title="Brk Short", style=shape.triangledown, location=location.abovebar, color=brk_short_col, size=size.small, text="BRK")
+
 plotchar(struct_bull, "Struct Bull", "", location.top, color=color.new(color.green, 100))
 plotchar(struct_bear, "Struct Bear", "", location.top, color=color.new(color.red, 100))
 plotchar(mss_bear, "MSS Bear", "", location.top, color=color.new(color.red, 100))
@@ -595,8 +616,5 @@ plot(last_bsl, "Last BSL", display=display.data_window)
 plot(last_ssl, "Last SSL", display=display.data_window)
 plotchar(last_bsl_swept, "Last BSL Swept", "", location.top, color=color.new(color.orange, 100))
 plotchar(last_ssl_swept, "Last SSL Swept", "", location.top, color=color.new(color.blue, 100))
-
-// آلرت‌ها: لیبل آخرین سیگنال روی همین بار ساخته شده باشد
-bool alert_now = not na(sig_label) and not na(last_signal_bar) and last_signal_bar == bar_index
-alertcondition(alert_now, title="Liquidity Reversal Signal", message="ICT Liquidity Reversal signal fired")
+plotchar(fired, "Signal Fired", "", location.top, color=color.new(color.white, 100))
 //#endregion

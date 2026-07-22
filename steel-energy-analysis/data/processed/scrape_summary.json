@@ -33,5 +33,26 @@
     "n_energy_rows": 102,
     "n_product_rows": 206,
     "n_errors": 6
+  },
+  {
+    "symbol": "کاوه",
+    "n_periods": 63,
+    "n_energy_rows": 26,
+    "n_product_rows": 281,
+    "n_errors": 6
+  },
+  {
+    "symbol": "فصبا",
+    "n_periods": 54,
+    "n_energy_rows": 13,
+    "n_product_rows": 137,
+    "n_errors": 5
+  },
+  {
+    "symbol": "فسبزوار",
+    "n_periods": 58,
+    "n_energy_rows": 48,
+    "n_product_rows": 175,
+    "n_errors": 5
   }
 ]

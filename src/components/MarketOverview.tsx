@@ -54,9 +54,11 @@ export function MarketOverview({
 }) {
   const o = data.overview
   const live = o.dataSource === 'live'
+  const src = o.fieldSources || {}
   const money = o.moneyFlowSeries.map((d) => ({ label: d.date, value: d.value }))
   const candles = o.candles1401 || []
   const retailDaily = o.retailMoneyFlowDaily
+  const blocked = o.blockedSources || []
 
   return (
     <section id="overview" className="scroll-mt-8 space-y-4">
@@ -64,21 +66,46 @@ export function MarketOverview({
         <h2 className="section-title">خلاصه بازار سرمایه ایران</h2>
         <p className="section-sub">
           {live
-            ? 'زنده: شاخص و دلار از TGJU · ارزش بازار/معاملات/تاثیر از شاخص‌بان'
-            : 'شاخص کل زنده از TGJU · جزئیات تا بارگذاری اسکرپر از seed'}
+            ? 'شاخص‌ها زنده · ارزش بازار رسمی TSETMC تا IP ایران موقت از تابلو · پول حقیقی از پارسیس'
+            : 'در حال بارگذاری داده زنده…'}
         </p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label={o.tedpix.name} value={fmtInt(o.tedpix.value)} change={o.tedpix.change} changePct={o.tedpix.changePct} delay={0.02} hint="TGJU" />
-        <Kpi label={o.equalWeight.name} value={fmtInt(o.equalWeight.value)} change={o.equalWeight.change} changePct={o.equalWeight.changePct} delay={0.05} hint="گزارش / seed" />
-        <Kpi label={o.ifb.name} value={fmtInt(o.ifb.value)} change={o.ifb.change} changePct={o.ifb.changePct} delay={0.08} hint="گزارش / seed" />
+        <Kpi
+          label={o.tedpix.name}
+          value={fmtInt(o.tedpix.value)}
+          change={o.tedpix.change}
+          changePct={o.tedpix.changePct}
+          delay={0.02}
+          hint={src.tedpix === 'tgju' ? 'TGJU' : 'شاخص‌بان / TGJU'}
+        />
+        <Kpi
+          label={o.equalWeight.name}
+          value={fmtInt(o.equalWeight.value)}
+          change={o.equalWeight.change}
+          changePct={o.equalWeight.changePct}
+          delay={0.05}
+          hint={src.equalWeight ? 'شاخص‌بان (زنده)' : 'seed'}
+        />
+        <Kpi
+          label={o.ifb.name}
+          value={fmtInt(o.ifb.value)}
+          change={o.ifb.change}
+          changePct={o.ifb.changePct}
+          delay={0.08}
+          hint={src.ifb ? 'شاخص‌بان (زنده)' : 'seed'}
+        />
         <Kpi
           label="مجموع ارزش بازار"
           value={fmtInt(o.totalMarketValueHmt)}
           unit="همت"
           delay={0.1}
-          hint={live ? 'شاخص‌بان · سهام بورس+فرابورس' : 'seed'}
+          hint={
+            blocked.includes('tsetmc')
+              ? 'موقت: تابلو شاخص‌بان — رسمی TSETMC قطع است'
+              : src.marketValue || '—'
+          }
         />
       </div>
 
@@ -87,28 +114,47 @@ export function MarketOverview({
           label="ارزش دلاری بازار"
           value={fmtInt(o.totalMarketValueUsdM)}
           unit="میلیون $"
-          hint={live ? 'ارزش بازار ÷ دلار TGJU' : 'seed'}
+          hint="ارزش بازار ÷ دلار آزاد TGJU"
         />
         <Kpi label="نرخ دلار" value={fmtInt(o.usdRate)} unit="ریال" hint="TGJU · آزاد" />
         <Kpi
           label="ارزش کل معاملات"
           value={fmtNum(o.totalTradeValueHmt, 2)}
           unit="همت"
-          hint={live ? 'شاخص‌بان · سهام' : 'seed'}
+          hint={
+            src.totalTrade === 'parsistahlil'
+              ? 'پارسیس (کل بازار گزارش)'
+              : blocked.includes('tsetmc')
+                ? 'موقت — رسمی TSETMC قطع'
+                : src.totalTrade || '—'
+          }
         />
+        <Kpi
+          label="معاملات خرد (سهام+صندوق+حق‌تقدم)"
+          value={o.retailTradeValueBillionToman != null ? fmtInt(o.retailTradeValueBillionToman) : '—'}
+          unit="میلیارد تومان"
+          hint={src.retailTrade === 'parsistahlil' ? 'پارسیس‌تحلیل' : 'در انتظار پارسیس'}
+        />
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="panel p-3.5">
-          <div className="kpi-label">
-            {retailDaily !== undefined ? 'خالص ورود پول حقیقی (امروز)' : 'خالص ورود پول حقیقی از ابتدای ۱۴۰۴'}
-          </div>
-          <div className={`kpi-value num ${changeClass(retailDaily ?? o.retailMoneyFlowYtd)}`}>
-            {fmtInt(retailDaily ?? o.retailMoneyFlowYtd)}
+          <div className="kpi-label">خالص ورود/خروج پول حقیقی (امروز)</div>
+          <div className={`kpi-value num ${changeClass(retailDaily ?? 0)}`}>
+            {retailDaily != null ? fmtInt(retailDaily) : '—'}
             <span className="mr-1 text-xs font-medium text-[var(--color-muted)]">میلیارد تومان</span>
           </div>
           <div className="mt-1 text-[10px] text-[var(--color-muted)]">
-            {retailDaily !== undefined
-              ? 'برآورد از حجم خرید/فروش حقیقی × قیمت (شاخص‌بان)'
-              : 'از گزارش روزانه — پارسی‌تحلیل فعلاً قفل عضویت'}
+            {src.retailMoneyFlowDaily === 'parsistahlil' ? 'آخرین گزارش پارسیس‌تحلیل' : 'در انتظار پارسیس'}
           </div>
+        </motion.div>
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="panel p-3.5">
+          <div className="kpi-label">خالص ورود پول حقیقی از ابتدای ۱۴۰۴</div>
+          <div className={`kpi-value num ${changeClass(o.retailMoneyFlowYtd)}`}>
+            {fmtInt(o.retailMoneyFlowYtd)}
+            <span className="mr-1 text-xs font-medium text-[var(--color-muted)]">میلیارد تومان</span>
+          </div>
+          <div className="mt-1 text-[10px] text-[var(--color-muted)]">طبق گزارش PDF روزانه</div>
         </motion.div>
       </div>
 
@@ -116,7 +162,7 @@ export function MarketOverview({
         <div className="panel p-4">
           <h3 className="mb-2 text-sm font-bold">روند تاریخی شاخص کل (کندل از ۱۴۰۱)</h3>
           <p className="mb-2 text-[10px] text-[var(--color-muted)]">
-            OHLC از TGJU · نمایش هفتگی برای خوانایی ({candles.length || histories.bourse?.length || 0} روز خام)
+            OHLC از TGJU · نمایش هفتگی ({candles.length || histories.bourse?.length || 0} روز خام)
           </p>
           <CandlestickChart
             data={
@@ -134,7 +180,7 @@ export function MarketOverview({
           />
         </div>
         <div className="panel p-4">
-          <h3 className="mb-2 text-sm font-bold">خالص ورود/خروج پول حقیقی (سری گزارش)</h3>
+          <h3 className="mb-2 text-sm font-bold">خالص ورود/خروج پول حقیقی (سری گزارش PDF)</h3>
           <FlowBarChart data={money} />
         </div>
       </div>
@@ -144,13 +190,13 @@ export function MarketOverview({
           title="تأثیر مثبت/منفی بورس"
           pos={data.impacts.boursePos}
           neg={data.impacts.bourseNeg}
-          live={live}
+          live={Boolean(o.impactsLive)}
         />
         <ImpactPanel
           title="تأثیر مثبت/منفی فرابورس"
           pos={data.impacts.ifbPos}
           neg={data.impacts.ifbNeg}
-          live={live}
+          live={Boolean(o.impactsLive)}
         />
         <TopTrades data={data} />
       </div>
@@ -181,7 +227,7 @@ function ImpactPanel({
     <div className="panel p-4">
       <h3 className="mb-1 text-sm font-bold">{title}</h3>
       <p className="mb-3 text-[10px] text-[var(--color-muted)]">
-        {live ? 'سورت‌شده · پروکسی تغییر٪×ارزش بازار' : 'از گزارش روزانه'}
+        {live ? 'سورت واقعی تاثیر بر شاخص · TSETMC' : 'فعلاً از گزارش PDF — سورت زنده TSETMC قطع است'}
       </p>
       <div className="grid grid-cols-2 gap-3">
         <ul className="space-y-2">

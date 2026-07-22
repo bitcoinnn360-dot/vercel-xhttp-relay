@@ -4,13 +4,12 @@ Market data scraper for MIDCO dashboard.
 
 Works from most cloud/VPS hosts:
   - TGJU live quotes + OHLC histories (bourse, FX, metals, …)
-  - shakhesban.com/stocks/list-data (HTML board mirror → market value, trades, impacts, retail flow)
+  - shakhesban indices (TEDPIX / equal-weight / IFB) + board aggregate
+  - parsistahlil.ir public «گزارش وضعیت بازار» (retail trades + daily money flow)
 
-Usually needs Iran IP:
-  - TSETMC, IME, parsistahlil membership pages, tradersarena /data
-
-Usage:
-  python3 scripts/scrape_market.py
+Needs Iran IP:
+  - TSETMC «در یک نگاه» (official market value + TSE/IFB trade value + index impacts)
+  - IME, tradersarena /data
 """
 from __future__ import annotations
 
@@ -238,94 +237,244 @@ def scrape_shakhesban_board(max_pages: int = 35) -> list[dict]:
     return all_rows
 
 
-def pick_change_pct(row: dict) -> float:
-    """Prefer closing %; use last-trade % only inside a normal daily band."""
-    close = float(row.get("changePctClose") or 0.0)
-    last = float(row.get("changePctLast") or 0.0)
-    if close != 0:
-        return close
-    # خارج از باند روزانه ≈ افزایش سرمایه/بازگشایی — برای تاثیر صفر در نظر بگیر
-    if abs(last) <= 7.0:
-        return last
-    return 0.0
+def scrape_shakhesban_indices() -> dict:
+    """Live TEDPIX / equal-weight / IFB from shakhesban markets/index (TSETMC mirror)."""
+    html = fetch("https://www.shakhesban.com/markets/index", timeout=40).decode("utf-8", errors="replace")
+    wanted = {
+        "ش-کل-بورس": "tedpix",
+        "ش-کل-هم-وزن": "equalWeight",
+        "ش-کل-فرابورس": "ifb",
+    }
+    out: dict[str, dict] = {}
+    for m in re.finditer(r"<tr[^>]*>(.*?)</tr>", html, re.S):
+        block = m.group(1)
+        hm = re.search(r'/markets/index/([^"\']+)".*?<h2[^>]*>(.*?)</h2>', block, re.S)
+        if not hm:
+            continue
+        slug = unescape(hm.group(1))
+        title = unescape(re.sub("<.*?>", "", hm.group(2))).strip()
+        key = wanted.get(slug)
+        if not key:
+            continue
+        vals: dict[str, str] = {}
+        for td in re.finditer(r'<td[^>]*data-val="([^"]*)"[^>]*data-col="([^"]+)"', block):
+            vals[td.group(2)] = unescape(td.group(1))
+        for td in re.finditer(r'<td[^>]*data-col="([^"]+)"[^>]*data-val="([^"]*)"', block):
+            vals[td.group(1)] = unescape(td.group(2))
+        value = num(vals.get("value") or vals.get("info.last_trade.PDrCotVal"))
+        change = num(vals.get("change") or vals.get("info.last_trade.last_change"))
+        pct_raw = num(vals.get("info.last_trade.last_change_percentage") or vals.get("percent"))
+        # shakhesban sometimes stores ratio (0.0069) instead of percent (0.69)
+        change_pct = None
+        if pct_raw is not None:
+            change_pct = pct_raw * 100.0 if abs(pct_raw) < 1 else pct_raw
+        elif value and change is not None and value != change:
+            prev = value - change
+            if prev:
+                change_pct = (change / prev) * 100.0
+        out[key] = {
+            "name": title,
+            "value": value,
+            "change": change,
+            "changePct": round(change_pct, 2) if change_pct is not None else None,
+            "source": "shakhesban",
+            "slug": slug,
+        }
+    return out
 
 
-def build_overview_live(stocks_all: list[dict], usd_rial: float | None, tedpix: dict | None) -> dict:
+def scrape_parsistahlil_market_status() -> dict:
+    """Latest retail trades + real-money flow from parsistahlil.ir public report pages."""
+    try:
+        home = fetch("https://parsistahlil.ir/", timeout=40).decode("utf-8", errors="replace")
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": str(exc)}
+
+    links = sorted(
+        set(
+            re.findall(
+                r"/contents/(\d+)-%DA%AF%D8%B2%D8%A7%D8%B1%D8%B4-%D9%88%D8%B6%D8%B9%DB%8C%D8%AA-%D8%A8%D8%A7%D8%B2%D8%A7%D8%B1-[^\"'\\s]+",
+                home,
+            )
+        ),
+        key=lambda x: int(x),
+        reverse=True,
+    )
+    if not links:
+        # fallback: any market-status content id
+        links = sorted(set(re.findall(r"/contents/(\d+)-[^\"'\\s]*خرد[^\"'\\s]*", home.replace("\\/", "/"))), key=lambda x: int(x), reverse=True)
+
+    slug = urllib.parse.quote("گزارش-وضعیت-بازار-ارزش-معاملات-خرد-و-ورود-و-خروج-پول-حقیقی")
+    last_err = "no report link"
+    for cid in links[:6]:
+        url = f"https://parsistahlil.ir/contents/{cid}-{slug}"
+        try:
+            html = fetch(url, timeout=40).decode("utf-8", errors="replace")
+        except Exception as exc:  # noqa: BLE001
+            last_err = str(exc)
+            continue
+        text = re.sub(r"<script[\s\S]*?</script>", " ", html)
+        text = re.sub(r"<[^>]+>", " ", text)
+        text = re.sub(r"\s+", " ", text)
+
+        retail = None
+        m = re.search(
+            r"معاملات\s*#?خرد.*?مبلغ\s*([\d,]+)\s*میلیارد",
+            text,
+        ) or re.search(r"مبلغ\s*([\d,]+)\s*میلیارد تومان بود", text)
+        if m:
+            retail = num(m.group(1))
+
+        total_trades = None
+        m = re.search(r"ارزش کل معاملات امروز بازار\s*([\d,]+)\s*میلیارد", text)
+        if m:
+            total_trades = num(m.group(1))
+
+        flow = None
+        m = re.search(r"مبلغ\s*([\d,]+)\s*میلیارد تومان\s*(ورود|خروج)\s*حقیقی", text)
+        if m:
+            flow = num(m.group(1))
+            if m.group(2) == "خروج" and flow is not None:
+                flow = -abs(flow)
+            elif flow is not None:
+                flow = abs(flow)
+        else:
+            m = re.search(r"(ورود|خروج)\s*حقیقی از بازار داشته ایم.*?مبلغ\s*([\d,]+)", text)
+            # reverse order variants already covered
+
+        date_j = None
+        m = re.search(r"مورخ\s*(\d{1,2}\s*تیر\s*\d{4}|\d{4}/\d{2}/\d{2})", text)
+        if m:
+            date_j = m.group(1).strip()
+
+        if retail is not None or flow is not None:
+            return {
+                "ok": True,
+                "source": "parsistahlil.ir",
+                "contentId": cid,
+                "url": url,
+                "dateJalali": date_j,
+                "retailTradeValueBillionToman": retail,
+                "totalTradeValueBillionToman": total_trades,
+                "retailMoneyFlowDailyBillionToman": flow,
+            }
+        last_err = f"content {cid} parsed but no numbers"
+    return {"ok": False, "error": last_err}
+
+
+def build_overview_live(
+    stocks_all: list[dict],
+    usd_rial: float | None,
+    indices: dict,
+    tgju_tedpix: dict | None,
+    pars: dict,
+    tsetmc_ok: bool,
+) -> dict:
     stocks = [s for s in stocks_all if s.get("marketFa") == "سهام"]
     bourse = [s for s in stocks if "فرابورس" not in (s.get("flow") or "")]
     ifb = [s for s in stocks if "فرابورس" in (s.get("flow") or "")]
 
     sum_mv = sum(s["marketValue"] for s in stocks)
     sum_trade = sum(s["tradeValue"] for s in stocks)
-    retail_buy = sum(s["buyIVol"] * (s["close"] or s["last"] or 0) for s in stocks)
-    retail_sell = sum(s["sellIVol"] * (s["close"] or s["last"] or 0) for s in stocks)
-    net_retail_bt = (retail_buy - retail_sell) / RIAL_PER_BILLION_TOMAN
 
     usd_m = None
-    if usd_rial and usd_rial > 0:
+    if usd_rial and usd_rial > 0 and sum_mv > 0:
         usd_m = round(sum_mv / usd_rial / 1e6, 0)
 
-    def impact_rows(universe: list[dict], limit: int = 8) -> tuple[list[dict], list[dict]]:
-        scored = []
-        for s in universe:
-            chg = pick_change_pct(s)
-            # پروکسی تاثیر شاخص: تغییر٪ × ارزش بازار (میلیارد تومان)
-            score = (chg / 100.0) * (s["marketValue"] / RIAL_PER_BILLION_TOMAN)
-            scored.append(
-                {
-                    "symbol": s["symbol"],
-                    "name": s["name"],
-                    "impact": round(score, 1),
-                    "changePct": round(chg, 2),
-                }
-            )
-        pos = sorted([x for x in scored if x["impact"] > 0], key=lambda r: r["impact"], reverse=True)[:limit]
-        neg = sorted([x for x in scored if x["impact"] < 0], key=lambda r: r["impact"])[:limit]
-        return (
-            [{"symbol": x["symbol"], "impact": x["impact"]} for x in pos],
-            [{"symbol": x["symbol"], "impact": x["impact"]} for x in neg],
-        )
-
-    b_pos, b_neg = impact_rows(bourse)
-    i_pos, i_neg = impact_rows(ifb)
-
+    # Top trades by value (تابلو) — not the same as TSETMC impact list
     top_trades = sorted(stocks, key=lambda s: s["tradeValue"], reverse=True)[:15]
     top_trades_out = [
-        {
-            "name": s["symbol"],
-            "valueBr": round(s["tradeValue"] / RIAL_PER_BILLION_TOMAN, 1),
-        }
+        {"name": s["symbol"], "valueBr": round(s["tradeValue"] / RIAL_PER_BILLION_TOMAN, 1)}
         for s in top_trades
         if s["tradeValue"] > 0
     ]
 
+    ted = indices.get("tedpix") or {}
+    eq = indices.get("equalWeight") or {}
+    ifb_idx = indices.get("ifb") or {}
+    if not ted and tgju_tedpix:
+        ted = {
+            "name": "شاخص کل بورس",
+            "value": tgju_tedpix.get("value"),
+            "change": tgju_tedpix.get("change"),
+            "changePct": tgju_tedpix.get("changePct"),
+            "source": "tgju",
+        }
+
+    board_mv = round(sum_mv / RIAL_PER_HEMAT, 1)
+    board_trade = round(sum_trade / RIAL_PER_HEMAT, 2)
+
+    # Prefer parsistahlil retail flow/trades when available
+    retail_flow = pars.get("retailMoneyFlowDailyBillionToman") if pars.get("ok") else None
+    retail_trades_bt = pars.get("retailTradeValueBillionToman") if pars.get("ok") else None
+    # کل معاملات رسمی باید از TSETMC باشد؛ پارسیس «کل بازار» شامل اوراق و غیره است
+    total_trade_hmt = None
+    total_trade_source = None
+    if tsetmc_ok:
+        total_trade_source = "tsetmc"
+    else:
+        total_trade_hmt = board_trade
+        total_trade_source = "shakhesban-board-interim"
+
+    notes = []
+    blocked = []
+    if not tsetmc_ok:
+        blocked.append("tsetmc")
+        notes.append(
+            "TSETMC از این سرور قطع است (Connection reset) — ارزش بازار/معاملات/تاثیر رسمی «در یک نگاه» و سورت تاثیر نیاز به IP ایران دارد."
+        )
+    notes.append(
+        f"ارزش بازار فعلی ({board_mv} همت) تجمیع تابلوی شاخص‌بان (سهام بورس+فرابورس) است؛ با عدد رسمی TSETMC ممکن است فرق کند."
+    )
+    if usd_m is not None:
+        notes.append("ارزش دلاری = همین ارزش بازار ÷ دلار آزاد TGJU.")
+    if indices:
+        notes.append("شاخص کل / هم‌وزن / فرابورس از شاخص‌بان (آینه بازار، نه PDF).")
+    if pars.get("ok"):
+        notes.append(
+            f"پارسیس‌تحلیل: معاملات خرد={retail_trades_bt} و خالص پول حقیقی روزانه={retail_flow} میلیارد تومان"
+            + (f" ({pars.get('dateJalali')})" if pars.get("dateJalali") else "")
+            + "."
+        )
+    else:
+        blocked.append("parsistahlil")
+        notes.append(f"پارسیس‌تحلیل خوانده نشد: {pars.get('error')}")
+    notes.append("خالص ورود/خروج از ابتدای ۱۴۰۴ از گزارش PDF نگه داشته شده.")
+    notes.append("تاثیر مثبت/منفی تا دسترسی TSETMC از seed گزارش می‌ماند (سورت پروکسی حذف شد).")
+
     return {
         "ok": True,
-        "source": "shakhesban+tgju",
         "asOf": datetime.now(timezone.utc).isoformat(),
+        "indices": {
+            "tedpix": ted or None,
+            "equalWeight": eq or None,
+            "ifb": ifb_idx or None,
+        },
         "stockCount": len(stocks),
         "bourseCount": len(bourse),
         "ifbCount": len(ifb),
-        "totalMarketValueHmt": round(sum_mv / RIAL_PER_HEMAT, 1),
+        # Official TSETMC glance fields — null until Iran IP
+        "tsetmcMarketValueHmt": None,
+        "tsetmcTradeValueHmt": None,
+        "impactsFromTsetmc": False,
+        # Interim board aggregate
+        "totalMarketValueHmt": board_mv,
         "totalMarketValueUsdM": usd_m,
+        "marketValueSource": "shakhesban-board-interim",
         "usdRate": usd_rial,
-        "totalTradeValueHmt": round(sum_trade / RIAL_PER_HEMAT, 2),
-        "totalTradeValueBillionToman": round(sum_trade / RIAL_PER_BILLION_TOMAN, 1),
-        "retailMoneyFlowDailyBillionToman": round(net_retail_bt, 1),
-        "tedpix": tedpix,
-        "impacts": {
-            "boursePos": b_pos,
-            "bourseNeg": b_neg,
-            "ifbPos": i_pos,
-            "ifbNeg": i_neg,
-        },
+        "totalTradeValueHmt": total_trade_hmt,
+        "totalTradeValueSource": total_trade_source,
+        "totalTradeValueBillionToman": round((total_trade_hmt or 0) * 1000, 1) if total_trade_hmt is not None else None,
+        "retailTradeValueBillionToman": retail_trades_bt,
+        "retailTradeValueHmt": round(retail_trades_bt / 1000.0, 2) if retail_trades_bt else None,
+        "retailMoneyFlowDailyBillionToman": retail_flow,
+        "retailMoneyFlowYtdFromPdf": True,
+        "impacts": None,  # do not overwrite seed with fake proxy
         "topTrades": top_trades_out,
-        "notes": [
-            "ارزش بازار/معاملات از تجمیع تابلوی شاخص‌بان (سهام بورس+فرابورس).",
-            "ارزش دلاری = ارزش بازار ریالی ÷ نرخ دلار آزاد TGJU.",
-            "خالص پول حقیقی: برآورد خرید/فروش حقیقی×قیمت (جایگزین پارسی‌تحلیل تا دسترسی عضویت/IP ایران).",
-            "تاثیر مثبت/منفی: پروکسی تغییر٪×ارزش بازار — جایگزین دقیق TSETMC با IP ایران.",
-        ],
+        "topTradesSource": "shakhesban-board",
+        "parsistahlil": pars,
+        "blocked": blocked,
+        "notes": notes,
     }
 
 
@@ -402,44 +551,52 @@ def main() -> int:
     tedpix = quotes.get("bourse")
     print(f"TEDPIX={tedpix} USD={usd}")
 
+    print("shakhesban indices (equal-weight / IFB)…")
+    indices = scrape_shakhesban_indices()
+    print("indices", {k: v.get("value") for k, v in indices.items()})
+
     print("TGJU histories…")
     histories = {k: scrape_tgju_history(k) for k in HIST_KEYS}
 
     print("TEDPIX OHLC from 1401…")
     ohlc = scrape_tgju_ohlc("bourse", 2800)
     candles = candles_from_1401(ohlc)
-    # also extend close history for charts
     if candles:
         histories["bourse"] = [
             {"date": c["date"], "dateJalali": c["dateJalali"], "value": c["close"]} for c in candles
         ]
     print(f"candles1401={len(candles)}")
 
+    print("parsistahlil market status…")
+    pars = scrape_parsistahlil_market_status()
+    print("pars", {k: pars.get(k) for k in ("ok", "retailTradeValueBillionToman", "retailMoneyFlowDailyBillionToman", "totalTradeValueBillionToman", "dateJalali", "error")})
+
     print("shakhesban board…")
     board = scrape_shakhesban_board()
-    overview_live = build_overview_live(board, usd, tedpix)
+
+    tsetmc = scrape_tsetmc()
+    overview_live = build_overview_live(board, usd, indices, tedpix, pars, bool(tsetmc.get("ok")))
     print(
         f"MV={overview_live['totalMarketValueHmt']} همت | "
         f"USD={overview_live['totalMarketValueUsdM']} m$ | "
-        f"trade={overview_live['totalTradeValueHmt']} همت | "
-        f"retail={overview_live['retailMoneyFlowDailyBillionToman']}"
+        f"trade={overview_live['totalTradeValueHmt']} همت ({overview_live['totalTradeValueSource']}) | "
+        f"retailFlow={overview_live['retailMoneyFlowDailyBillionToman']}"
     )
 
-    tsetmc = scrape_tsetmc()
     ime = scrape_ime()
     sectors = build_sectors(quotes)
 
     market = {
         "updatedAt": datetime.now(timezone.utc).isoformat(),
         "infra": {
-            "tgju": "no special infra — works from Cloudflare/most VPS",
-            "shakhesban": "public list-data HTML board — market value / trades / retail proxy",
-            "tsetmc": "usually needs Iran IP / office network",
-            "ime": "usually needs Iran IP; parser can be extended when reachable",
-            "parsistahlil": "latest market status often membership-locked",
+            "tgju": "TEDPIX + USD live",
+            "shakhesban": "equal-weight + IFB indices + board aggregate (interim MV/trades)",
+            "parsistahlil": "retail trades + daily real-money flow from public report pages (.ir)",
+            "tsetmc": "BLOCKED from this host — needs Iran IP for در یک نگاه + index impacts",
+            "ime": "usually needs Iran IP",
             "tradersarena": "/data endpoints need auth",
             "custeel": "paid; interim uses TGJU iron-ore/steel-coil + FRED",
-            "fred": "free API key recommended; CSV snapshot via scripts/fetch_fred.py",
+            "fred": "scripts/fetch_fred.py",
         },
         "tgju": tgju,
         "histories": {k: v for k, v in histories.items() if v},
@@ -448,29 +605,32 @@ def main() -> int:
         "sectors": sectors,
         "tsetmc": tsetmc,
         "ime": ime,
+        "parsistahlil": pars,
     }
 
     scraped = {
         "updatedAt": market["updatedAt"],
-        "tgjuBourse": tedpix,
+        "indices": overview_live.get("indices"),
         "overviewLive": {
-            k: overview_live[k]
+            k: overview_live.get(k)
             for k in (
                 "totalMarketValueHmt",
                 "totalMarketValueUsdM",
                 "usdRate",
                 "totalTradeValueHmt",
+                "totalTradeValueSource",
+                "retailTradeValueBillionToman",
                 "retailMoneyFlowDailyBillionToman",
+                "marketValueSource",
+                "impactsFromTsetmc",
+                "blocked",
                 "stockCount",
             )
-            if k in overview_live
         },
         "candles1401Count": len(candles),
         "tsetmc": tsetmc,
         "ime": ime,
-        "custeelAlternative": {
-            "providers": ["tgju:base-us-iron-ore", "tgju:base-us-steel-coil", "fred:PIORECRUSDM"],
-        },
+        "parsistahlil": pars,
     }
 
     (OUT_DIR / "market.json").write_text(json.dumps(market, ensure_ascii=False, indent=2), encoding="utf-8")

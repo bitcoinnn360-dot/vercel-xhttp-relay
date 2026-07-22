@@ -267,10 +267,22 @@ async function fetchScrapedMarket(): Promise<{
     totalMarketValueUsdM?: number
     usdRate?: number
     totalTradeValueHmt?: number
+    totalTradeValueSource?: string
+    marketValueSource?: string
     retailMoneyFlowDailyBillionToman?: number
-    impacts?: DashboardData['impacts']
+    retailTradeValueBillionToman?: number
+    retailTradeValueHmt?: number
+    impacts?: DashboardData['impacts'] | null
+    impactsFromTsetmc?: boolean
     topTrades?: DashboardData['topTrades']
+    topTradesSource?: string
+    indices?: {
+      tedpix?: { name?: string; value?: number; change?: number; changePct?: number; source?: string }
+      equalWeight?: { name?: string; value?: number; change?: number; changePct?: number; source?: string }
+      ifb?: { name?: string; value?: number; change?: number; changePct?: number; source?: string }
+    }
     notes?: string[]
+    blocked?: string[]
     asOf?: string
   }
   candles1401?: import('./types').CandlePoint[]
@@ -291,10 +303,22 @@ async function fetchScrapedMarket(): Promise<{
         totalMarketValueUsdM?: number
         usdRate?: number
         totalTradeValueHmt?: number
+        totalTradeValueSource?: string
+        marketValueSource?: string
         retailMoneyFlowDailyBillionToman?: number
-        impacts?: DashboardData['impacts']
+        retailTradeValueBillionToman?: number
+        retailTradeValueHmt?: number
+        impacts?: DashboardData['impacts'] | null
+        impactsFromTsetmc?: boolean
         topTrades?: DashboardData['topTrades']
+        topTradesSource?: string
+        indices?: {
+          tedpix?: { name?: string; value?: number; change?: number; changePct?: number; source?: string }
+          equalWeight?: { name?: string; value?: number; change?: number; changePct?: number; source?: string }
+          ifb?: { name?: string; value?: number; change?: number; changePct?: number; source?: string }
+        }
         notes?: string[]
+        blocked?: string[]
         asOf?: string
       }
       candles1401?: import('./types').CandlePoint[]
@@ -316,6 +340,18 @@ async function fetchScrapedMarket(): Promise<{
   }
 }
 
+function patchIndex(
+  target: { name: string; value: number; change: number; changePct: number },
+  live?: { name?: string; value?: number; change?: number; changePct?: number },
+) {
+  if (!live || live.value == null || !Number.isFinite(live.value)) return false
+  if (live.name) target.name = live.name
+  target.value = live.value
+  if (live.change != null && Number.isFinite(live.change)) target.change = live.change
+  if (live.changePct != null && Number.isFinite(live.changePct)) target.changePct = live.changePct
+  return true
+}
+
 function applyOverviewLive(
   base: DashboardData,
   live: NonNullable<Awaited<ReturnType<typeof fetchScrapedMarket>>>['overviewLive'],
@@ -326,17 +362,60 @@ function applyOverviewLive(
     return false
   }
   const o = base.overview
-  if (live.totalMarketValueHmt != null) o.totalMarketValueHmt = live.totalMarketValueHmt
-  if (live.totalMarketValueUsdM != null) o.totalMarketValueUsdM = live.totalMarketValueUsdM
-  if (live.usdRate != null) o.usdRate = live.usdRate
-  if (live.totalTradeValueHmt != null) o.totalTradeValueHmt = live.totalTradeValueHmt
+  const sources: Record<string, string> = {}
+
+  if (live.indices) {
+    if (patchIndex(o.tedpix, live.indices.tedpix)) sources.tedpix = live.indices.tedpix?.source || 'shakhesban'
+    if (patchIndex(o.equalWeight, live.indices.equalWeight)) sources.equalWeight = 'shakhesban'
+    if (patchIndex(o.ifb, live.indices.ifb)) sources.ifb = 'shakhesban'
+  }
+
+  if (live.totalMarketValueHmt != null) {
+    o.totalMarketValueHmt = live.totalMarketValueHmt
+    sources.marketValue = live.marketValueSource || 'interim'
+  }
+  if (live.totalMarketValueUsdM != null) {
+    o.totalMarketValueUsdM = live.totalMarketValueUsdM
+    sources.usdMarketValue = 'marketValue÷tgjuUsd'
+  }
+  if (live.usdRate != null) {
+    o.usdRate = live.usdRate
+    sources.usdRate = 'tgju'
+  }
+  if (live.totalTradeValueHmt != null) {
+    o.totalTradeValueHmt = live.totalTradeValueHmt
+    sources.totalTrade = live.totalTradeValueSource || 'interim'
+  }
+  if (live.retailTradeValueBillionToman != null) {
+    o.retailTradeValueBillionToman = live.retailTradeValueBillionToman
+    o.retailTradeValueHmt = live.retailTradeValueHmt ?? live.retailTradeValueBillionToman / 1000
+    sources.retailTrade = 'parsistahlil'
+  }
   if (live.retailMoneyFlowDailyBillionToman != null) {
     o.retailMoneyFlowDaily = live.retailMoneyFlowDailyBillionToman
+    sources.retailMoneyFlowDaily = 'parsistahlil'
   }
-  if (live.impacts) base.impacts = live.impacts
-  if (live.topTrades?.length) base.topTrades = live.topTrades
+  sources.retailMoneyFlowYtd = 'pdf-seed'
+
+  // Only replace impacts when real TSETMC data arrives
+  if (live.impactsFromTsetmc && live.impacts) {
+    base.impacts = live.impacts
+    o.impactsLive = true
+    sources.impacts = 'tsetmc'
+  } else {
+    o.impactsLive = false
+    sources.impacts = 'pdf-seed (waiting TSETMC)'
+  }
+
+  if (live.topTrades?.length) {
+    base.topTrades = live.topTrades
+    sources.topTrades = live.topTradesSource || 'shakhesban'
+  }
+
   if (candles?.length) o.candles1401 = candles
   o.liveNotes = live.notes
+  o.fieldSources = sources
+  o.blockedSources = live.blocked || []
   o.dataSource = 'live'
   return true
 }
@@ -410,14 +489,23 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
 
   base.sources = markSources(base, liveCount, fredOk, now)
   if (overviewLiveOk) {
+    const hasPars = Boolean(scraped?.overviewLive?.retailMoneyFlowDailyBillionToman != null
+      || scraped?.overviewLive?.retailTradeValueBillionToman != null)
     base.sources = [
-      ...base.sources.filter((s) => s.id !== 'shakhesban'),
+      ...base.sources.filter((s) => s.id !== 'shakhesban' && s.id !== 'parsistahlil'),
       {
         id: 'shakhesban',
         name: 'شاخص‌بان',
         status: 'live',
-        note: 'ارزش بازار، معاملات، تاثیر و برآورد پول حقیقی',
+        note: 'هم‌وزن + فرابورس + تجمیع تابلو (موقت برای ارزش بازار)',
         lastOk: scraped?.overviewLive?.asOf || now,
+      },
+      {
+        id: 'parsistahlil',
+        name: 'پارسیس‌تحلیل',
+        status: hasPars ? 'live' : 'blocked',
+        note: hasPars ? 'معاملات خرد + خالص پول حقیقی روزانه' : 'گزارش وضعیت بازار خوانده نشد',
+        lastOk: hasPars ? scraped?.overviewLive?.asOf || now : undefined,
       },
     ]
   }
@@ -426,12 +514,10 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
       if (s.id === 'tsetmc') {
         return {
           ...s,
-          status: scraped.meta.tsetmcOk ? 'live' : overviewLiveOk || liveCount > 0 ? 'live' : 'seed',
+          status: scraped.meta.tsetmcOk ? 'live' : 'blocked',
           note: scraped.meta.tsetmcOk
-            ? 'اسکرپر TSETMC موفق'
-            : overviewLiveOk
-              ? 'جزئیات تابلو از شاخص‌بان — TSETMC نیاز به IP ایران'
-              : 'جزئیات TSETMC نیاز به IP ایران — شاخص از TGJU',
+            ? 'در یک نگاه + تاثیر شاخص'
+            : 'قطع از این سرور — ارزش بازار/معاملات/تاثیر رسمی نیاز به IP ایران',
         }
       }
       if (s.id === 'ime') {

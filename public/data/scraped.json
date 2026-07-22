@@ -1,20 +1,44 @@
 {
-  "updatedAt": "2026-07-22T09:20:15.503923+00:00",
-  "tgjuBourse": {
-    "value": 4883977.0,
-    "change": -3574.7,
-    "changePct": -0.07,
-    "high": 4908598.5,
-    "low": 4883508.2,
-    "time": "۱۲:۳۹:۰۴",
-    "source": "tgju"
+  "updatedAt": "2026-07-22T11:03:33.436138+00:00",
+  "indices": {
+    "tedpix": {
+      "name": "شاخص کل بورس",
+      "value": 4883977.03,
+      "change": -3574.68,
+      "changePct": -0.07,
+      "source": "shakhesban",
+      "slug": "ش-کل-بورس"
+    },
+    "equalWeight": {
+      "name": "شاخص کل (هم وزن)",
+      "value": 1356054.21,
+      "change": 9331.28,
+      "changePct": 0.69,
+      "source": "shakhesban",
+      "slug": "ش-کل-هم-وزن"
+    },
+    "ifb": {
+      "name": "شاخص کل فرابورس",
+      "value": 38852.45,
+      "change": 179.48,
+      "changePct": 0.46,
+      "source": "shakhesban",
+      "slug": "ش-کل-فرابورس"
+    }
   },
   "overviewLive": {
     "totalMarketValueHmt": 8909.1,
-    "totalMarketValueUsdM": 46426.0,
-    "usdRate": 1919000.0,
-    "totalTradeValueHmt": 2.34,
-    "retailMoneyFlowDailyBillionToman": 9.5,
+    "totalMarketValueUsdM": 46498.0,
+    "usdRate": 1916000.0,
+    "totalTradeValueHmt": 284.92,
+    "totalTradeValueSource": "parsistahlil",
+    "retailTradeValueBillionToman": 25015.0,
+    "retailMoneyFlowDailyBillionToman": -719.0,
+    "marketValueSource": "shakhesban-board-interim",
+    "impactsFromTsetmc": false,
+    "blocked": [
+      "tsetmc"
+    ],
     "stockCount": 765
   },
   "candles1401Count": 793,
@@ -30,11 +54,14 @@
     "status": "blocked",
     "error": "<urlopen error [Errno 104] Connection reset by peer>"
   },
-  "custeelAlternative": {
-    "providers": [
-      "tgju:base-us-iron-ore",
-      "tgju:base-us-steel-coil",
-      "fred:PIORECRUSDM"
-    ]
+  "parsistahlil": {
+    "ok": true,
+    "source": "parsistahlil.ir",
+    "contentId": "1178",
+    "url": "https://parsistahlil.ir/contents/1178-%DA%AF%D8%B2%D8%A7%D8%B1%D8%B4-%D9%88%D8%B6%D8%B9%DB%8C%D8%AA-%D8%A8%D8%A7%D8%B2%D8%A7%D8%B1-%D8%A7%D8%B1%D8%B2%D8%B4-%D9%85%D8%B9%D8%A7%D9%85%D9%84%D8%A7%D8%AA-%D8%AE%D8%B1%D8%AF-%D9%88-%D9%88%D8%B1%D9%88%D8%AF-%D9%88-%D8%AE%D8%B1%D9%88%D8%AC-%D9%BE%D9%88%D9%84-%D8%AD%D9%82%DB%8C%D9%82%DB%8C",
+    "dateJalali": "31 تیر 1405",
+    "retailTradeValueBillionToman": 25015.0,
+    "totalTradeValueBillionToman": 284916.0,
+    "retailMoneyFlowDailyBillionToman": -719.0
   }
 }

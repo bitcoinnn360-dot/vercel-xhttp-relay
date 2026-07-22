@@ -38,14 +38,19 @@ export interface MarketOverview {
   totalTradeValueHmt: number
   retailTradeValueHmt: number
   retailMoneyFlowYtd: number
-  /** برآورد خالص ورود/خروج پول حقیقی امروز (میلیارد تومان) از تابلو */
+  /** برآورد خالص ورود/خروج پول حقیقی امروز (میلیارد تومان) */
   retailMoneyFlowDaily?: number
+  /** ارزش معاملات خرد سهام+صندوق+حق تقدم (میلیارد تومان) از پارسیس */
+  retailTradeValueBillionToman?: number
   indexHistory: { date: string; value: number }[]
   intradayIndex: { time: string; value: number }[]
   moneyFlowSeries: { date: string; value: number }[]
   candles1401?: CandlePoint[]
   liveNotes?: string[]
   dataSource?: 'live' | 'seed'
+  fieldSources?: Record<string, string>
+  blockedSources?: string[]
+  impactsLive?: boolean
 }
 
 export interface ImpactStock {

@@ -454,6 +454,8 @@ find_nearest_untouched_fvg(bool want_bull, bool below_price) =>
 //#endregion
 
 //#region Signal engine
+// نکته Pine: داخل فانکشن نمی‌شود به var گلوبال (مثل sl_line) مقدار داد.
+// پس فقط دادهٔ سیگنال را جمع می‌کنیم و رسم را در اسکوپ اصلی انجام می‌دهیم.
 var int last_signal_bar = na
 var line sl_line = na
 var line tp1_line = na
@@ -463,22 +465,8 @@ var label sig_label = na
 can_signal() =>
     na(last_signal_bar) or (bar_index - last_signal_bar) >= signal_cooldown
 
-clear_trade_drawings() =>
-    if not na(sl_line)
-        line.delete(sl_line)
-        sl_line := na
-    if not na(tp1_line)
-        line.delete(tp1_line)
-        tp1_line := na
-    if not na(tp2_line)
-        line.delete(tp2_line)
-        tp2_line := na
-    if not na(sig_label)
-        label.delete(sig_label)
-        sig_label := na
-
-draw_signal(bool is_long, bool is_mitigation, float entry, float sl, float tp1, float tp2) =>
-    clear_trade_drawings()
+// فقط آبجکت‌های جدید می‌سازد و برمی‌گرداند (بدون دست زدن به var گلوبال)
+build_signal_drawings(bool is_long, bool is_mitigation, float entry, float sl, float tp1, float tp2) =>
     color c = is_mitigation ? (is_long ? mit_long_col : mit_short_col) : (is_long ? brk_long_col : brk_short_col)
     string kind = is_mitigation ? "MITIGATION" : "BREAKER"
     string side = is_long ? "LONG" : "SHORT"
@@ -487,18 +475,16 @@ draw_signal(bool is_long, bool is_mitigation, float entry, float sl, float tp1, 
         txt += "\nTP1 Liq " + str.tostring(tp1, format.mintick)
     if not na(tp2)
         txt += "\nTP2 FVG " + str.tostring(tp2, format.mintick)
-    sig_label := label.new(bar_index, is_long ? low : high, txt, style=is_long ? label.style_label_up : label.style_label_down, color=c, textcolor=color.white, size=size.small)
-    sl_line := line.new(bar_index, sl, bar_index + 20, sl, color=color.red, style=line.style_solid, width=2)
-    if not na(tp1)
-        tp1_line := line.new(bar_index, tp1, bar_index + 20, tp1, color=color.orange, style=line.style_dotted, width=2)
-    if not na(tp2)
-        tp2_line := line.new(bar_index, tp2, bar_index + 20, tp2, color=color.teal, style=line.style_dotted, width=2)
+    label new_lbl = label.new(bar_index, is_long ? low : high, txt, style=is_long ? label.style_label_up : label.style_label_down, color=c, textcolor=color.white, size=size.small)
+    line new_sl = line.new(bar_index, sl, bar_index + 20, sl, color=color.red, style=line.style_solid, width=2)
+    line new_tp1 = na(tp1) ? na : line.new(bar_index, tp1, bar_index + 20, tp1, color=color.orange, style=line.style_dotted, width=2)
+    line new_tp2 = na(tp2) ? na : line.new(bar_index, tp2, bar_index + 20, tp2, color=color.teal, style=line.style_dotted, width=2)
+    [new_lbl, new_sl, new_tp1, new_tp2]
 
 float sl_pad = sl_buffer_ticks * syminfo.mintick
 [last_bsl, last_bsl_swept, last_bsl_swept_bar, last_bsl_start] = find_last_bsl()
 [last_ssl, last_ssl_swept, last_ssl_swept_bar, last_ssl_start] = find_last_ssl()
 
-// آیا شکست OB با لمس دوباره زون بریکر هم‌زمان است؟
 ob_retest_ready(OrderBlock ob) =>
     if enter_on_break
         ob.just_broke
@@ -506,9 +492,14 @@ ob_retest_ready(OrderBlock ob) =>
         ob.is_breaker and ob.signal_armed and not ob.just_broke and high >= ob.bottom and low <= ob.top
 
 bool fired = false
+bool sig_is_long = false
+bool sig_is_mitigation = false
+float sig_entry = na
+float sig_sl = na
+float sig_tp1 = na
+float sig_tp2 = na
 
 if can_signal() and array.size(ob_array) > 0
-    // از جدیدترین OB به عقب
     for i = array.size(ob_array) - 1 to 0
         if not fired
             OrderBlock ob = array.get(ob_array, i)
@@ -520,7 +511,6 @@ if can_signal() and array.size(ob_array) > 0
                     bool trend_ok = struct_bull or close > nz(last_ssl, close)
                     if mss_ok and trend_ok and not na(last_bsl)
                         bool mitigation_case = not last_bsl_swept
-                        // سوئیپ اخیرِ همان BSL قبل/همراه شکست = بریکر کلاسیک
                         bool breaker_case = last_bsl_swept and not na(last_bsl_swept_bar) and last_bsl_swept_bar <= bar_index and (bar_index - last_bsl_swept_bar) <= mss_lookback
 
                         float entry = close
@@ -529,12 +519,22 @@ if can_signal() and array.size(ob_array) > 0
                         float tp2 = show_tp_fvg ? find_nearest_untouched_fvg(false, true) : na
 
                         if mitigation_case and enable_mitigation and sl > entry
-                            draw_signal(false, true, entry, sl, tp1, tp2)
+                            sig_is_long := false
+                            sig_is_mitigation := true
+                            sig_entry := entry
+                            sig_sl := sl
+                            sig_tp1 := tp1
+                            sig_tp2 := tp2
                             last_signal_bar := bar_index
                             ob.signal_armed := false
                             fired := true
                         else if breaker_case and enable_breaker and sl > entry
-                            draw_signal(false, false, entry, sl, tp1, tp2)
+                            sig_is_long := false
+                            sig_is_mitigation := false
+                            sig_entry := entry
+                            sig_sl := sl
+                            sig_tp1 := tp1
+                            sig_tp2 := tp2
                             last_signal_bar := bar_index
                             ob.signal_armed := false
                             fired := true
@@ -553,15 +553,41 @@ if can_signal() and array.size(ob_array) > 0
                         float tp2 = show_tp_fvg ? find_nearest_untouched_fvg(true, false) : na
 
                         if mitigation_case and enable_mitigation and sl < entry
-                            draw_signal(true, true, entry, sl, tp1, tp2)
+                            sig_is_long := true
+                            sig_is_mitigation := true
+                            sig_entry := entry
+                            sig_sl := sl
+                            sig_tp1 := tp1
+                            sig_tp2 := tp2
                             last_signal_bar := bar_index
                             ob.signal_armed := false
                             fired := true
                         else if breaker_case and enable_breaker and sl < entry
-                            draw_signal(true, false, entry, sl, tp1, tp2)
+                            sig_is_long := true
+                            sig_is_mitigation := false
+                            sig_entry := entry
+                            sig_sl := sl
+                            sig_tp1 := tp1
+                            sig_tp2 := tp2
                             last_signal_bar := bar_index
                             ob.signal_armed := false
                             fired := true
+
+// رسم در اسکوپ اصلی (اینجا مجاز است var گلوبال را عوض کنیم)
+if fired
+    if not na(sl_line)
+        line.delete(sl_line)
+    if not na(tp1_line)
+        line.delete(tp1_line)
+    if not na(tp2_line)
+        line.delete(tp2_line)
+    if not na(sig_label)
+        label.delete(sig_label)
+    [label new_lbl, line new_sl, line new_tp1, line new_tp2] = build_signal_drawings(sig_is_long, sig_is_mitigation, sig_entry, sig_sl, sig_tp1, sig_tp2)
+    sig_label := new_lbl
+    sl_line := new_sl
+    tp1_line := new_tp1
+    tp2_line := new_tp2
 //#endregion
 
 //#region Debug / status plots (Data Window)

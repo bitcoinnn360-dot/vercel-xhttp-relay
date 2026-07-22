@@ -1,14 +1,23 @@
 {
-  "updatedAt": "2026-07-21T15:21:16.065643+00:00",
+  "updatedAt": "2026-07-22T09:20:15.503923+00:00",
   "tgjuBourse": {
-    "value": 4887551.7,
-    "change": 74048.3,
-    "changePct": 1.54,
-    "high": 4887748.8,
-    "low": 4873381.3,
+    "value": 4883977.0,
+    "change": -3574.7,
+    "changePct": -0.07,
+    "high": 4908598.5,
+    "low": 4883508.2,
     "time": "۱۲:۳۹:۰۴",
     "source": "tgju"
   },
+  "overviewLive": {
+    "totalMarketValueHmt": 8909.1,
+    "totalMarketValueUsdM": 46426.0,
+    "usdRate": 1919000.0,
+    "totalTradeValueHmt": 2.34,
+    "retailMoneyFlowDailyBillionToman": 9.5,
+    "stockCount": 765
+  },
+  "candles1401Count": 793,
   "tsetmc": {
     "ok": false,
     "source": "tsetmc",

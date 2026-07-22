@@ -17,6 +17,15 @@ export interface IndexSnapshot {
   marketValueHmt?: number
 }
 
+export interface CandlePoint {
+  date: string
+  dateJalali?: string
+  open: number
+  high: number
+  low: number
+  close: number
+}
+
 export interface MarketOverview {
   dateJalali: string
   dateGregorian: string
@@ -29,9 +38,14 @@ export interface MarketOverview {
   totalTradeValueHmt: number
   retailTradeValueHmt: number
   retailMoneyFlowYtd: number
+  /** برآورد خالص ورود/خروج پول حقیقی امروز (میلیارد تومان) از تابلو */
+  retailMoneyFlowDaily?: number
   indexHistory: { date: string; value: number }[]
   intradayIndex: { time: string; value: number }[]
   moneyFlowSeries: { date: string; value: number }[]
+  candles1401?: CandlePoint[]
+  liveNotes?: string[]
+  dataSource?: 'live' | 'seed'
 }
 
 export interface ImpactStock {

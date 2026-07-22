@@ -261,6 +261,19 @@ async function fetchScrapedMarket(): Promise<{
   histories: Record<string, HistoryPoint[]>
   sectors: LiveBundle['sectors']
   meta: LiveBundle['scrapeMeta']
+  overviewLive?: {
+    ok?: boolean
+    totalMarketValueHmt?: number
+    totalMarketValueUsdM?: number
+    usdRate?: number
+    totalTradeValueHmt?: number
+    retailMoneyFlowDailyBillionToman?: number
+    impacts?: DashboardData['impacts']
+    topTrades?: DashboardData['topTrades']
+    notes?: string[]
+    asOf?: string
+  }
+  candles1401?: import('./types').CandlePoint[]
 } | null> {
   try {
     const res = await fetch('/data/market.json', { cache: 'no-store' })
@@ -272,6 +285,19 @@ async function fetchScrapedMarket(): Promise<{
       tsetmc?: { ok?: boolean }
       ime?: { ok?: boolean }
       infra?: Record<string, string>
+      overviewLive?: {
+        ok?: boolean
+        totalMarketValueHmt?: number
+        totalMarketValueUsdM?: number
+        usdRate?: number
+        totalTradeValueHmt?: number
+        retailMoneyFlowDailyBillionToman?: number
+        impacts?: DashboardData['impacts']
+        topTrades?: DashboardData['topTrades']
+        notes?: string[]
+        asOf?: string
+      }
+      candles1401?: import('./types').CandlePoint[]
     }
     return {
       histories: json.histories || {},
@@ -282,10 +308,37 @@ async function fetchScrapedMarket(): Promise<{
         imeOk: Boolean(json.ime?.ok),
         infra: json.infra,
       },
+      overviewLive: json.overviewLive,
+      candles1401: json.candles1401,
     }
   } catch {
     return null
   }
+}
+
+function applyOverviewLive(
+  base: DashboardData,
+  live: NonNullable<Awaited<ReturnType<typeof fetchScrapedMarket>>>['overviewLive'],
+  candles?: import('./types').CandlePoint[],
+) {
+  if (!live?.ok) {
+    if (candles?.length) base.overview.candles1401 = candles
+    return false
+  }
+  const o = base.overview
+  if (live.totalMarketValueHmt != null) o.totalMarketValueHmt = live.totalMarketValueHmt
+  if (live.totalMarketValueUsdM != null) o.totalMarketValueUsdM = live.totalMarketValueUsdM
+  if (live.usdRate != null) o.usdRate = live.usdRate
+  if (live.totalTradeValueHmt != null) o.totalTradeValueHmt = live.totalTradeValueHmt
+  if (live.retailMoneyFlowDailyBillionToman != null) {
+    o.retailMoneyFlowDaily = live.retailMoneyFlowDailyBillionToman
+  }
+  if (live.impacts) base.impacts = live.impacts
+  if (live.topTrades?.length) base.topTrades = live.topTrades
+  if (candles?.length) o.candles1401 = candles
+  o.liveNotes = live.notes
+  o.dataSource = 'live'
+  return true
 }
 
 export async function loadDashboardBundle(): Promise<LiveBundle> {
@@ -300,8 +353,12 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   ])
 
   const liveCount = applyLiveQuotes(base, current)
+  const overviewLiveOk = applyOverviewLive(base, scraped?.overviewLive, scraped?.candles1401)
+
   const histories: Record<string, HistoryPoint[]> = { ...(scraped?.histories || {}) }
   for (const [k, pts] of histEntries) {
+    // Prefer longer scraped bourse history (from 1401) over short client fetch
+    if (k === 'bourse' && (histories.bourse?.length || 0) > pts.length) continue
     if (pts.length) histories[k] = pts
   }
 
@@ -352,15 +409,29 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   }
 
   base.sources = markSources(base, liveCount, fredOk, now)
+  if (overviewLiveOk) {
+    base.sources = [
+      ...base.sources.filter((s) => s.id !== 'shakhesban'),
+      {
+        id: 'shakhesban',
+        name: 'شاخص‌بان',
+        status: 'live',
+        note: 'ارزش بازار، معاملات، تاثیر و برآورد پول حقیقی',
+        lastOk: scraped?.overviewLive?.asOf || now,
+      },
+    ]
+  }
   if (scraped?.meta) {
     base.sources = base.sources.map((s) => {
       if (s.id === 'tsetmc') {
         return {
           ...s,
-          status: scraped.meta.tsetmcOk ? 'live' : liveCount > 0 ? 'live' : 'seed',
+          status: scraped.meta.tsetmcOk ? 'live' : overviewLiveOk || liveCount > 0 ? 'live' : 'seed',
           note: scraped.meta.tsetmcOk
             ? 'اسکرپر TSETMC موفق'
-            : 'جزئیات TSETMC نیاز به IP ایران — شاخص از TGJU',
+            : overviewLiveOk
+              ? 'جزئیات تابلو از شاخص‌بان — TSETMC نیاز به IP ایران'
+              : 'جزئیات TSETMC نیاز به IP ایران — شاخص از TGJU',
         }
       }
       if (s.id === 'ime') {

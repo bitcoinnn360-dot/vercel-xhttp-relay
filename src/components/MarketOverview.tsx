@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import type { DashboardData } from '../data/types'
 import type { HistoryPoint } from '../data/fetchers'
 import { changeClass, fmtChange, fmtInt, fmtNum, fmtPct } from '../lib/format'
-import { FlowBarChart, PriceAreaChart } from './charts/Charts'
+import { CandlestickChart, FlowBarChart } from './charts/Charts'
 import { TopTrades } from './StocksSection'
 
 function Kpi({
@@ -12,6 +12,7 @@ function Kpi({
   change,
   changePct,
   delay = 0,
+  hint,
 }: {
   label: string
   value: string
@@ -19,6 +20,7 @@ function Kpi({
   change?: number
   changePct?: number
   delay?: number
+  hint?: string
 }) {
   return (
     <motion.div
@@ -38,6 +40,7 @@ function Kpi({
           {change !== undefined ? <span className="mr-2 text-xs opacity-80">({fmtChange(change)})</span> : null}
         </div>
       )}
+      {hint ? <div className="mt-1 text-[10px] text-[var(--color-muted)]">{hint}</div> : null}
     </motion.div>
   )
 }
@@ -50,55 +53,115 @@ export function MarketOverview({
   histories: Record<string, HistoryPoint[]>
 }) {
   const o = data.overview
+  const live = o.dataSource === 'live'
   const money = o.moneyFlowSeries.map((d) => ({ label: d.date, value: d.value }))
-  const indexSeries = (histories.bourse || []).slice(-60).map((p) => ({
-    label: (p.dateJalali || p.date).slice(5),
-    value: p.value,
-  }))
+  const candles = o.candles1401 || []
+  const retailDaily = o.retailMoneyFlowDaily
 
   return (
     <section id="overview" className="scroll-mt-8 space-y-4">
       <div>
         <h2 className="section-title">خلاصه بازار سرمایه ایران</h2>
-        <p className="section-sub">شاخص کل زنده از TGJU · جزئیات گزارش روزانه</p>
+        <p className="section-sub">
+          {live
+            ? 'زنده: شاخص و دلار از TGJU · ارزش بازار/معاملات/تاثیر از شاخص‌بان'
+            : 'شاخص کل زنده از TGJU · جزئیات تا بارگذاری اسکرپر از seed'}
+        </p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label={o.tedpix.name} value={fmtInt(o.tedpix.value)} change={o.tedpix.change} changePct={o.tedpix.changePct} delay={0.02} />
-        <Kpi label={o.equalWeight.name} value={fmtInt(o.equalWeight.value)} change={o.equalWeight.change} changePct={o.equalWeight.changePct} delay={0.05} />
-        <Kpi label={o.ifb.name} value={fmtInt(o.ifb.value)} change={o.ifb.change} changePct={o.ifb.changePct} delay={0.08} />
-        <Kpi label="مجموع ارزش بازار" value={fmtInt(o.totalMarketValueHmt)} unit="همت" delay={0.1} />
+        <Kpi label={o.tedpix.name} value={fmtInt(o.tedpix.value)} change={o.tedpix.change} changePct={o.tedpix.changePct} delay={0.02} hint="TGJU" />
+        <Kpi label={o.equalWeight.name} value={fmtInt(o.equalWeight.value)} change={o.equalWeight.change} changePct={o.equalWeight.changePct} delay={0.05} hint="گزارش / seed" />
+        <Kpi label={o.ifb.name} value={fmtInt(o.ifb.value)} change={o.ifb.change} changePct={o.ifb.changePct} delay={0.08} hint="گزارش / seed" />
+        <Kpi
+          label="مجموع ارزش بازار"
+          value={fmtInt(o.totalMarketValueHmt)}
+          unit="همت"
+          delay={0.1}
+          hint={live ? 'شاخص‌بان · سهام بورس+فرابورس' : 'seed'}
+        />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="ارزش دلاری بازار" value={fmtInt(o.totalMarketValueUsdM)} unit="میلیون $" />
-        <Kpi label="نرخ دلار" value={fmtInt(o.usdRate)} unit="ریال" />
-        <Kpi label="ارزش کل معاملات" value={fmtNum(o.totalTradeValueHmt, 1)} unit="همت" />
+        <Kpi
+          label="ارزش دلاری بازار"
+          value={fmtInt(o.totalMarketValueUsdM)}
+          unit="میلیون $"
+          hint={live ? 'ارزش بازار ÷ دلار TGJU' : 'seed'}
+        />
+        <Kpi label="نرخ دلار" value={fmtInt(o.usdRate)} unit="ریال" hint="TGJU · آزاد" />
+        <Kpi
+          label="ارزش کل معاملات"
+          value={fmtNum(o.totalTradeValueHmt, 2)}
+          unit="همت"
+          hint={live ? 'شاخص‌بان · سهام' : 'seed'}
+        />
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="panel p-3.5">
-          <div className="kpi-label">خالص ورود پول حقیقی از ابتدای ۱۴۰۴</div>
-          <div className={`kpi-value num ${changeClass(o.retailMoneyFlowYtd)}`}>
-            {fmtInt(o.retailMoneyFlowYtd)}
+          <div className="kpi-label">
+            {retailDaily !== undefined ? 'خالص ورود پول حقیقی (امروز)' : 'خالص ورود پول حقیقی از ابتدای ۱۴۰۴'}
+          </div>
+          <div className={`kpi-value num ${changeClass(retailDaily ?? o.retailMoneyFlowYtd)}`}>
+            {fmtInt(retailDaily ?? o.retailMoneyFlowYtd)}
             <span className="mr-1 text-xs font-medium text-[var(--color-muted)]">میلیارد تومان</span>
+          </div>
+          <div className="mt-1 text-[10px] text-[var(--color-muted)]">
+            {retailDaily !== undefined
+              ? 'برآورد از حجم خرید/فروش حقیقی × قیمت (شاخص‌بان)'
+              : 'از گزارش روزانه — پارسی‌تحلیل فعلاً قفل عضویت'}
           </div>
         </motion.div>
       </div>
 
       <div className="grid gap-3 lg:grid-cols-2">
         <div className="panel p-4">
-          <h3 className="mb-2 text-sm font-bold">روند شاخص کل (تاریخچه TGJU)</h3>
-          <PriceAreaChart data={indexSeries.length ? indexSeries : o.intradayIndex.map((x) => ({ label: x.time, value: x.value }))} color="#0b3d6e" />
+          <h3 className="mb-2 text-sm font-bold">روند تاریخی شاخص کل (کندل از ۱۴۰۱)</h3>
+          <p className="mb-2 text-[10px] text-[var(--color-muted)]">
+            OHLC از TGJU · نمایش هفتگی برای خوانایی ({candles.length || histories.bourse?.length || 0} روز خام)
+          </p>
+          <CandlestickChart
+            data={
+              candles.length
+                ? candles
+                : (histories.bourse || []).map((p) => ({
+                    date: p.date,
+                    dateJalali: p.dateJalali,
+                    open: p.value,
+                    high: p.value,
+                    low: p.value,
+                    close: p.value,
+                  }))
+            }
+          />
         </div>
         <div className="panel p-4">
-          <h3 className="mb-2 text-sm font-bold">خالص ورود/خروج پول حقیقی</h3>
+          <h3 className="mb-2 text-sm font-bold">خالص ورود/خروج پول حقیقی (سری گزارش)</h3>
           <FlowBarChart data={money} />
         </div>
       </div>
 
       <div className="grid gap-3 lg:grid-cols-3">
-        <ImpactPanel title="تأثیر مثبت/منفی بورس" pos={data.impacts.boursePos} neg={data.impacts.bourseNeg} />
-        <ImpactPanel title="تأثیر مثبت/منفی فرابورس" pos={data.impacts.ifbPos} neg={data.impacts.ifbNeg} />
+        <ImpactPanel
+          title="تأثیر مثبت/منفی بورس"
+          pos={data.impacts.boursePos}
+          neg={data.impacts.bourseNeg}
+          live={live}
+        />
+        <ImpactPanel
+          title="تأثیر مثبت/منفی فرابورس"
+          pos={data.impacts.ifbPos}
+          neg={data.impacts.ifbNeg}
+          live={live}
+        />
         <TopTrades data={data} />
       </div>
+
+      {o.liveNotes?.length ? (
+        <div className="panel px-4 py-3 text-[11px] leading-6 text-[var(--color-muted)]">
+          {o.liveNotes.map((n) => (
+            <div key={n}>• {n}</div>
+          ))}
+        </div>
+      ) : null}
     </section>
   )
 }
@@ -107,14 +170,19 @@ function ImpactPanel({
   title,
   pos,
   neg,
+  live,
 }: {
   title: string
   pos: { symbol: string; impact: number }[]
   neg: { symbol: string; impact: number }[]
+  live?: boolean
 }) {
   return (
     <div className="panel p-4">
-      <h3 className="mb-3 text-sm font-bold">{title}</h3>
+      <h3 className="mb-1 text-sm font-bold">{title}</h3>
+      <p className="mb-3 text-[10px] text-[var(--color-muted)]">
+        {live ? 'سورت‌شده · پروکسی تغییر٪×ارزش بازار' : 'از گزارش روزانه'}
+      </p>
       <div className="grid grid-cols-2 gap-3">
         <ul className="space-y-2">
           {pos.map((s) => (

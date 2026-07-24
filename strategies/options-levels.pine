@@ -1,43 +1,47 @@
 //@version=5
-indicator("Options Levels (Max Pain / Call Wall / Put Wall)", overlay=true, max_lines_count=50, max_labels_count=50)
+indicator("Options Levels + Transition Probabilities", overlay=true, max_lines_count=50, max_labels_count=50)
 
 // =============================================================================
-// سه سطح آپشن برای ترید بین آن‌ها:
-//   Put Wall  = strike با بیشترین OI پوت
-//   Max Pain  = قیمتی که بیشترین درد را برای هولدرها دارد
-//   Call Wall = strike با بیشترین OI کال
-//
-// TradingView نمی‌تواند مستقیم از Coinglass/Deribit فچ کند.
-// سطوح را از endpoint زیر بگیر و اینجا وارد کن:
-//   GET /api/options-levels?currency=BTC
+// سطوح + احتمال حرکت بین آن‌ها
+// داده از: GET /api/options-levels?currency=BTC  → فیلد pine_inputs
+// داشبورد: GET /api/options-dashboard?currency=BTC
+// احتمال‌ها مدل ریسک‌خنثی (ATM IV) هستند، نه تضمین.
 // =============================================================================
 
 string GRP_LV = "Levels"
+string GRP_PR = "Probabilities %"
 string GRP_VIS = "Visuals"
 
-float putWallIn = input.float(0.0, "Put Wall", group=GRP_LV, tooltip="Strike با بیشترین Put OI")
-float maxPainIn = input.float(0.0, "Max Pain", group=GRP_LV, tooltip="Max pain تا نزدیک‌ترین expiry")
-float callWallIn = input.float(0.0, "Call Wall", group=GRP_LV, tooltip="Strike با بیشترین Call OI")
-string expiryLabel = input.string("", "Expiry label (optional)", group=GRP_LV, tooltip="مثلا 25JUL26")
+float putWallIn = input.float(0.0, "Put Wall", group=GRP_LV)
+float maxPainIn = input.float(0.0, "Max Pain", group=GRP_LV)
+float callWallIn = input.float(0.0, "Call Wall", group=GRP_LV)
+string expiryLabel = input.string("", "Expiry label", group=GRP_LV)
+
+float pPutToMax = input.float(0.0, "P(Put → Max Pain) %", minval=0, maxval=100, group=GRP_PR)
+float pMaxToPut = input.float(0.0, "P(Max Pain → Put) %", minval=0, maxval=100, group=GRP_PR)
+float pMaxToCall = input.float(0.0, "P(Max → Call Wall) %", minval=0, maxval=100, group=GRP_PR)
+float pCallToMax = input.float(0.0, "P(Call → Max Pain) %", minval=0, maxval=100, group=GRP_PR)
 
 bool showPut = input.bool(true, "Show Put Wall", group=GRP_VIS)
 bool showMax = input.bool(true, "Show Max Pain", group=GRP_VIS)
 bool showCall = input.bool(true, "Show Call Wall", group=GRP_VIS)
-bool showLabels = input.bool(true, "Show Labels", group=GRP_VIS)
+bool showLabels = input.bool(true, "Show Level Labels", group=GRP_VIS)
+bool showProbLabels = input.bool(true, "Show Transition Prob Labels", group=GRP_VIS)
 bool showZone = input.bool(true, "Shade Put↔Call Zone", group=GRP_VIS)
 
 color putCol = input.color(color.new(#42a5f5, 0), "Put Wall Color", group=GRP_VIS)
 color maxCol = input.color(color.new(#ffca28, 0), "Max Pain Color", group=GRP_VIS)
 color callCol = input.color(color.new(#ef5350, 0), "Call Wall Color", group=GRP_VIS)
 color zoneCol = input.color(color.new(#90a4ae, 92), "Zone Fill", group=GRP_VIS)
+color probCol = input.color(color.new(#ce93d8, 0), "Prob Label Color", group=GRP_VIS)
 
 float putWall = putWallIn > 0 ? putWallIn : na
 float maxPain = maxPainIn > 0 ? maxPainIn : na
 float callWall = callWallIn > 0 ? callWallIn : na
 
-plot(showPut ? putWall : na, "Put Wall", color=putCol, linewidth=2, style=plot.style_line)
-plot(showMax ? maxPain : na, "Max Pain", color=maxCol, linewidth=2, style=plot.style_line)
-plot(showCall ? callWall : na, "Call Wall", color=callCol, linewidth=2, style=plot.style_line)
+plot(showPut ? putWall : na, "Put Wall", color=putCol, linewidth=2)
+plot(showMax ? maxPain : na, "Max Pain", color=maxCol, linewidth=2)
+plot(showCall ? callWall : na, "Call Wall", color=callCol, linewidth=2)
 
 pLo = plot(showZone and not na(putWall) and not na(callWall) ? math.min(nz(putWall), nz(callWall)) : na, "Zone Low", display=display.none)
 pHi = plot(showZone and not na(putWall) and not na(callWall) ? math.max(nz(putWall), nz(callWall)) : na, "Zone High", display=display.none)
@@ -46,6 +50,8 @@ fill(pLo, pHi, color=zoneCol, title="Options Range Zone")
 var label putLbl = na
 var label maxLbl = na
 var label callLbl = na
+var label midLowLbl = na
+var label midHighLbl = na
 
 if barstate.islast and showLabels
     if not na(putLbl)
@@ -54,16 +60,33 @@ if barstate.islast and showLabels
         label.delete(maxLbl)
     if not na(callLbl)
         label.delete(callLbl)
+    if not na(midLowLbl)
+        label.delete(midLowLbl)
+    if not na(midHighLbl)
+        label.delete(midHighLbl)
 
-    string expTxt = expiryLabel != "" ? " (" + expiryLabel + ")" : ""
+    string expTxt = expiryLabel != "" ? " · " + expiryLabel : ""
     if showPut and not na(putWall)
-        putLbl := label.new(bar_index + 2, putWall, "PUT WALL " + str.tostring(putWall, format.mintick) + expTxt, style=label.style_label_left, color=putCol, textcolor=color.white, size=size.small)
+        putLbl := label.new(bar_index + 2, putWall, "PUT " + str.tostring(putWall, format.mintick) + expTxt, style=label.style_label_left, color=putCol, textcolor=color.white, size=size.small)
     if showMax and not na(maxPain)
-        maxLbl := label.new(bar_index + 2, maxPain, "MAX PAIN " + str.tostring(maxPain, format.mintick) + expTxt, style=label.style_label_left, color=maxCol, textcolor=color.black, size=size.small)
+        maxLbl := label.new(bar_index + 2, maxPain, "MAX " + str.tostring(maxPain, format.mintick) + expTxt, style=label.style_label_left, color=maxCol, textcolor=color.black, size=size.small)
     if showCall and not na(callWall)
-        callLbl := label.new(bar_index + 2, callWall, "CALL WALL " + str.tostring(callWall, format.mintick) + expTxt, style=label.style_label_left, color=callCol, textcolor=color.white, size=size.small)
+        callLbl := label.new(bar_index + 2, callWall, "CALL " + str.tostring(callWall, format.mintick) + expTxt, style=label.style_label_left, color=callCol, textcolor=color.white, size=size.small)
 
-// واکنش ساده بین سطوح (فقط مارکر، نه استراتژی کامل)
+    if showProbLabels
+        if not na(putWall) and not na(maxPain) and pPutToMax > 0
+            float mid1 = (putWall + maxPain) / 2.0
+            string t1 = "Put→Max " + str.tostring(pPutToMax, "#.0") + "%"
+            if pMaxToPut > 0
+                t1 := t1 + "\nMax→Put " + str.tostring(pMaxToPut, "#.0") + "%"
+            midLowLbl := label.new(bar_index + 8, mid1, t1, style=label.style_label_left, color=probCol, textcolor=color.white, size=size.small)
+        if not na(maxPain) and not na(callWall) and pMaxToCall > 0
+            float mid2 = (maxPain + callWall) / 2.0
+            string t2 = "Max→Call " + str.tostring(pMaxToCall, "#.0") + "%"
+            if pCallToMax > 0
+                t2 := t2 + "\nCall→Max " + str.tostring(pCallToMax, "#.0") + "%"
+            midHighLbl := label.new(bar_index + 8, mid2, t2, style=label.style_label_left, color=probCol, textcolor=color.white, size=size.small)
+
 bool nearPut = not na(putWall) and low <= putWall and close > putWall
 bool nearCall = not na(callWall) and high >= callWall and close < callWall
 bool nearMax = not na(maxPain) and math.abs(close - maxPain) <= syminfo.mintick * 50

@@ -3,6 +3,8 @@
   "name": "vercel-xhttp-relay",
   "rewrites": [
     { "source": "/api/options-levels", "destination": "/api/options-levels" },
+    { "source": "/api/options-dashboard", "destination": "/api/options-dashboard" },
+    { "source": "/options", "destination": "/api/options-dashboard" },
     { "source": "/(.*)", "destination": "/api/index" }
   ],
   "trailingSlash": false

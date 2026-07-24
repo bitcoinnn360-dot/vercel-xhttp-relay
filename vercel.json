@@ -2,6 +2,7 @@
   "version": 2,
   "name": "vercel-xhttp-relay",
   "rewrites": [
+    { "source": "/api/options-levels", "destination": "/api/options-levels" },
     { "source": "/(.*)", "destination": "/api/index" }
   ],
   "trailingSlash": false

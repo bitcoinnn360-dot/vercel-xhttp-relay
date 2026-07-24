@@ -1,0 +1,73 @@
+//@version=5
+indicator("Options Levels (Max Pain / Call Wall / Put Wall)", overlay=true, max_lines_count=50, max_labels_count=50)
+
+// =============================================================================
+// سه سطح آپشن برای ترید بین آن‌ها:
+//   Put Wall  = strike با بیشترین OI پوت
+//   Max Pain  = قیمتی که بیشترین درد را برای هولدرها دارد
+//   Call Wall = strike با بیشترین OI کال
+//
+// TradingView نمی‌تواند مستقیم از Coinglass/Deribit فچ کند.
+// سطوح را از endpoint زیر بگیر و اینجا وارد کن:
+//   GET /api/options-levels?currency=BTC
+// =============================================================================
+
+string GRP_LV = "Levels"
+string GRP_VIS = "Visuals"
+
+float putWallIn = input.float(0.0, "Put Wall", group=GRP_LV, tooltip="Strike با بیشترین Put OI")
+float maxPainIn = input.float(0.0, "Max Pain", group=GRP_LV, tooltip="Max pain تا نزدیک‌ترین expiry")
+float callWallIn = input.float(0.0, "Call Wall", group=GRP_LV, tooltip="Strike با بیشترین Call OI")
+string expiryLabel = input.string("", "Expiry label (optional)", group=GRP_LV, tooltip="مثلا 25JUL26")
+
+bool showPut = input.bool(true, "Show Put Wall", group=GRP_VIS)
+bool showMax = input.bool(true, "Show Max Pain", group=GRP_VIS)
+bool showCall = input.bool(true, "Show Call Wall", group=GRP_VIS)
+bool showLabels = input.bool(true, "Show Labels", group=GRP_VIS)
+bool showZone = input.bool(true, "Shade Put↔Call Zone", group=GRP_VIS)
+
+color putCol = input.color(color.new(#42a5f5, 0), "Put Wall Color", group=GRP_VIS)
+color maxCol = input.color(color.new(#ffca28, 0), "Max Pain Color", group=GRP_VIS)
+color callCol = input.color(color.new(#ef5350, 0), "Call Wall Color", group=GRP_VIS)
+color zoneCol = input.color(color.new(#90a4ae, 92), "Zone Fill", group=GRP_VIS)
+
+float putWall = putWallIn > 0 ? putWallIn : na
+float maxPain = maxPainIn > 0 ? maxPainIn : na
+float callWall = callWallIn > 0 ? callWallIn : na
+
+plot(showPut ? putWall : na, "Put Wall", color=putCol, linewidth=2, style=plot.style_line)
+plot(showMax ? maxPain : na, "Max Pain", color=maxCol, linewidth=2, style=plot.style_line)
+plot(showCall ? callWall : na, "Call Wall", color=callCol, linewidth=2, style=plot.style_line)
+
+pLo = plot(showZone and not na(putWall) and not na(callWall) ? math.min(nz(putWall), nz(callWall)) : na, "Zone Low", display=display.none)
+pHi = plot(showZone and not na(putWall) and not na(callWall) ? math.max(nz(putWall), nz(callWall)) : na, "Zone High", display=display.none)
+fill(pLo, pHi, color=zoneCol, title="Options Range Zone")
+
+var label putLbl = na
+var label maxLbl = na
+var label callLbl = na
+
+if barstate.islast and showLabels
+    if not na(putLbl)
+        label.delete(putLbl)
+    if not na(maxLbl)
+        label.delete(maxLbl)
+    if not na(callLbl)
+        label.delete(callLbl)
+
+    string expTxt = expiryLabel != "" ? " (" + expiryLabel + ")" : ""
+    if showPut and not na(putWall)
+        putLbl := label.new(bar_index + 2, putWall, "PUT WALL " + str.tostring(putWall, format.mintick) + expTxt, style=label.style_label_left, color=putCol, textcolor=color.white, size=size.small)
+    if showMax and not na(maxPain)
+        maxLbl := label.new(bar_index + 2, maxPain, "MAX PAIN " + str.tostring(maxPain, format.mintick) + expTxt, style=label.style_label_left, color=maxCol, textcolor=color.black, size=size.small)
+    if showCall and not na(callWall)
+        callLbl := label.new(bar_index + 2, callWall, "CALL WALL " + str.tostring(callWall, format.mintick) + expTxt, style=label.style_label_left, color=callCol, textcolor=color.white, size=size.small)
+
+// واکنش ساده بین سطوح (فقط مارکر، نه استراتژی کامل)
+bool nearPut = not na(putWall) and low <= putWall and close > putWall
+bool nearCall = not na(callWall) and high >= callWall and close < callWall
+bool nearMax = not na(maxPain) and math.abs(close - maxPain) <= syminfo.mintick * 50
+
+plotshape(nearPut, title="Bounce Put Wall", style=shape.triangleup, location=location.belowbar, color=putCol, size=size.tiny)
+plotshape(nearCall, title="Reject Call Wall", style=shape.triangledown, location=location.abovebar, color=callCol, size=size.tiny)
+plotshape(nearMax, title="At Max Pain", style=shape.circle, location=location.absolute, color=maxCol, size=size.tiny)

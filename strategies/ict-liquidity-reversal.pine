@@ -461,6 +461,19 @@ find_nearest_untouched_fvg(bool want_bull, bool below_price) =>
     if array.size(fvg_array) > 0
         for i = 0 to array.size(fvg_array) - 1
             FVGZone f = array.get(fvg_array, i)
+            if f.is_bull == want_bull and not f.touched
+                float edge = want_bull ? f.top : f.bottom
+                bool side_ok = below_price ? edge < close : edge > close
+                if side_ok
+                    if na(best_edge)
+                        best_edge := edge
+                    else if below_price
+                        best_edge := math.max(best_edge, edge)
+                    else
+                        best_edge := math.min(best_edge, edge)
+    best_edge
+//#endregion
+
 //#region Signal engine — Failed-Swing Mitigation + Rejection + Fractal leave
 var int last_signal_bar = na
 var label[] hist_labels = array.new_label()

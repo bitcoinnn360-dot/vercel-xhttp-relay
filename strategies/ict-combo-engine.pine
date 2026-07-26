@@ -532,9 +532,13 @@ float sig_tp = na
 try_enter(bool is_long) =>
     float entry = close
     float stop = compute_sl(is_long, entry)
-    float tp = not na(stop) ? pick_tp(is_long, entry, stop) : na
-    bool geom = not na(stop) and not na(tp) and (is_long ? stop < entry and tp > entry : stop > entry and tp < entry)
-    geom and filters_ok(is_long) and can_signal() and flat_ok() ? [true, stop, tp] : [false, stop, tp]
+    float tp = na
+    bool ok = false
+    if not na(stop)
+        tp := pick_tp(is_long, entry, stop)
+        bool geom = not na(tp) and (is_long ? stop < entry and tp > entry : stop > entry and tp < entry)
+        ok := geom and filters_ok(is_long) and can_signal() and flat_ok()
+    [ok, stop, tp]
 
 if pend_short and bar_index > arm_bar and (na(fail_px) or high < fail_px)
     bool in_zone = zone_touch()

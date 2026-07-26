@@ -50,13 +50,24 @@ export function PriceAreaChart({
   color = '#1a5f9e',
   height = 220,
   valueLabel = 'مقدار',
+  /** Zoom Y to the series range (needed for TEDPIX intraday — otherwise 0-baseline flattens the line). */
+  zoomY = false,
 }: {
   data: { label: string; value: number }[]
   color?: string
   height?: number
   valueLabel?: string
+  zoomY?: boolean
 }) {
   const gid = `g-${color.replace('#', '')}`
+  const vals = data.map((d) => d.value).filter((v) => Number.isFinite(v))
+  let yDomain: [number | string, number | string] | undefined
+  if (zoomY && vals.length >= 2) {
+    const min = Math.min(...vals)
+    const max = Math.max(...vals)
+    const pad = Math.max((max - min) * 0.12, Math.abs(max) * 0.0008, 1)
+    yDomain = [min - pad, max + pad]
+  }
   return (
     <div style={{ height }} className="w-full">
       <ResponsiveContainer width="100%" height="100%">
@@ -70,6 +81,7 @@ export function PriceAreaChart({
           <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
           <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} minTickGap={24} />
           <YAxis
+            domain={yDomain}
             tick={{ fontSize: 10, fill: '#64748b' }}
             axisLine={false}
             tickLine={false}

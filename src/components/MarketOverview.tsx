@@ -175,6 +175,7 @@ export function MarketOverview({
           color="#0b3d6e"
           height={240}
           valueLabel="شاخص"
+          zoomY
         />
       </div>
 
@@ -254,20 +255,22 @@ function ImpactPanel({
       </p>
       <div className="grid grid-cols-2 gap-3">
         <ul className="space-y-2">
-          {(pos || []).map((s, i) => (
+          {(pos || []).slice(0, 5).map((s, i) => (
             <li key={`${s.symbol || 'p'}-${i}`} className="flex items-center justify-between text-sm">
               <span className="font-semibold">{s.symbol || '—'}</span>
               <span className="num pos">{fmtChange(s.impact)}</span>
             </li>
           ))}
+          {!pos?.length ? <li className="text-[11px] text-[var(--color-muted)]">—</li> : null}
         </ul>
         <ul className="space-y-2">
-          {(neg || []).map((s, i) => (
+          {(neg || []).slice(0, 5).map((s, i) => (
             <li key={`${s.symbol || 'n'}-${i}`} className="flex items-center justify-between text-sm">
               <span className="font-semibold">{s.symbol || '—'}</span>
               <span className="num neg">{fmtChange(s.impact)}</span>
             </li>
           ))}
+          {!neg?.length ? <li className="text-[11px] text-[var(--color-muted)]">بدون تاثیر منفی معنادار</li> : null}
         </ul>
       </div>
     </div>

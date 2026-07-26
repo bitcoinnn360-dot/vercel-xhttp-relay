@@ -156,13 +156,80 @@ function parseIntraday(payload) {
   return points
 }
 
+function isEquityRow(row) {
+  const market = String(row?.market || '')
+  const industry = String(row?.industry || '')
+  const name = String(row?.name || '')
+  const full = String(row?.full_name || '')
+  const code = String(row?.namad_code || '')
+  const blob = `${market} ${industry} ${name} ${full}`
+  if (!market.includes('بورس') && !market.includes('فرابورس')) return false
+  if (
+    /صندوق|مرابحه|اجاره|اختيار|اختیار|تبعی|حق تقدم|آتی/.test(blob) ||
+    name.endsWith('ح') ||
+    code.startsWith('IRF') ||
+    code.startsWith('IRR')
+  ) {
+    return false
+  }
+  return true
+}
+
+function buildImpactsAndTopTrades(allRows, bourseGlance, ifbGlance) {
+  const indexB = parseBillionRial(bourseGlance?.index)
+  const indexF = parseBillionRial(ifbGlance?.index)
+  const totalB = (parseBillionRial(bourseGlance?.market_value) || 0) * 1e9
+  const totalF = (parseBillionRial(ifbGlance?.market_value) || 0) * 1e9
+  const bourse = []
+  const ifb = []
+  const trades = []
+
+  for (const row of allRows || []) {
+    if (!isEquityRow(row)) continue
+    const name = String(row.name || '').trim()
+    const mv = parseNum(row.market_value) || 0
+    const yesterday = parseNum(row.yesterday_price) || 0
+    const change = parseNum(row.close_price_change) ?? parseNum(row.final_price_change)
+    const tradeValue = parseNum(row.trade_value) || 0
+    if (!name || !mv || !yesterday || change == null) continue
+    const market = String(row.market || '')
+    const isIfb = market.includes('فرابورس')
+    const total = isIfb ? totalF : totalB
+    const index = isIfb ? indexF : indexB
+    if (!total || !index) continue
+    const impact = index * (mv / total) * (change / yesterday)
+    const item = { symbol: name, impact: Math.round(impact * 10) / 10 }
+    ;(isIfb ? ifb : bourse).push(item)
+    if (tradeValue > 0) {
+      trades.push({ name, valueBr: Math.round((tradeValue / 1e10) * 10) / 10 })
+    }
+  }
+
+  const pick = (rows, positive) =>
+    rows
+      .filter((r) => (positive ? r.impact > 0 : r.impact < 0))
+      .sort((a, b) => (positive ? b.impact - a.impact : a.impact - b.impact))
+      .slice(0, 5)
+
+  return {
+    impacts: {
+      boursePos: pick(bourse, true),
+      bourseNeg: pick(bourse, false),
+      ifbPos: pick(ifb, true),
+      ifbNeg: pick(ifb, false),
+    },
+    topTrades: trades.sort((a, b) => b.valueBr - a.valueBr).slice(0, 13),
+  }
+}
+
 async function scrapeSourceArena(token) {
   const tok = (token || '').trim()
   if (!tok) return { ok: false, error: 'SOURCEARENA_TOKEN missing' }
 
-  const [bourseRes, ifbRes, indBourseRes, indIfbRes] = await Promise.allSettled([
+  const [bourseRes, ifbRes, allRes, indBourseRes, indIfbRes] = await Promise.allSettled([
     fetchJsonRetry(`${SOURCEARENA_API}?token=${encodeURIComponent(tok)}&market=market_bourse`),
     fetchJsonRetry(`${SOURCEARENA_API}?token=${encodeURIComponent(tok)}&market=market_farabourse`),
+    fetchJsonRetry(`${SOURCEARENA_API}?token=${encodeURIComponent(tok)}&all&type=0`, 3),
     fetchJsonRetry(`${SOURCEARENA_API}?token=${encodeURIComponent(tok)}&market=ind_namad_bourse`, 3),
     fetchJsonRetry(`${SOURCEARENA_API}?token=${encodeURIComponent(tok)}&market=ind_namad_farabourse`, 3),
   ])
@@ -187,7 +254,6 @@ async function scrapeSourceArena(token) {
 
   let totalTrade = null
   let tradeSource = null
-  // ارزش معاملات فرابورس «در یک نگاه» اغلب اوراق را هم دارد؛ فقط وقتی معقول است جمع کن
   if (bTr != null && fTr != null && fTr <= Math.max(bTr * 4, 80)) {
     totalTrade = Math.round((bTr + fTr) * 100) / 100
     tradeSource = 'sourcearena-bourse+ifb'
@@ -196,7 +262,7 @@ async function scrapeSourceArena(token) {
     tradeSource = 'sourcearena-bourse-only'
   }
 
-  function splitImpacts(rows) {
+  function splitOfficial(rows) {
     const list = Array.isArray(rows) ? rows : []
     const mapped = []
     for (const row of list.slice(0, 16)) {
@@ -206,18 +272,25 @@ async function scrapeSourceArena(token) {
       mapped.push({ symbol, impact: effect })
     }
     return {
-      pos: mapped.filter((x) => x.impact > 0).sort((a, b) => b.impact - a.impact).slice(0, 7),
-      neg: mapped.filter((x) => x.impact < 0).sort((a, b) => a.impact - b.impact).slice(0, 7),
+      pos: mapped.filter((x) => x.impact > 0).sort((a, b) => b.impact - a.impact).slice(0, 5),
+      neg: mapped.filter((x) => x.impact < 0).sort((a, b) => a.impact - b.impact).slice(0, 5),
     }
   }
 
-  const bImp = splitImpacts(indBourseRes.status === 'fulfilled' ? indBourseRes.value : [])
-  const fImp = splitImpacts(indIfbRes.status === 'fulfilled' ? indIfbRes.value : [])
+  const computed =
+    allRes.status === 'fulfilled' && Array.isArray(allRes.value)
+      ? buildImpactsAndTopTrades(allRes.value, bourse, ifb)
+      : { impacts: null, topTrades: [] }
+
+  const bOff = splitOfficial(indBourseRes.status === 'fulfilled' ? indBourseRes.value : [])
+  const fOff = splitOfficial(indIfbRes.status === 'fulfilled' ? indIfbRes.value : [])
+
+  // رسمی مثبت از ind_namad؛ منفی از محاسبه روی all (API رسمی فقط مثبت‌های بزرگ را می‌دهد)
   const impacts = {
-    boursePos: bImp.pos,
-    bourseNeg: bImp.neg,
-    ifbPos: fImp.pos,
-    ifbNeg: fImp.neg,
+    boursePos: bOff.pos.length ? bOff.pos : computed.impacts?.boursePos || [],
+    bourseNeg: bOff.neg.length ? bOff.neg : computed.impacts?.bourseNeg || [],
+    ifbPos: fOff.pos.length ? fOff.pos : computed.impacts?.ifbPos || [],
+    ifbNeg: fOff.neg.length ? fOff.neg : computed.impacts?.ifbNeg || [],
   }
   const hasImpacts = Object.values(impacts).some((arr) => arr.length > 0)
 
@@ -232,6 +305,8 @@ async function scrapeSourceArena(token) {
     marketValueSource: 'sourcearena-bourse+ifb',
     impacts: hasImpacts ? impacts : null,
     impactsFromSourceArena: hasImpacts,
+    topTrades: computed.topTrades,
+    topTradesSource: computed.topTrades.length ? 'sourcearena-all' : null,
   }
 }
 
@@ -533,6 +608,8 @@ export async function onRequestGet(context) {
       totalTradeValueSource: sourcearena.totalTradeValueSource ?? null,
       impacts: sourcearena.impacts ?? null,
       impactsFromSourceArena: Boolean(sourcearena.impactsFromSourceArena),
+      topTrades: sourcearena.topTrades ?? [],
+      topTradesSource: sourcearena.topTradesSource ?? null,
       parsistahlil,
       retailMoneyFlowYtd: moneyFlowStore.ytdBillionToman,
       retailMoneyFlowYtdSource: 'parsistahlil-cumulative',

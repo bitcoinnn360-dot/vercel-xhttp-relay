@@ -611,7 +611,7 @@ def scrape_sourcearena_glance(token: str | None = None) -> dict:
     if b_mv is None or f_mv is None:
         return {**out, "error": "missing market_value", "bourse": bourse, "ifb": ifb}
 
-    def load_impacts(market_key: str) -> list[dict]:
+    def load_official_impacts(market_key: str) -> list[dict]:
         rows_out: list[dict] = []
         try:
             ind = json.loads(
@@ -633,30 +633,114 @@ def scrape_sourcearena_glance(token: str | None = None) -> dict:
             effect = parse_sourcearena_billion_rial(row.get("effect"))
             if not name or effect is None:
                 continue
-            # UI expects { symbol, impact }
             rows_out.append({"symbol": name, "impact": effect})
         return rows_out
 
-    bourse_impacts = load_impacts("ind_namad_bourse")
-    ifb_impacts = load_impacts("ind_namad_farabourse")
+    def is_equity(row: dict) -> bool:
+        market = str(row.get("market") or "")
+        industry = str(row.get("industry") or "")
+        name = str(row.get("name") or "")
+        full = str(row.get("full_name") or "")
+        code = str(row.get("namad_code") or "")
+        blob = f"{market} {industry} {name} {full}"
+        if "بورس" not in market and "فرابورس" not in market:
+            return False
+        if any(k in blob for k in ("صندوق", "مرابحه", "اجاره", "اختيار", "اختیار", "تبعی", "حق تقدم", "آتی")):
+            return False
+        if name.endswith("ح") or code.startswith("IRF") or code.startswith("IRR"):
+            return False
+        return True
+
+    def compute_from_all() -> tuple[dict, list[dict]]:
+        try:
+            all_rows = json.loads(
+                fetch_with_retries(
+                    f"{SOURCEARENA_API}?token={urllib.parse.quote(tok)}&all&type=0",
+                    timeout=60,
+                    attempts=3,
+                )
+            )
+        except Exception as exc:  # noqa: BLE001
+            out["allError"] = str(exc)
+            return {
+                "boursePos": [],
+                "bourseNeg": [],
+                "ifbPos": [],
+                "ifbNeg": [],
+            }, []
+        if not isinstance(all_rows, list):
+            return {
+                "boursePos": [],
+                "bourseNeg": [],
+                "ifbPos": [],
+                "ifbNeg": [],
+            }, []
+
+        index_b = parse_sourcearena_billion_rial(bourse.get("index")) or 0.0
+        index_f = parse_sourcearena_billion_rial(ifb.get("index")) or 0.0
+        total_b = (parse_sourcearena_billion_rial(bourse.get("market_value")) or 0.0) * 1e9
+        total_f = (parse_sourcearena_billion_rial(ifb.get("market_value")) or 0.0) * 1e9
+        bourse_rows: list[dict] = []
+        ifb_rows: list[dict] = []
+        trades: list[dict] = []
+        for row in all_rows:
+            if not isinstance(row, dict) or not is_equity(row):
+                continue
+            name = str(row.get("name") or "").strip()
+            mv = num(row.get("market_value")) or 0.0
+            yesterday = num(row.get("yesterday_price")) or 0.0
+            change = num(row.get("close_price_change"))
+            if change is None:
+                change = num(row.get("final_price_change"))
+            trade_value = num(row.get("trade_value")) or 0.0
+            if not name or not mv or not yesterday or change is None:
+                continue
+            market = str(row.get("market") or "")
+            is_ifb = "فرابورس" in market
+            total = total_f if is_ifb else total_b
+            index = index_f if is_ifb else index_b
+            if not total or not index:
+                continue
+            impact = index * (mv / total) * (change / yesterday)
+            item = {"symbol": name, "impact": round(impact, 1)}
+            (ifb_rows if is_ifb else bourse_rows).append(item)
+            if trade_value > 0:
+                trades.append({"name": name, "valueBr": round(trade_value / 1e10, 1)})
+
+        def pick(rows: list[dict], positive: bool) -> list[dict]:
+            filtered = [r for r in rows if (r["impact"] > 0 if positive else r["impact"] < 0)]
+            filtered.sort(key=lambda r: -r["impact"] if positive else r["impact"])
+            return filtered[:5]
+
+        impacts = {
+            "boursePos": pick(bourse_rows, True),
+            "bourseNeg": pick(bourse_rows, False),
+            "ifbPos": pick(ifb_rows, True),
+            "ifbNeg": pick(ifb_rows, False),
+        }
+        trades.sort(key=lambda r: -r["valueBr"])
+        return impacts, trades[:13]
+
+    b_off = load_official_impacts("ind_namad_bourse")
+    f_off = load_official_impacts("ind_namad_farabourse")
+    computed_impacts, top_trades = compute_from_all()
 
     def split_pos_neg(rows: list[dict]) -> tuple[list[dict], list[dict]]:
-        pos = sorted([x for x in rows if x["impact"] > 0], key=lambda x: -x["impact"])[:7]
-        neg = sorted([x for x in rows if x["impact"] < 0], key=lambda x: x["impact"])[:7]
+        pos = sorted([x for x in rows if x["impact"] > 0], key=lambda x: -x["impact"])[:5]
+        neg = sorted([x for x in rows if x["impact"] < 0], key=lambda x: x["impact"])[:5]
         return pos, neg
 
-    b_pos, b_neg = split_pos_neg(bourse_impacts)
-    f_pos, f_neg = split_pos_neg(ifb_impacts)
+    b_pos, b_neg = split_pos_neg(b_off)
+    f_pos, f_neg = split_pos_neg(f_off)
     impacts_ui = {
-        "boursePos": b_pos,
-        "bourseNeg": b_neg,
-        "ifbPos": f_pos,
-        "ifbNeg": f_neg,
+        "boursePos": b_pos or computed_impacts["boursePos"],
+        "bourseNeg": b_neg or computed_impacts["bourseNeg"],
+        "ifbPos": f_pos or computed_impacts["ifbPos"],
+        "ifbNeg": f_neg or computed_impacts["ifbNeg"],
     }
     has_impacts = any(impacts_ui[k] for k in impacts_ui)
 
     total_mv = round(b_mv + f_mv, 1)
-    # ارزش معاملات فرابورس «در یک نگاه» اغلب اوراق را هم دارد؛ اگر غیرعادی بزرگ بود فقط بورس را بگیر
     total_tr = None
     trade_source = None
     if b_tr is not None and f_tr is not None and f_tr <= max(b_tr * 4, 80):
@@ -688,6 +772,8 @@ def scrape_sourcearena_glance(token: str | None = None) -> dict:
         "totalTradeValueSource": trade_source,
         "impacts": impacts_ui if has_impacts else None,
         "impactsFromSourceArena": has_impacts,
+        "topTrades": top_trades,
+        "topTradesSource": "sourcearena-all" if top_trades else None,
     }
 
 
@@ -707,13 +793,18 @@ def build_overview_live(
     sum_mv = sum(s["marketValue"] for s in stocks)
     sum_trade = sum(s["tradeValue"] for s in stocks)
 
-    # Top trades by value (تابلو)
-    top_trades = sorted(stocks, key=lambda s: s["tradeValue"], reverse=True)[:15]
-    top_trades_out = [
-        {"name": s["symbol"], "valueBr": round(s["tradeValue"] / RIAL_PER_BILLION_TOMAN, 1)}
-        for s in top_trades
-        if s["tradeValue"] > 0
-    ]
+    # Top trades: prefer SourceArena all (سهام واقعی)؛ وگرنه تابلو شاخص‌بان
+    if glance.get("ok") and glance.get("topTrades"):
+        top_trades_out = list(glance.get("topTrades") or [])
+        top_trades_source = glance.get("topTradesSource") or "sourcearena-all"
+    else:
+        top_trades = sorted(stocks, key=lambda s: s["tradeValue"], reverse=True)[:15]
+        top_trades_out = [
+            {"name": s["symbol"], "valueBr": round(s["tradeValue"] / RIAL_PER_BILLION_TOMAN, 1)}
+            for s in top_trades
+            if s["tradeValue"] > 0
+        ]
+        top_trades_source = "shakhesban-board"
 
     ted = indices.get("tedpix") or {}
     eq = indices.get("equalWeight") or {}
@@ -836,7 +927,7 @@ def build_overview_live(
         "impactsFromTsetmc": False,
         "impactsFromSourceArena": bool(impacts),
         "topTrades": top_trades_out,
-        "topTradesSource": "shakhesban-board",
+        "topTradesSource": top_trades_source,
         "sourcearena": {"ok": bool(glance.get("ok")), "error": glance.get("error")},
         "parsistahlil": pars,
         "blocked": blocked,

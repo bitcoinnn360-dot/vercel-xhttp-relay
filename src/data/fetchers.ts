@@ -405,6 +405,8 @@ type OverviewApi = {
   totalTradeValueSource?: string
   impacts?: DashboardData['impacts'] | null
   impactsFromSourceArena?: boolean
+  topTrades?: DashboardData['topTrades']
+  topTradesSource?: string
   retailMoneyFlowYtd?: number
   retailMoneyFlowYtdSource?: string
   moneyFlowAsOfJalali?: string
@@ -524,6 +526,10 @@ function applyFreshOverview(base: DashboardData, api: OverviewApi | null, intrad
     // applied on base via caller — store flag on overview
     o.impactsLive = true
     sources.impacts = 'sourcearena'
+  }
+  if (api?.topTrades?.length) {
+    // applied on base via caller
+    sources.topTrades = api.topTradesSource || 'sourcearena-all'
   }
 
   const pars = api?.parsistahlil
@@ -684,6 +690,13 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
     base.overview.fieldSources = {
       ...(base.overview.fieldSources || {}),
       impacts: 'sourcearena-live',
+    }
+  }
+  if (overviewApi?.topTrades?.length) {
+    base.topTrades = overviewApi.topTrades
+    base.overview.fieldSources = {
+      ...(base.overview.fieldSources || {}),
+      topTrades: overviewApi.topTradesSource || 'sourcearena-all',
     }
   }
 

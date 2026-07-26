@@ -16990,17 +16990,30 @@
         {
           "symbol": "شستا",
           "impact": 3724.03
-        },
-        {
-          "symbol": "ونوین",
-          "impact": 3700.18
-        },
-        {
-          "symbol": "شسپا",
-          "impact": 3418.56
         }
       ],
-      "bourseNeg": [],
+      "bourseNeg": [
+        {
+          "symbol": "دعبید",
+          "impact": -1193.6
+        },
+        {
+          "symbol": "وامید",
+          "impact": -1155.9
+        },
+        {
+          "symbol": "غکورش",
+          "impact": -882.5
+        },
+        {
+          "symbol": "تیپیکو",
+          "impact": -676.4
+        },
+        {
+          "symbol": "وپخش",
+          "impact": -404.6
+        }
+      ],
       "ifbPos": [
         {
           "symbol": "مارون",
@@ -17021,83 +17034,88 @@
         {
           "symbol": "آریا",
           "impact": 50.48
-        },
-        {
-          "symbol": "نیشکر",
-          "impact": 34.65
-        },
-        {
-          "symbol": "آریان",
-          "impact": 33.89
         }
       ],
-      "ifbNeg": []
+      "ifbNeg": [
+        {
+          "symbol": "غصینو",
+          "impact": -15.6
+        },
+        {
+          "symbol": "کاسپین",
+          "impact": -13.4
+        },
+        {
+          "symbol": "دقاضی",
+          "impact": -12.7
+        },
+        {
+          "symbol": "دتوزیع",
+          "impact": -9.0
+        },
+        {
+          "symbol": "شگویا",
+          "impact": -8.8
+        }
+      ]
     },
     "impactsFromTsetmc": false,
     "impactsFromSourceArena": true,
     "topTrades": [
       {
-        "name": "فصبا",
-        "valueBr": 394.9
-      },
-      {
-        "name": "فولاد",
-        "valueBr": 79.7
-      },
-      {
-        "name": "ونیرو",
-        "valueBr": 48.8
-      },
-      {
-        "name": "سصفها",
-        "valueBr": 43.2
-      },
-      {
-        "name": "رایا",
-        "valueBr": 42.5
-      },
-      {
-        "name": "بپردیس",
-        "valueBr": 41.2
-      },
-      {
-        "name": "خزامیا",
-        "valueBr": 40.0
+        "name": "وبملت",
+        "valueBr": 1648.4
       },
       {
         "name": "شپنا",
-        "valueBr": 39.3
+        "valueBr": 494.3
       },
       {
-        "name": "بزندگی",
-        "valueBr": 36.0
+        "name": "شبندر",
+        "valueBr": 443.4
       },
       {
-        "name": "بهامرز",
-        "valueBr": 36.0
+        "name": "ونوین",
+        "valueBr": 427.8
       },
       {
-        "name": "فرابورس",
-        "valueBr": 32.0
+        "name": "فزر",
+        "valueBr": 390.6
       },
       {
-        "name": "خودرو",
-        "valueBr": 30.8
+        "name": "ددانا",
+        "valueBr": 345.1
       },
       {
-        "name": "کسرام",
-        "valueBr": 30.1
+        "name": "دزاگرس",
+        "valueBr": 327.0
       },
       {
-        "name": "شلعاب",
-        "valueBr": 25.9
+        "name": "شگویا",
+        "valueBr": 304.8
       },
       {
-        "name": "فملی",
-        "valueBr": 25.9
+        "name": "شستا",
+        "valueBr": 272.7
+      },
+      {
+        "name": "وگردش",
+        "valueBr": 270.0
+      },
+      {
+        "name": "دارو",
+        "valueBr": 258.6
+      },
+      {
+        "name": "شسپا",
+        "valueBr": 258.5
+      },
+      {
+        "name": "تاصیکو",
+        "valueBr": 254.5
       }
     ],
-    "topTradesSource": "shakhesban-board",
+    "topTradesSource": "sourcearena-all",
     "sourcearena": {
       "ok": true,
       "error": null
@@ -17505,17 +17523,30 @@
         {
           "symbol": "شستا",
           "impact": 3724.03
-        },
-        {
-          "symbol": "ونوین",
-          "impact": 3700.18
-        },
-        {
-          "symbol": "شسپا",
-          "impact": 3418.56
         }
       ],
-      "bourseNeg": [],
+      "bourseNeg": [
+        {
+          "symbol": "دعبید",
+          "impact": -1193.6
+        },
+        {
+          "symbol": "وامید",
+          "impact": -1155.9
+        },
+        {
+          "symbol": "غکورش",
+          "impact": -882.5
+        },
+        {
+          "symbol": "تیپیکو",
+          "impact": -676.4
+        },
+        {
+          "symbol": "وپخش",
+          "impact": -404.6
+        }
+      ],
       "ifbPos": [
         {
           "symbol": "مارون",
@@ -17536,19 +17567,87 @@
         {
           "symbol": "آریا",
           "impact": 50.48
-        },
-        {
-          "symbol": "نیشکر",
-          "impact": 34.65
-        },
-        {
-          "symbol": "آریان",
-          "impact": 33.89
         }
       ],
-      "ifbNeg": []
+      "ifbNeg": [
+        {
+          "symbol": "غصینو",
+          "impact": -15.6
+        },
+        {
+          "symbol": "کاسپین",
+          "impact": -13.4
+        },
+        {
+          "symbol": "دقاضی",
+          "impact": -12.7
+        },
+        {
+          "symbol": "دتوزیع",
+          "impact": -9.0
+        },
+        {
+          "symbol": "شگویا",
+          "impact": -8.8
+        }
+      ]
     },
-    "impactsFromSourceArena": true
+    "impactsFromSourceArena": true,
+    "topTrades": [
+      {
+        "name": "وبملت",
+        "valueBr": 1648.4
+      },
+      {
+        "name": "شپنا",
+        "valueBr": 494.3
+      },
+      {
+        "name": "شبندر",
+        "valueBr": 443.4
+      },
+      {
+        "name": "ونوین",
+        "valueBr": 427.8
+      },
+      {
+        "name": "فزر",
+        "valueBr": 390.6
+      },
+      {
+        "name": "ددانا",
+        "valueBr": 345.1
+      },
+      {
+        "name": "دزاگرس",
+        "valueBr": 327.0
+      },
+      {
+        "name": "شگویا",
+        "valueBr": 304.8
+      },
+      {
+        "name": "شستا",
+        "valueBr": 272.7
+      },
+      {
+        "name": "وگردش",
+        "valueBr": 270.0
+      },
+      {
+        "name": "دارو",
+        "valueBr": 258.6
+      },
+      {
+        "name": "شسپا",
+        "valueBr": 258.5
+      },
+      {
+        "name": "تاصیکو",
+        "valueBr": 254.5
+      }
+    ],
+    "topTradesSource": "sourcearena-all"
   },
   "tsetmc": {
     "ok": false,

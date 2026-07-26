@@ -1,0 +1,901 @@
+//@version=5
+indicator('Advanced Master Dashboard: Dual Sniper Engine v59', shorttitle='Sniper_CVD_v59', max_labels_count=500, overlay=true, max_bars_back=1000)
+
+//=============================================================================
+// ۱. تنظیمات اولیه و منوی فعالسازی ستاپ‌ها (اصلی)
+//=============================================================================
+res = input.timeframe('1', title="LTF Resolution (تایمفریم درونبار)")
+threshold_pct = input.float(15.0, title="حداقل فاصله معنادار واگرایی %") / 100.0
+
+show_sw_sig = input.bool(true, title="امواج ستاپ فعالسازی SW (قوی/ضعیف)", group="ستاپهای معاملاتی")
+show_ict_sniper = input.bool(true, title="اصیل ستاپ فعالسازی Sniper v35 (نزدیک)", group="ستاپهای معاملاتی")
+show_sniper_plus = input.bool(true, title="دوربرد ستاپ فعالسازی SN++", group="ستاپهای معاملاتی")
+show_lq_sweep = input.bool(true, title="نقدینگی شکار ستاپ فعالسازی LQ v19", group="ستاپهای معاملاتی")
+
+max_box_len = input.int(40, title="حداکثر طول باکس بررسی (کندل)", minval=20, maxval=60, group="تنظیمات باکس داینامیک")
+lq_lookback = input.int(20, title="بازه بررسی هانت نقدینگی (اسنایپر v19)", minval=10, maxval=50, group="تنظیمات اختصاصی شکار نقدینگی")
+p_length = input.int(2, title="طول بررسی پیوت (Pivot Length)", minval=1, maxval=50, group="تنظیمات اختصاصی اسنایپر (پیوت)")
+min_div_lookback = input.int(10, title="حداقل فاصله پیوتهای دوربرد SN++ (کندل)", minval=5, maxval=50, group="تنظیمات اختصاصی اسنایپر (پیوت)")
+max_div_lookback = input.int(100, title="حداکثر عمق جستجوی پیوتهای SN++ (کندل)", minval=20, maxval=200, group="تنظیمات اختصاصی اسنایپر (پیوت)")
+min_wick_pct = input.float(50.0, title="هانت کندل موافق شدو طول حداقل % SN++", minval=20.0, maxval=80.0, step=5.0, group="شدو اختصاصی فیلترهای (Wick Engine)")
+
+w1_price_thresh = input.float(0.02, title="حداقل شیب قیمت W1 شارپ (%)", step=0.01, group="ریگلاژ اختصاصی امواج SW")
+w1_cvd_thresh = input.float(5.0, title="حداقل شیب حجم W1 شارپ", minval=0.0, maxval=50.0, step=0.5, group="ریگلاژ اختصاصی امواج SW")
+
+// کنترل بازه عددی اصلاح قیمت و حجم در ستاپ امواج SW (حذف کامل حداقل اصلاح CVD)
+min_price_retracement = input.float(20.0, title="حداقل درصد اصلاح مجاز قیمت موج ۲", minval=0.0, maxval=100.0, step=5.0, group="اصلاح تنظیمات (Correction)") / 100.0
+max_price_retracement = input.float(50.0, title="حداکثر درصد اصلاح مجاز قیمت موج ۲", minval=10.0, maxval=100.0, step=5.0, group="اصلاح تنظیمات (Correction)") / 100.0
+max_cvd_retracement   = input.float(50.0, title="حداکثر درصد اصلاح مجاز حجم (CVD) موج ۲", minval=10.0, maxval=100.0, step=5.0, group="اصلاح تنظیمات (Correction)")
+
+//=============================================================================
+// ۲. تنظیمات اختصاصی ماتریکس واگرایی و دکمه خاموش/روشن سیگنال‌های ناکام ( Failed )
+//=============================================================================
+div_prd          = input.int(10, title="پریود پیوت واگرایی (Pivot Period)", minval=1, maxval=50, group="تنظیمات سیگنال طلایی")
+div_source       = input.string("Close", title="منبع پیوت‌ها", options=["Close", "High/Low"], group="تنظیمات سیگنال طلایی")
+div_searchdiv    = input.string("Regular/Hidden", title="نوع واگرایی مورد جستجو", options=["Regular", "Hidden", "Regular/Hidden"], group="تنظیمات سیگنال طلایی")
+div_maxpp        = input.int(10, title="حداکثر نقاط پیوت برای بررسی", minval=1, maxval=20, group="تنظیمات سیگنال طلایی")
+div_maxbars      = input.int(100, title="حداکثر کندل‌های عقبگرد بررسی", minval=30, maxval=200, group="تنظیمات سیگنال طلایی")
+div_dontconfirm  = input.bool(false, title="عدم انتظار برای تأیید کندل آخر", group="تنظیمات سیگنال طلایی")
+
+// فیلترهای تلورانس و حساسیت سیگنال طلایی
+lookback_window  = input.int(3, title="تلورانس کندل خطا (Latency Window)", minval=0, maxval=10, group="زمانبندی سیگنال طلایی")
+min_div_limit    = input.int(3, title="حداقل تعداد واگرایی‌های همزمان جهت تایید", minval=1, maxval=10, group="زمانبندی سیگنال طلایی")
+
+// تنظیمات فیلتر کندلی دقیق برای تایید ورود
+strict_candle_confirm = input.bool(true, title="فعالسازی فیلتر کندلی دقیق (به جز LQ)", group="تنظیمات فیلتر کندلی دقیق")
+wick_pct_confirm      = input.float(75.0, title="حداقل درصد سایه کندل سیگنال", minval=50.0, maxval=100.0, step=5.0, group="تنظیمات فیلتر کندلی دقیق")
+reversal_check_enabled = input.bool(true, title="فعالسازی بررسی سیگنال معکوس (Reversal)", group="تنظیمات فیلتر کندلی دقیق")
+delayed_confirm_window = input.int(2, title="بازه تأیید تأخیری (کندل)", minval=1, maxval=3, group="تنظیمات فیلتر کندلی دقیق")
+
+// تنظیمات فیلتر نویزگیر سایه مخالف و قرارگیری POC در آن (۲۵٪ منعطف جدید)
+opp_wick_confirm = input.bool(true, title="فعالسازی فیلتر سایه مخالف و POC", group="نویزگیر سایه مخالف و POC")
+opp_wick_thresh  = input.float(25.0, title="حداقل درصد سایه مخالف کندل (%)", minval=10.0, maxval=90.0, step=5.0, group="نویزگیر سایه مخالف و POC")
+
+// دکمه روشن/خاموش سیگنال‌های ناکام (Failed) جهت جلوگیری از شلوغی چارت
+show_failed_sigs = input.bool(true, title="نمایش سیگنال‌های فیلتر شده (Failed)", group="تنظیمات بصری سیگنال طلایی")
+show_golden_sig  = input.bool(true, title="نمایش سیگنال طلایی روی چارت", group="تنظیمات بصری سیگنال طلایی")
+
+// ورودی فعالسازی اندیکاتورهای ماتریکس واگرایی
+div_calcmacd     = input.bool(true, title="سنجش واگرایی در MACD", group="اندیکاتورهای فعال در واگرایی تجمعی")
+div_calcmacda    = input.bool(true, title="سنجش واگرایی در MACD Histogram", group="اندیکاتورهای فعال در واگرایی تجمعی")
+div_calcrsi      = input.bool(true, title="سنجش واگرایی در RSI", group="اندیکاتورهای فعال در واگرایی تجمعی")
+div_calcstoc     = input.bool(true, title="سنجش واگرایی در Stochastic", group="اندیکاتورهای فعال در واگرایی تجمعی")
+div_calccci      = input.bool(true, title="سنجش واگرایی در CCI", group="اندیکاتورهای فعال در واگرایی تجمعی")
+div_calcmom      = input.bool(true, title="سنجش واگرایی در Momentum", group="اندیکاتورهای فعال در واگرایی تجمعی")
+div_calcobv      = input.bool(true, title="سنجش واگرایی در OBV", group="اندیکاتورهای فعال در واگرایی تجمعی")
+div_calcvwmacd   = input.bool(true, title="سنجش واگرایی در VWmacd", group="اندیکاتورهای فعال در واگرایی تجمعی")
+div_calccmf      = input.bool(true, title="سنجش واگرایی در Chaikin Money Flow", group="اندیکاتورهای فعال در واگرایی تجمعی")
+div_calcmfi      = input.bool(true, title="سنجش واگرایی در Money Flow Index", group="اندیکاتورهای فعال در واگرایی تجمعی")
+
+colUp = #089981
+colDn = #f23645
+
+//=============================================================================
+// ۳. دریافت دیتای درون‌بار و پیاده‌سازی متغیرهای پایه (رفع تداخل محاسباتی)
+//=============================================================================
+[bV, sV, tV, aCl] = request.security_lower_tf(syminfo.tickerid, res, [close > open ? volume : 0, close < open ? volume : 0, volume, close])
+bullV = array.sum(bV)
+bearV = array.sum(sV)
+delta = bullV - bearV
+bVmax = array.max(bV)
+sVmax = array.max(sV)
+
+float[] active_b_s_vol = bVmax > sVmax ? bV : sV
+int[] indices = array.sort_indices(active_b_s_vol, order.descending)
+
+int indices_size = array.size(indices)
+int first_index = indices_size > 0 ? array.get(indices, 0) : na
+float maxV = not na(first_index) ? array.get(aCl, first_index) : na
+
+var float custom_cvd = 0.0
+custom_cvd := custom_cvd + (na(delta) ? 0.0 : delta)
+
+// آرایه‌های پویا برای ثبت پیوت‌های واگرایی تجمعی
+var ph_positions = array.new<int>(20, 0)
+var pl_positions = array.new<int>(20, 0)
+var ph_vals      = array.new<float>(20, 0.0)
+var pl_vals      = array.new<float>(20, 0.0)
+
+//=============================================================================
+// ۴. توابع محاسباتی رگرسیون خطی، واگرایی‌ها و فیلترهای جدید کندلی (Pine Script v5)
+//=============================================================================
+f_lr_slope_fixed(series float src, int len, int offset) =>
+    float sumX = 0.0
+    float sumY = 0.0
+    float sumXY = 0.0
+    float sumX2 = 0.0
+    for i = 0 to len - 1
+        float y = src[i + offset]
+        int x = len - 1 - i
+        sumX := sumX + x
+        sumY := sumY + y
+        sumXY := sumXY + (x * y)
+        sumX2 := sumX2 + (x * x)
+    (len * sumXY - sumX * sumY) / (len * sumX2 - sumX * sumX)
+
+// الف) تابع واگرایی صعودی معمولی برای اندیکاتورها (با حفظ سختی فیلتر خط روند)
+f_pos_div(src, cond, div_src_opt, div_p, max_p, max_b, dont_conf, pl_pos, pl_v) =>
+    divlen = 0
+    prsc = div_src_opt == "Close" ? close : low
+    if dont_conf or src > src[1] or close > close[1]
+        startpoint = dont_conf ? 0 : 1
+        for x = 0 to max_p - 1
+            len = bar_index - array.get(pl_pos, x) + div_p
+            if array.get(pl_pos, x) == 0 or len > max_b
+                break
+            if len > 5 and ((cond == 1 and src[startpoint] > src[len] and prsc[startpoint] < nz(array.get(pl_v, x))) or (cond == 2 and src[startpoint] < src[len] and prsc[startpoint] > nz(array.get(pl_v, x))))
+                slope1 = (src[startpoint] - src[len]) / (len - startpoint)
+                virtual_line1 = src[startpoint] - slope1
+                slope2 = (close[startpoint] - close[len]) / (len - startpoint)
+                virtual_line2 = close[startpoint] - slope2
+                arrived = true
+                for y = 1 + startpoint to len - 1
+                    if src[y] < virtual_line1 or nz(close[y]) < virtual_line2
+                        arrived := false
+                        break
+                    virtual_line1 := virtual_line1 - slope1
+                    virtual_line2 := virtual_line2 - slope2
+                if arrived
+                    divlen := len
+                    break
+    divlen
+
+// ب) تابع واگرایی نزولی معمولی برای اندیکاتورها (با حفظ سختی فیلتر خط روند)
+f_neg_div(src, cond, div_src_opt, div_p, max_p, max_b, dont_conf, ph_pos, ph_v) =>
+    divlen = 0
+    prsc = div_src_opt == "Close" ? close : high
+    if dont_conf or src < src[1] or close < close[1]
+        startpoint = dont_conf ? 0 : 1
+        for x = 0 to max_p - 1
+            len = bar_index - array.get(ph_pos, x) + div_p
+            if array.get(ph_pos, x) == 0 or len > max_b
+                break
+            if len > 5 and ((cond == 1 and src[startpoint] < src[len] and prsc[startpoint] > nz(array.get(ph_v, x))) or (cond == 2 and src[startpoint] > src[len] and prsc[startpoint] < nz(array.get(ph_v, x))))
+                slope1 = (src[startpoint] - src[len]) / (len - startpoint)
+                virtual_line1 = src[startpoint] - slope1
+                slope2 = (close[startpoint] - nz(close[len])) / (len - startpoint)
+                virtual_line2 = close[startpoint] - slope2
+                arrived = true
+                for y = 1 + startpoint to len - 1
+                    if src[y] > virtual_line1 or nz(close[y]) > virtual_line2
+                        arrived := false
+                        break
+                    virtual_line1 := virtual_line1 - slope1
+                    virtual_line2 := virtual_line2 - slope2
+                if arrived
+                    divlen := len
+                    break
+    divlen
+
+// ج) تابع جدید و ادغام شده: واگرایی صعودی اختصاصی CVD (حفظ خط روند قیمت / آزاد کردن خط حجم CVD جهت ردیابی کامل سیگنال‌ها)
+// اعمال دقیق فیلتر اختلاف معنادار حجم تجمعی با نرمال‌سازی پویا نسبت به رنج عددی CVD جهت پایداری کامل و رفع باگ Shadowing
+f_pos_div_cvd(src, cond, div_src_opt, div_p, max_p, max_b, dont_conf, pl_pos, pl_v, thresh_pct, local_cvd_rng) =>
+    divlen = 0
+    prsc = div_src_opt == "Close" ? close : low
+    if dont_conf or src > src[1] or close > close[1]
+        startpoint = dont_conf ? 0 : 1
+        for x = 0 to max_p - 1
+            len = bar_index - array.get(pl_pos, x) + div_p
+            if array.get(pl_pos, x) == 0 or len > max_b
+                break
+            if len > 5
+                bool cond_met = false
+                float diff = math.abs(src[startpoint] - src[len])
+                bool is_significant = (local_cvd_rng != 0) ? (diff / local_cvd_rng >= thresh_pct) : true
+                
+                if is_significant
+                    if cond == 1 // Regular Bullish
+                        if prsc[startpoint] < nz(array.get(pl_v, x)) and src[startpoint] > src[len]
+                            cond_met := true
+                    else if cond == 2 // Hidden Bullish
+                        if prsc[startpoint] > nz(array.get(pl_v, x)) and src[startpoint] < src[len]
+                            cond_met := true
+                
+                if cond_met
+                    slope2 = (close[startpoint] - close[len]) / (len - startpoint)
+                    virtual_line2 = close[startpoint] - slope2
+                    arrived = true
+                    for y = 1 + startpoint to len - 1
+                        if nz(close[y]) < virtual_line2
+                            arrived := false
+                            break
+                        virtual_line2 := virtual_line2 - slope2
+                    if arrived
+                        divlen := len
+                        break
+    divlen
+
+// د) تابع جدید و ادغام شده: واگرایی نزولی اختصاصی CVD
+f_neg_div_cvd(src, cond, div_src_opt, div_p, max_p, max_b, dont_conf, ph_pos, ph_v, thresh_pct, local_cvd_rng) =>
+    divlen = 0
+    prsc = div_src_opt == "Close" ? close : high
+    if dont_conf or src < src[1] or close < close[1]
+        startpoint = dont_conf ? 0 : 1
+        for x = 0 to max_p - 1
+            len = bar_index - array.get(ph_pos, x) + div_p
+            if array.get(ph_pos, x) == 0 or len > max_b
+                break
+            if len > 5
+                bool cond_met = false
+                float diff = math.abs(src[startpoint] - src[len])
+                bool is_significant = (local_cvd_rng != 0) ? (diff / local_cvd_rng >= thresh_pct) : true
+                
+                if is_significant
+                    if cond == 1 // Regular Bearish
+                        if prsc[startpoint] > nz(array.get(ph_v, x)) and src[startpoint] < src[len]
+                            cond_met := true
+                    else if cond == 2 // Hidden Bearish
+                        if prsc[startpoint] < nz(array.get(ph_v, x)) and src[startpoint] > src[len]
+                            cond_met := true
+                
+                if cond_met
+                    slope2 = (close[startpoint] - nz(close[len])) / (len - startpoint)
+                    virtual_line2 = close[startpoint] - slope2
+                    arrived = true
+                    for y = 1 + startpoint to len - 1
+                        if nz(close[y]) > virtual_line2
+                            arrived := false
+                            break
+                        virtual_line2 := virtual_line2 - slope2
+                    if arrived
+                        divlen := len
+                        break
+    divlen
+
+// هـ) تابع کمکی تایید نهایی ماتریکس واگرایی لونسوم برای ۱۰ اندیکاتور پیش‌فرض (احیا شد جهت رفع خطای کامپایلر)
+f_check_indicator_divs(enabled, indicator_val, search_opt, div_src_opt, div_p, max_p, max_b, dont_conf, pl_pos, pl_v, ph_pos, ph_v) =>
+    pos_div = 0
+    neg_div = 0
+    if enabled
+        pos_reg = (search_opt == "Regular" or search_opt == "Regular/Hidden") ? (f_pos_div(indicator_val, 1, div_src_opt, div_p, max_p, max_b, dont_conf, pl_pos, pl_v) > 0 ? 1 : 0) : 0
+        pos_hid = (search_opt == "Hidden" or search_opt == "Regular/Hidden") ? (f_pos_div(indicator_val, 2, div_src_opt, div_p, max_p, max_b, dont_conf, pl_pos, pl_v) > 0 ? 1 : 0) : 0
+        neg_reg = (search_opt == "Regular" or search_opt == "Regular/Hidden") ? (f_neg_div(indicator_val, 1, div_src_opt, div_p, max_p, max_b, dont_conf, ph_pos, ph_v) > 0 ? 1 : 0) : 0
+        neg_hid = (search_opt == "Hidden" or search_opt == "Regular/Hidden") ? (f_neg_div(indicator_val, 2, div_src_opt, div_p, max_p, max_b, dont_conf, ph_pos, ph_v) > 0 ? 1 : 0) : 0
+        pos_div := (pos_reg == 1 or pos_hid == 1) ? 1 : 0
+        neg_div := (neg_reg == 1 or neg_hid == 1) ? 1 : 0
+    [pos_div, neg_div]
+
+// و) تابع کمکی تایید نهایی ماتریکس واگرایی بومی حجم تجمعی CVD (اضافه شدن پارامترهای جدید جهت همگام‌سازی کامل)
+f_check_indicator_divs_cvd(enabled, indicator_val, search_opt, div_src_opt, div_p, max_p, max_b, dont_conf, pl_pos, pl_v, ph_pos, ph_v, thresh_pct, local_cvd_rng) =>
+    pos_div = 0
+    neg_div = 0
+    if enabled
+        pos_reg = (search_opt == "Regular" or search_opt == "Regular/Hidden") ? (f_pos_div_cvd(indicator_val, 1, div_src_opt, div_p, max_p, max_b, dont_conf, pl_pos, pl_v, thresh_pct, local_cvd_rng) > 0 ? 1 : 0) : 0
+        pos_hid = (search_opt == "Hidden" or search_opt == "Regular/Hidden") ? (f_pos_div_cvd(indicator_val, 2, div_src_opt, div_p, max_p, max_b, dont_conf, pl_pos, pl_v, thresh_pct, local_cvd_rng) > 0 ? 1 : 0) : 0
+        neg_reg = (search_opt == "Regular" or search_opt == "Regular/Hidden") ? (f_neg_div_cvd(indicator_val, 1, div_src_opt, div_p, max_p, max_b, dont_conf, ph_pos, ph_v, thresh_pct, local_cvd_rng) > 0 ? 1 : 0) : 0
+        neg_hid = (search_opt == "Hidden" or search_opt == "Regular/Hidden") ? (f_neg_div_cvd(indicator_val, 2, div_src_opt, div_p, max_p, max_b, dont_conf, ph_pos, ph_v, thresh_pct, local_cvd_rng) > 0 ? 1 : 0) : 0
+        pos_div := (pos_reg == 1 or pos_hid == 1) ? 1 : 0
+        neg_div := (neg_reg == 1 or neg_hid == 1) ? 1 : 0
+    [pos_div, neg_div]
+
+// بررسی بسته شدن در دل بدنه قبلی و فیلتر بر اساس شدو ۷۵ درصد و POC (خرید - رفع باگ لودینگ)
+f_check_strict_candle_confirm_buy(max_vol_pt, wick_perc_thresh) =>
+    bool ok = true
+    float current_body_bottom = math.min(open, close)
+    float prev_body_top = math.max(open[1], close[1])
+    float prev_body_bottom = math.min(open[1], close[1])
+    
+    bool is_closed_inside_prev_body = (close >= prev_body_bottom) and (close <= prev_body_top)
+    
+    if is_closed_inside_prev_body
+        float current_candle_range = high - low
+        float lower_wick_len_curr = current_body_bottom - low
+        bool wick_condition_met = false
+        if current_candle_range > 0
+            float wick_perc = (lower_wick_len_curr / current_candle_range) * 100
+            if wick_perc >= wick_perc_thresh and low < low[1]
+                if na(max_vol_pt) or (max_vol_pt <= (low + lower_wick_len_curr) and max_vol_pt >= low)
+                    wick_condition_met := true
+        if not wick_condition_met
+            ok := false
+    ok
+
+// بررسی بسته شدن در دل بدنه قبلی و فیلتر بر اساس شدو ۷۵ درصد و POC (فروش - رفع باگ لودینگ)
+f_check_strict_candle_confirm_sell(max_vol_pt, wick_perc_thresh) =>
+    bool ok = true
+    float current_body_top = math.max(open, close)
+    float prev_body_top = math.max(open[1], close[1])
+    float prev_body_bottom = math.min(open[1], close[1])
+    
+    bool is_closed_inside_prev_body = (close >= prev_body_bottom) and (close <= prev_body_top)
+    
+    if is_closed_inside_prev_body
+        float current_candle_range = high - low
+        float upper_wick_len_curr = high - current_body_top
+        bool wick_condition_met = false
+        if current_candle_range > 0
+            float wick_perc = (upper_wick_len_curr / current_candle_range) * 100
+            if wick_perc >= wick_perc_thresh and high > high[1]
+                if na(max_vol_pt) or (max_vol_pt >= (high - upper_wick_len_curr) and max_vol_pt <= high)
+                    wick_condition_met := true
+        if not wick_condition_met
+            ok := false
+    ok
+
+//=============================================================================
+// ۵. پیاده‌سازی پیوت‌ها و ستاپ‌های پایه (رفع ارور Forward Reference با اصلاح ترتیب خطوط)
+//=============================================================================
+float pv_high = ta.pivothigh(high, p_length, p_length)
+float pv_low = ta.pivotlow(low, p_length, p_length)
+
+// ستاپ الف) Sniper دیتای پایه
+var float last_pv_high_price = na
+var float last_pv_high_cvd = na
+var float last_pv_low_price = na
+var float last_pv_low_cvd = na
+
+if not na(pv_high)
+    last_pv_high_price := high[p_length]
+    last_pv_high_cvd := custom_cvd[p_length]
+if not na(pv_low)
+    last_pv_low_price := low[p_length]
+    last_pv_low_cvd := custom_cvd[p_length]
+
+bool pivot_hidden_bull_div = false
+bool pivot_hidden_bear_div = false
+
+if not na(last_pv_low_price)
+    pivot_hidden_bull_div := (low >= last_pv_low_price) and (custom_cvd < last_pv_low_cvd)
+if not na(last_pv_high_price)
+    pivot_hidden_bear_div := (high <= last_pv_high_price) and (custom_cvd > last_pv_high_cvd)
+
+// ستاپ ب) آرایه‌ها برای سوئینگ‌های پیوت SN++
+var int[] pv_high_dirs = array.new_int()
+var float[] pv_high_prcs = array.new_float()
+var float[] pv_high_cvds = array.new_float()
+var int[] pv_low_dirs = array.new_int()
+var float[] pv_low_prcs = array.new_float()
+var float[] pv_low_cvds = array.new_float()
+
+if not na(pv_high)
+    array.push(pv_high_dirs, bar_index[p_length])
+    array.push(pv_high_prcs, high[p_length])
+    array.push(pv_high_cvds, custom_cvd[p_length])
+    if array.size(pv_high_dirs) > 40
+        array.shift(pv_high_dirs), array.shift(pv_high_prcs), array.shift(pv_high_cvds)
+
+if not na(pv_low)
+    array.push(pv_low_dirs, bar_index[p_length])
+    array.push(pv_low_prcs, low[p_length])
+    array.push(pv_low_cvds, custom_cvd[p_length])
+    if array.size(pv_low_dirs) > 40
+        array.shift(pv_low_dirs), array.shift(pv_low_prcs), array.shift(pv_low_cvds)
+
+//=============================================================================
+// ۶. واگرایی‌های ماتریکس و فیلترهای نهایی
+//=============================================================================
+bool is_green = close > open
+bool is_red = close < open
+
+bool is_bull_engulf = is_green and is_red[1] and close >= high[1]
+bool is_bear_engulf = is_red and is_green[1] and close <= low[1]
+
+abs_d0 = math.abs(delta)
+abs_d1 = math.abs(delta[1])
+abs_d2 = math.abs(delta[2])
+abs_d3 = math.abs(delta[3])
+abs_d4 = math.abs(delta[4])
+
+bool step1_buy = (delta[1] < 0) and (1.7*abs_d0 < abs_d1)
+bool step2_buy = (delta[1] < 0 and delta[2] < 0) and (abs_d0 < ((abs_d1 + abs_d2) / 2.0))
+bool step3_buy = (delta[1] < 0 and delta[2] < 0 and delta[3] < 0) and (abs_d0 < ((abs_d1 + abs_d2 + abs_d3) / 3.0))
+bool step4_buy = (delta[1] < 0 and delta[2] < 0 and delta[3] < 0 and delta[4] < 0) and (abs_d0 < ((abs_d1 + abs_d2 + abs_d3 + abs_d4) / 4.0))
+
+bool delta_is_ld_buy = step1_buy or step2_buy or step3_buy or step4_buy
+
+bool step1_sell = (delta[1] > 0) and (abs_d0 < abs_d1)
+bool step2_sell = (delta[1] > 0 and delta[2] > 0) and (abs_d0 < ((abs_d1 + abs_d2) / 2.0))
+bool step3_sell = (delta[1] > 0 and delta[2] > 0 and delta[3] > 0) and (abs_d0 < ((abs_d1 + abs_d2 + abs_d3) / 3.0))
+bool step4_sell = (delta[1] > 0 and delta[2] > 0 and delta[3] > 0 and delta[4] > 0) and (abs_d0 < ((abs_d1 + abs_d2 + abs_d3 + abs_d4) / 4.0))
+
+bool delta_is_ld_sell = step1_sell or step2_sell or step3_sell or step4_sell
+
+bool ld_engulf_buy = (is_bull_engulf or is_green) and delta_is_ld_buy
+bool ld_engulf_sell = (is_bear_engulf or is_red) and delta_is_ld_sell
+
+bool orderflow_confirmed_buy = (is_green and delta < 0) or ld_engulf_buy or (is_red and delta < 0)
+bool orderflow_confirmed_sell = (is_red and delta > 0) or ld_engulf_sell or (is_green and delta > 0)
+
+float top_wick_len = high - math.max(open, close)
+float bot_wick_len = math.min(open, close) - low
+float candle_range = high - low
+
+float top_wick_half_level = high - (top_wick_len * 0.50)
+float bot_wick_half_level = low + (bot_wick_len * 0.50)
+
+bool is_failed_upward_poc = not na(maxV) and (maxV > close or maxV >= (high - candle_range * 0.30))
+bool is_failed_downward_poc = not na(maxV) and (maxV < close or maxV <= (low + candle_range * 0.30))
+
+bool is_excessive_top_wick = (candle_range > 0) and (top_wick_len / candle_range > 0.30)
+bool is_excessive_bot_wick = (candle_range > 0) and (bot_wick_len / candle_range > 0.30)
+
+bool fail_filter_long = is_failed_upward_poc or (is_green and is_excessive_top_wick)
+bool fail_filter_short = is_failed_downward_poc or (is_red and is_excessive_bot_wick)
+
+bool confirm_climax_sell = top_wick_len > 0 and not na(maxV) and (maxV >= top_wick_half_level) and (maxV <= high)
+bool confirm_climax_buy = bot_wick_len > 0 and not na(maxV) and (maxV <= bot_wick_half_level) and (maxV >= low)
+
+bool confirm_hidden_cvd_sell = (is_red and delta > 0) or (is_red[1] and delta[1] > 0)
+bool confirm_hidden_cvd_buy = (is_green and delta < 0) or (is_green[1] and delta[1] < 0)
+
+bool confirm_ld_sell = delta_is_ld_sell or delta_is_ld_sell[1]
+bool confirm_ld_buy = delta_is_ld_buy or delta_is_ld_buy[1]
+
+bool side_filter_sell = confirm_hidden_cvd_sell or confirm_ld_sell
+bool side_filter_buy = confirm_hidden_cvd_buy or confirm_ld_buy
+
+bool raw_pattern_sell = is_bear_engulf or (is_red and is_green[1] and open <= close[1] and close < open[1])
+bool raw_pattern_buy = is_bull_engulf or (is_green and is_red[1] and open >= close[1] and close > open[1])
+
+bool confirm_pattern_sell = raw_pattern_sell and side_filter_sell
+bool confirm_pattern_buy = raw_pattern_buy and side_filter_buy
+
+bool any_candle_ok_sell = confirm_climax_sell or confirm_pattern_sell or confirm_hidden_cvd_sell or confirm_ld_sell
+bool any_candle_ok_buy = confirm_climax_buy or confirm_pattern_buy or confirm_hidden_cvd_buy or confirm_ld_buy
+
+bool poc_in_upper_wick = not na(maxV) and maxV >= (high - (high - low) / 3.0)
+bool poc_in_lower_wick = not na(maxV) and maxV <= (low + (high - low) / 3.0)
+
+float body_middle = (open + close) / 2.0
+bool flex_poc_sniper_sell = not na(maxV) and (maxV >= high - (high - low) / 3.0 or maxV > body_middle)
+bool flex_poc_sniper_buy = not na(maxV) and (maxV <= low + (high - low) / 3.0 or maxV < body_middle)
+
+bool candle_orderflow_approved_buy = (poc_in_lower_wick or flex_poc_sniper_buy) and any_candle_ok_buy and not fail_filter_long
+bool candle_orderflow_approved_sell = (poc_in_upper_wick or flex_poc_sniper_sell) and any_candle_ok_sell and not fail_filter_short
+
+bool final_confirmed_buy = is_green and candle_orderflow_approved_buy
+bool final_confirmed_sell = is_red and candle_orderflow_approved_sell
+
+// ستاپ ج) ستاپ نقدینگی LQ Sweep
+lq_highest_price = ta.highest(high, lq_lookback)[1]
+lq_lowest_price = ta.lowest(low, lq_lookback)[1]
+
+bool base_lq_sweep_bull = (low < lq_lowest_price) and (close > lq_lowest_price) and is_green and orderflow_confirmed_buy
+bool base_lq_sweep_bear = (high > lq_highest_price) and (close < lq_highest_price) and is_red and orderflow_confirmed_sell
+
+// ستاپ هـ) موتور فلو صعودی/نزولی SW ستاپ امواج
+bool wave_structure_short_ok = false
+bool wave_structure_long_ok = false
+
+for total_len = 15 to max_box_len
+    int w1_len = math.floor(total_len / 3.5)
+    int w2_len = total_len - w1_len
+    if w2_len < 4
+        continue
+    if w1_len >= 3
+        float sum_p = 0.0
+        float local_cvd_max = custom_cvd[0]
+        float local_cvd_min = custom_cvd[0]
+        for j = 0 to total_len - 1
+            sum_p := sum_p + close[j]
+            if custom_cvd[j] > local_cvd_max
+                local_cvd_max := custom_cvd[j]
+            if custom_cvd[j] < local_cvd_min
+                local_cvd_min := custom_cvd[j]
+        float price_mean = sum_p / total_len
+        float local_cvd_rng = local_cvd_max - local_cvd_min
+        float slope_p_w1 = (f_lr_slope_fixed(close, w1_len, w2_len) / price_mean) * 100
+        
+        float sumX_w1 = 0.0
+        float sumY_cvd_w1 = 0.0
+        float sumXY_cvd_w1 = 0.0
+        float sumX2_w1 = 0.0
+        float sum_scaled_cvd_w1 = 0.0
+        for i = 0 to w1_len - 1
+            float raw_cvd = custom_cvd[i + w2_len]
+            float scaled_cvd = local_cvd_rng != 0 ? ((raw_cvd - local_cvd_min) / local_cvd_rng) * 100 : 0.0
+            sum_scaled_cvd_w1 := sum_scaled_cvd_w1 + scaled_cvd
+            int x = w1_len - 1 - i
+            sumX_w1 := sumX_w1 + x
+            sumY_cvd_w1 := sumY_cvd_w1 + scaled_cvd
+            sumXY_cvd_w1 := sumXY_cvd_w1 + (x * scaled_cvd)
+            sumX2_w1 := sumX2_w1 + (x * x)
+        float slope_cvd_w1 = (w1_len * sumXY_cvd_w1 - sumX_w1 * sumY_cvd_w1) / (w1_len * sumX2_w1 - sumX_w1 * sumX_w1)
+        float cvd_mean_w1 = sum_scaled_cvd_w1 / w1_len
+        float final_cvd_slope_w1 = cvd_mean_w1 != 0 ? (slope_cvd_w1 / math.abs(cvd_mean_w1)) * 10 : slope_cvd_w1
+        
+        float w1_start_price = close[total_len - 1]
+        float w1_end_price = close[w2_len]
+        float w1_price_move = math.abs(w1_end_price - w1_start_price)
+        float w1_start_cvd = custom_cvd[total_len - 1]
+        float w1_end_cvd = custom_cvd[w2_len]
+        float w1_cvd_move = math.abs(w1_end_cvd - w1_start_cvd)
+        
+        // شرط‌گذاری شورت موج ۲ (تطبیق بازه‌های اصلاح قیمت و حجم)
+        bool w1_is_strong_sh = slope_p_w1 < -w1_price_thresh and final_cvd_slope_w1 < -w1_cvd_thresh
+        float w2_price_retraced_sh = high - w1_end_price
+        float price_retracement_pct_sh = w1_price_move != 0 ? (w2_price_retraced_sh / w1_price_move) * 100.0 : 0.0
+        float w2_cvd_retraced_sh = custom_cvd - w1_end_cvd
+        float cvd_retracement_pct_sh = w1_cvd_move != 0 ? (w2_cvd_retraced_sh / w1_cvd_move) * 100.0 : 0.0
+        
+        bool price_retracement_sh_ok = price_retracement_pct_sh >= (min_price_retracement * 100.0) and price_retracement_pct_sh <= (max_price_retracement * 100.0) and high >= w1_end_price
+        bool cvd_retracement_sh_ok = cvd_retracement_pct_sh <= max_cvd_retracement
+        
+        if w1_is_strong_sh and price_retracement_sh_ok and cvd_retracement_sh_ok
+            wave_structure_short_ok := true
+            break
+            
+        // شرط‌گذاری لانگ موج ۲ (تطبیق بازه‌های اصلاح قیمت و حجم)
+        bool w1_is_strong_lg = slope_p_w1 > w1_price_thresh and final_cvd_slope_w1 > w1_cvd_thresh
+        float w2_price_retraced_lg = w1_end_price - low
+        float price_retracement_pct_lg = w1_price_move != 0 ? (w2_price_retraced_lg / w1_price_move) * 100.0 : 0.0
+        float w2_cvd_retraced_lg = w1_end_cvd - custom_cvd
+        float cvd_retracement_pct_lg = w1_cvd_move != 0 ? (w2_cvd_retraced_lg / w1_cvd_move) * 100.0 : 0.0
+        
+        bool price_retracement_lg_ok = price_retracement_pct_lg >= (min_price_retracement * 100.0) and price_retracement_pct_lg <= (max_price_retracement * 100.0) and low <= w1_end_price
+        bool cvd_retracement_lg_ok = cvd_retracement_pct_lg <= max_cvd_retracement
+        
+        if w1_is_strong_lg and price_retracement_lg_ok and cvd_retracement_lg_ok
+            wave_structure_long_ok := true
+            break
+
+//=============================================================================
+// ۷. ماتریکس واگرایی تجمعی و تعریف ستاپ‌های پایه
+//=============================================================================
+// احیای توابع اصلی لونسوم در این بخش جهت برطرف شدن کامل ارورهای ماتریکس واگرایی ۱۰ اندیکاتور
+float ph_div_cond = ta.pivothigh(div_source == "Close" ? close : high, div_prd, div_prd)
+float pl_div_cond = ta.pivotlow(div_source == "Close" ? close : low, div_prd, div_prd)
+
+if ph_div_cond
+    array.unshift(ph_positions, bar_index)
+    array.unshift(ph_vals, ph_div_cond)
+    if array.size(ph_positions) > 20
+        array.pop(ph_positions), array.pop(ph_vals)
+
+if pl_div_cond
+    array.unshift(pl_positions, bar_index)
+    array.unshift(pl_vals, pl_div_cond)
+    if array.size(pl_positions) > 20
+        array.pop(pl_positions), array.pop(pl_vals)
+
+// محاسبات پویای ۱۰ اندیکاتور به روش نسخه ۵ پین‌اسکریپت
+rsi_val        = ta.rsi(close, 14)
+[macd_v, _, hist_v] = ta.macd(close, 12, 26, 9)
+moment_val     = ta.mom(close, 10)
+cci_val        = ta.cci(close, 10)
+obv_val        = ta.obv
+stoc_val       = ta.sma(ta.stoch(close, high, low, 14), 3)
+
+float maFast_val = ta.vwma(close, 12)
+float maSlow_val = ta.vwma(close, 26)
+vwmacd_val     = maFast_val - maSlow_val
+cmfm_val       = (high == low) ? 0.0 : ((close - low) - (high - close)) / (high - low)
+cmfv_val       = cmfm_val * volume
+cmf_val        = ta.sma(volume, 21) != 0.0 ? ta.sma(cmfv_val, 21) / ta.sma(volume, 21) : 0.0
+mfi_val        = ta.mfi(close, 14)
+
+// تعریف و مقداردهی اولیه متغیرهای شمارش واگرایی تجمعی (تفکیک به خطوط مجزا جهت رفع ارور Undeclared)
+tot_pos_divs = 0
+tot_neg_divs = 0
+
+// استفاده از ماتریکس استاندارد لونسوم (f_check_indicator_divs) برای ۱۰ اندیکاتور و ماتریکس اختصاصی CVD (f_check_indicator_divs_cvd) برای ++SN
+[macd_pos, macd_neg]     = f_check_indicator_divs(div_calcmacd, macd_v, div_searchdiv, div_source, div_prd, div_maxpp, div_maxbars, div_dontconfirm, pl_positions, pl_vals, ph_positions, ph_vals)
+[hist_pos, hist_neg]     = f_check_indicator_divs(div_calcmacda, hist_v, div_searchdiv, div_source, div_prd, div_maxpp, div_maxbars, div_dontconfirm, pl_positions, pl_vals, ph_positions, ph_vals)
+[rsi_pos, rsi_neg]       = f_check_indicator_divs(div_calcrsi, rsi_val, div_searchdiv, div_source, div_prd, div_maxpp, div_maxbars, div_dontconfirm, pl_positions, pl_vals, ph_positions, ph_vals)
+[stoch_pos, stoch_neg]   = f_check_indicator_divs(div_calcstoc, stoc_val, div_searchdiv, div_source, div_prd, div_maxpp, div_maxbars, div_dontconfirm, pl_positions, pl_vals, ph_positions, ph_vals)
+[cci_pos, cci_neg]       = f_check_indicator_divs(div_calccci, cci_val, div_searchdiv, div_source, div_prd, div_maxpp, div_maxbars, div_dontconfirm, pl_positions, pl_vals, ph_positions, ph_vals)
+[mom_pos, mom_neg]       = f_check_indicator_divs(div_calcmom, moment_val, div_searchdiv, div_source, div_prd, div_maxpp, div_maxbars, div_dontconfirm, pl_positions, pl_vals, ph_positions, ph_vals)
+[obv_pos, obv_neg]       = f_check_indicator_divs(div_calcobv, obv_val, div_searchdiv, div_source, div_prd, div_maxpp, div_maxbars, div_dontconfirm, pl_positions, pl_vals, ph_positions, ph_vals)
+[vwmacd_pos, vwmacd_neg] = f_check_indicator_divs(div_calcvwmacd, vwmacd_val, div_searchdiv, div_source, div_prd, div_maxpp, div_maxbars, div_dontconfirm, pl_positions, pl_vals, ph_positions, ph_vals)
+[cmf_pos, cmf_neg]       = f_check_indicator_divs(div_calccmf, cmf_val, div_searchdiv, div_source, div_prd, div_maxpp, div_maxbars, div_dontconfirm, pl_positions, pl_vals, ph_positions, ph_vals)
+[mfi_pos, mfi_neg]       = f_check_indicator_divs(div_calcmfi, mfi_val, div_searchdiv, div_source, div_prd, div_maxpp, div_maxbars, div_dontconfirm, pl_positions, pl_vals, ph_positions, ph_vals)
+
+// اندازه گیری رنج نوسانی CVD جهت محاسبات نرمالایز شده و برطرف شدن کامل عدم صدور سیگنال
+float local_cvd_max = ta.highest(custom_cvd, div_maxbars)
+float local_cvd_min = ta.lowest(custom_cvd, div_maxbars)
+float local_cvd_rng = local_cvd_max - local_cvd_min
+
+// یکپارچه‌سازی و بهینه‌سازی کامل ستاپ ++SN با ماتریکس واگرایی حجم تجمعی CVD (تطبیق کامل ۱۴ پارامتر فراخوانی با تعریف تابع جهت رفع ارور)
+[cvd_pos, cvd_neg]       = f_check_indicator_divs_cvd(show_sniper_plus, custom_cvd, div_searchdiv, div_source, div_prd, div_maxpp, div_maxbars, div_dontconfirm, pl_positions, pl_vals, ph_positions, ph_vals, threshold_pct, local_cvd_rng)
+
+bool sn_plus_bull_div = cvd_pos > 0
+bool sn_plus_bear_div = cvd_neg > 0
+
+tot_pos_divs := macd_pos + hist_pos + rsi_pos + stoch_pos + cci_pos + mom_pos + obv_pos + vwmacd_pos + cmf_pos + mfi_pos
+tot_neg_divs := macd_neg + hist_neg + rsi_neg + stoch_neg + cci_neg + mom_neg + obv_neg + vwmacd_neg + cmf_neg + mfi_neg
+
+// تعریف ستاپ‌های پایه با تاییدیه رنگ کندل صعودی/نزولی برای ستاپ ++SN (حل نوسان سیگنال‌ها)
+bool base_sw_buy  = wave_structure_long_ok and is_green and orderflow_confirmed_buy
+bool base_sw_sell = wave_structure_short_ok and is_red and orderflow_confirmed_sell
+
+bool base_sniper_buy  = pivot_hidden_bull_div and is_green and orderflow_confirmed_buy
+bool base_sniper_sell = pivot_hidden_bear_div and is_red and orderflow_confirmed_sell
+
+bool base_sn_plus_buy  = sn_plus_bull_div and is_green and orderflow_confirmed_buy
+bool base_sn_plus_sell = sn_plus_bear_div and is_red and orderflow_confirmed_sell
+
+bool wick_filter_sn_plus_buy = (candle_range > 0) and ((bot_wick_len / candle_range) >= (min_wick_pct / 100.0))
+bool wick_filter_sn_plus_sell = (candle_range > 0) and ((top_wick_len / candle_range) >= (min_wick_pct / 100.0))
+
+bool sw_confirmed_buy = base_sw_buy and candle_orderflow_approved_buy
+bool sw_confirmed_sell = base_sw_sell and candle_orderflow_approved_sell
+
+bool sn_plus_confirmed_buy = base_sn_plus_buy and candle_orderflow_approved_buy and wick_filter_sn_plus_buy
+bool sn_plus_confirmed_sell = base_sn_plus_sell and candle_orderflow_approved_sell and wick_filter_sn_plus_sell
+
+//=============================================================================
+// ۸. استخراج سیگنال‌های خام اولیه صادرشده
+//=============================================================================
+bool raw_sw_buy      = base_sw_buy
+bool raw_sw_sell     = base_sw_sell
+
+bool raw_sniper_buy  = base_sniper_buy
+bool raw_sniper_sell = base_sniper_sell
+
+bool raw_sn_plus_buy  = base_sn_plus_buy
+bool raw_sn_plus_sell = base_sn_plus_sell
+
+// بررسی وجود هرگونه سیگنال خام در کندل فعلی
+bool has_any_raw_buy  = raw_sw_buy or raw_sniper_buy or raw_sn_plus_buy
+bool has_any_raw_sell = raw_sw_sell or raw_sniper_sell or raw_sn_plus_sell
+
+// مانیتور کردن وضعیت تأیید قدرتمند سیگنال‌ها
+bool is_confirmed_buy_active  = sw_confirmed_buy or final_confirmed_buy or sn_plus_confirmed_buy
+bool is_confirmed_sell_active = sw_confirmed_sell or final_confirmed_sell or sn_plus_confirmed_sell
+
+//=============================================================================
+// ۹. فیلتر کندلی دقیق (بررسی Inside Bar Body کلوز و شکار نقدینگی بر اساس POC)
+//=============================================================================
+bool strict_buy_ok = true
+bool strict_sell_ok = true
+
+if strict_candle_confirm
+    if has_any_raw_buy
+        strict_buy_ok := f_check_strict_candle_confirm_buy(maxV, wick_pct_confirm)
+    if has_any_raw_sell
+        strict_sell_ok := f_check_strict_candle_confirm_sell(maxV, wick_pct_confirm)
+
+//=============================================================================
+// ۹.۵. فیلتر نویزگیر سایه مخالف و قرارگیری POC در آن (۲۵٪ منعطف)
+//=============================================================================
+bool is_opposite_wick_poc_buy_canceled  = false
+bool is_opposite_wick_poc_sell_canceled = false
+
+if opp_wick_confirm
+    // صعودی: بررسی سایه بالای کندل صعودی
+    float upper_wick_len = high - math.max(open, close)
+    if candle_range > 0
+        float upper_wick_ratio = (upper_wick_len / candle_range) * 100
+        if upper_wick_ratio >= opp_wick_thresh
+            if not na(maxV) and maxV >= (high - upper_wick_len) and maxV <= high
+                is_opposite_wick_poc_buy_canceled := true
+
+    // نزولی: بررسی سایه پایین کندل نزولی
+    float lower_wick_len = math.min(open, close) - low
+    if candle_range > 0
+        float lower_wick_ratio = (lower_wick_len / candle_range) * 100
+        if lower_wick_ratio >= opp_wick_thresh
+            if not na(maxV) and maxV >= low and maxV <= (low + lower_wick_len)
+                is_opposite_wick_poc_sell_canceled := true
+
+//=============================================================================
+// ۱۰. منطق سیگنال معکوس (Reversal) و تأیید با تأخیر (Delayed) صعودی و نزولی
+//=============================================================================
+bool reversal_buy_trigger  = false
+bool reversal_sell_trigger = false
+bool delayed_buy_confirm   = false
+bool delayed_sell_confirm  = false
+
+bool reversal_buy_strong   = false
+bool reversal_sell_strong  = false
+bool delayed_buy_strong    = false
+bool delayed_sell_strong   = false
+
+// تعریف بدنه کندل قبل
+float prev_body_top_0 = math.max(open[1], close[1])
+float prev_body_bottom_0 = math.min(open[1], close[1])
+
+// سیگنال نهایی سیستم با فیلتر کندلی دقیق و فیلتر سایه مخالف
+bool final_system_buy_signal  = raw_sw_buy and strict_buy_ok and (not is_opposite_wick_poc_buy_canceled)
+bool final_system_sell_signal = raw_sw_sell and strict_sell_ok and (not is_opposite_wick_poc_sell_canceled)
+
+if reversal_check_enabled
+    // ۱. سیگنال معکوس (اعمال نویزگیر سایه مخالف روی کندل قبلی)
+    if raw_sw_buy[1] and (not strict_buy_ok[1] or is_opposite_wick_poc_buy_canceled[1]) and (close < prev_body_bottom_0)
+        reversal_sell_trigger := true
+        reversal_sell_strong  := sw_confirmed_buy[1]
+    else if raw_sw_sell[1] and (not strict_sell_ok[1] or is_opposite_wick_poc_sell_canceled[1]) and (close > prev_body_top_0)
+        reversal_buy_trigger := true
+        reversal_buy_strong  := sw_confirmed_sell[1]
+        
+    // ۲. تایید با تاخیر
+    if not reversal_buy_trigger and not final_system_buy_signal
+        for d = 1 to delayed_confirm_window
+            if raw_sw_buy[d] and (not strict_buy_ok[d] or is_opposite_wick_poc_buy_canceled[d])
+                float sig_body_top = math.max(open[d], close[d])
+                if close > sig_body_top
+                    bool already_confirmed = false
+                    if d > 1
+                        for check_b = 1 to d - 1
+                            if close[check_b] > sig_body_top
+                                already_confirmed := true
+                                break
+                    if not already_confirmed
+                        delayed_buy_confirm := true
+                        delayed_buy_strong  := sw_confirmed_buy[d]
+                        break
+
+    if not reversal_sell_trigger and not final_system_sell_signal
+        for d = 1 to delayed_confirm_window
+            if raw_sw_sell[d] and (not strict_sell_ok[d] or is_opposite_wick_poc_sell_canceled[d])
+                float sig_body_bottom = math.min(open[d], close[d])
+                if close < sig_body_bottom
+                    bool already_confirmed = false
+                    if d > 1
+                        for check_b = 1 to d - 1
+                            if close[check_b] < sig_body_bottom
+                                already_confirmed := true
+                                break
+                    if not already_confirmed
+                        delayed_sell_confirm := true
+                        delayed_sell_strong  := sw_confirmed_sell[d]
+                        break
+
+// اعمال تایید نهایی فیلتر کندلی صادرشده
+bool print_sw_buy  = raw_sw_buy and strict_buy_ok and (not is_opposite_wick_poc_buy_canceled)
+bool print_sw_sell = raw_sw_sell and strict_sell_ok and (not is_opposite_wick_poc_sell_canceled)
+
+bool print_sniper_buy   = raw_sniper_buy and strict_buy_ok and (not is_opposite_wick_poc_buy_canceled)
+bool print_sniper_sell  = raw_sniper_sell and strict_sell_ok and (not is_opposite_wick_poc_sell_canceled)
+
+// ستاپ ++SN را در صورت تاییدیه کامل کندلی پرینت میکنیم تا جلوی سیگنال‌های بی در و پیکر گرفته شود
+bool print_sn_plus_buy  = sn_plus_confirmed_buy and strict_buy_ok and (not is_opposite_wick_poc_buy_canceled)
+bool print_sn_plus_sell = sn_plus_confirmed_sell and strict_sell_ok and (not is_opposite_wick_poc_sell_canceled)
+
+// ستاپ شکار نقدینگی LQ کاملا از فیلتر کندلی مستثنی است
+bool print_lq_buy       = base_lq_sweep_bull and final_confirmed_buy
+bool print_lq_sell      = base_lq_sweep_bear and final_confirmed_sell
+
+// تعریف شرط صدور برچسب‌های ناکام (Failed Signals) برای نمایش فیلتر نویزگیر سایه مخالف
+bool failed_sw_buy       = raw_sw_buy and strict_buy_ok and is_opposite_wick_poc_buy_canceled
+bool failed_sw_sell      = raw_sw_sell and strict_sell_ok and is_opposite_wick_poc_sell_canceled
+
+bool failed_sniper_buy   = raw_sniper_buy and strict_buy_ok and is_opposite_wick_poc_buy_canceled
+bool failed_sniper_sell  = raw_sniper_sell and strict_sell_ok and is_opposite_wick_poc_sell_canceled
+
+bool failed_sn_plus_buy  = raw_sn_plus_buy and strict_buy_ok and is_opposite_wick_poc_buy_canceled
+bool failed_sn_plus_sell = raw_sn_plus_sell and strict_sell_ok and is_opposite_wick_poc_sell_canceled
+
+//=============================================================================
+// ۱۲. مدیریت رسم و چاپ برچسب‌ها روی نمودار (فول چسبنده به اسکیل عمودی قیمت)
+//=============================================================================
+plot(close, title="Anchor Plot", color=color.new(color.blue, 100))
+float micro_gap = close * 0.0003
+
+// رسم سیگنال‌های صعودی و نزولی امواج SW (دوگانه کمرنگ/پررنگ با سایز مناسب)
+if print_sw_buy and show_sw_sig
+    color target_color = sw_confirmed_buy ? color.orange : color.new(color.orange, 55)
+    color text_color = sw_confirmed_buy ? color.black : color.new(color.black, 40)
+    label_size = sw_confirmed_buy ? size.small : size.tiny
+    label.new(x=bar_index, y=low - micro_gap, text="SW-Buy", style=label.style_label_up, color=target_color, textcolor=text_color, size=label_size)
+
+if print_sw_sell and show_sw_sig
+    color target_color = sw_confirmed_sell ? color.orange : color.new(color.orange, 55)
+    color text_color = sw_confirmed_sell ? color.black : color.new(color.black, 40)
+    label_size = sw_confirmed_sell ? size.small : size.tiny
+    label.new(x=bar_index, y=high + micro_gap, text="SW-Sell", style=label.style_label_down, color=target_color, textcolor=text_color, size=label_size)
+
+// رسم سیگنال‌های صعودی و نزولی ستاپ اسنایپر (SN)
+if print_sniper_buy and show_ict_sniper
+    color target_color = final_confirmed_buy ? color.green : color.new(color.green, 55)
+    color text_color = final_confirmed_buy ? color.white : color.new(color.white, 40)
+    label_size = final_confirmed_buy ? size.small : size.tiny
+    label.new(x=bar_index, y=low - micro_gap, text="Div", style=label.style_label_up, color=target_color, textcolor=text_color, size=label_size)
+
+if print_sniper_sell and show_ict_sniper
+    color target_color = final_confirmed_sell ? color.red : color.new(color.red, 55)
+    color text_color = final_confirmed_sell ? color.white : color.new(color.white, 40)
+    label_size = final_confirmed_sell ? size.small : size.tiny
+    label.new(x=bar_index, y=high + micro_gap, text="Div", style=label.style_label_down, color=target_color, textcolor=text_color, size=label_size)
+
+// رسم سیگنال‌های صعودی و نزولی ستاپ دوربرد ++SN
+if print_sn_plus_buy and show_sniper_plus
+    color target_color = sn_plus_confirmed_buy ? #10b981 : color.new(#10b981, 55)
+    color text_color = sn_plus_confirmed_buy ? color.white : color.new(color.white, 40)
+    label_size = sn_plus_confirmed_buy ? size.small : size.tiny
+    label.new(x=bar_index, y=low - micro_gap, text="SN++", style=label.style_label_up, color=target_color, textcolor=text_color, size=label_size)
+
+if print_sn_plus_sell and show_sniper_plus
+    color target_color = sn_plus_confirmed_sell ? #e11d48 : color.new(#e11d48, 55)
+    color text_color = sn_plus_confirmed_sell ? color.white : color.new(color.white, 40)
+    label_size = sn_plus_confirmed_sell ? size.small : size.tiny
+    label.new(x=bar_index, y=high + micro_gap, text="SN++", style=label.style_label_down, color=target_color, textcolor=text_color, size=label_size)
+
+// ستاپ نقدینگی LQ صعودی و نزولی
+if print_lq_buy and show_lq_sweep
+    color target_color = final_confirmed_buy ? color.blue : color.new(color.blue, 55)
+    color text_color = final_confirmed_buy ? color.white : color.new(color.white, 40)
+    label_size = final_confirmed_buy ? size.small : size.tiny
+    label.new(x=bar_index, y=low - micro_gap, text="LQ", style=label.style_label_up, color=target_color, textcolor=text_color, size=label_size)
+
+if print_lq_sell and show_lq_sweep
+    color target_color = final_confirmed_sell ? color.blue : color.new(color.blue, 55)
+    color text_color = final_confirmed_sell ? color.white : color.new(color.white, 40)
+    label_size = final_confirmed_sell ? size.small : size.tiny
+    label.new(x=bar_index, y=high + micro_gap, text="LQ", style=label.style_label_down, color=target_color, textcolor=text_color, size=label_size)
+
+// --- چاپ برچسب‌های ناکام فیلتر نویزگیر سایه مخالف (Failed Signals - بسیار کوچک و خاکستری) ---
+
+if failed_sw_buy and show_sw_sig and show_failed_sigs
+    label.new(x=bar_index, y=low - micro_gap, text="F-WS", style=label.style_label_up, color=color.new(color.gray, 65), textcolor=color.new(color.gray, 30), size=size.tiny)
+
+if failed_sniper_buy and show_ict_sniper and show_failed_sigs
+    label.new(x=bar_index, y=low - micro_gap, text="F-SN", style=label.style_label_up, color=color.new(color.gray, 65), textcolor=color.new(color.gray, 30), size=size.tiny)
+
+if failed_sn_plus_buy and show_sniper_plus and show_failed_sigs
+    label.new(x=bar_index, y=low - micro_gap, text="F-SN++", style=label.style_label_up, color=color.new(color.gray, 65), textcolor=color.new(color.gray, 30), size=size.tiny)
+
+if failed_sw_sell and show_sw_sig and show_failed_sigs
+    label.new(x=bar_index, y=high + micro_gap, text="F-WS", style=label.style_label_down, color=color.new(color.gray, 65), textcolor=color.new(color.gray, 30), size=size.tiny)
+
+if failed_sniper_sell and show_ict_sniper and show_failed_sigs
+    label.new(x=bar_index, y=high + micro_gap, text="F-SN", style=label.style_label_down, color=color.new(color.gray, 65), textcolor=color.new(color.gray, 30), size=size.tiny)
+
+if failed_sn_plus_sell and show_sniper_plus and show_failed_sigs
+    label.new(x=bar_index, y=high + micro_gap, text="F-SN++", style=label.style_label_down, color=color.new(color.gray, 65), textcolor=color.new(color.gray, 30), size=size.tiny)
+
+// --- چاپ سیگنال‌های معکوس و تایید تاخیری صادر شده (کمرنگ/پررنگ بر اساس منبع مشتق شده) ---
+
+if reversal_buy_trigger
+    color target_color = reversal_buy_strong ? color.lime : color.new(color.lime, 55)
+    color text_color = reversal_buy_strong ? color.black : color.new(color.black, 40)
+    label_size = reversal_buy_strong ? size.small : size.tiny
+    label.new(x=bar_index, y=low - (micro_gap * 2), text="REV BUY", style=label.style_label_up, color=target_color, textcolor=text_color, size=label_size)
+
+if reversal_sell_trigger
+    color target_color = reversal_sell_strong ? color.red : color.new(color.red, 55)
+    color text_color = reversal_sell_strong ? color.white : color.new(color.white, 40)
+    label_size = reversal_sell_strong ? size.small : size.tiny
+    label.new(x=bar_index, y=high + (micro_gap * 2), text="REV SELL", style=label.style_label_down, color=target_color, textcolor=text_color, size=label_size)
+
+if delayed_buy_confirm
+    color target_color = delayed_buy_strong ? color.teal : color.new(color.teal, 55)
+    color text_color = delayed_buy_strong ? color.white : color.new(color.white, 40)
+    label_size = delayed_buy_strong ? size.small : size.tiny
+    label.new(x=bar_index, y=low - (micro_gap * 2), text="DL BUY", style=label.style_label_up, color=target_color, textcolor=text_color, size=label_size)
+
+if delayed_sell_confirm
+    color target_color = delayed_sell_strong ? color.purple : color.new(color.purple, 55)
+    color text_color = delayed_sell_strong ? color.white : color.new(color.white, 40)
+    label_size = delayed_sell_strong ? size.small : size.tiny
+    label.new(x=bar_index, y=high + (micro_gap * 2), text="DL SELL", style=label.style_label_down, color=target_color, textcolor=text_color, size=label_size)
+
+//=============================================================================
+// ۱۳. فیلتر هم‌زمانی پویا (Dynamic Time Sync) و فعالسازی سیگنال طلایی
+//=============================================================================
+// بررسی وقوع سیگنال تایید شده نهایی در سیستم‌های شما (بدون احتساب ستاپ SN++ جهت بهینه‌سازی و هماهنگی)
+bool any_my_system_buy = print_sw_buy or print_sniper_buy or print_lq_buy or delayed_buy_confirm or reversal_buy_trigger
+bool any_my_system_sell = print_sw_sell or print_sniper_sell or print_lq_sell or delayed_sell_confirm or reversal_sell_trigger
+
+// شرط فیلتر بر اساس حد نصاب تعداد واگرایی‌ها روی کندل جاری
+bool has_enough_pos_div = tot_pos_divs >= min_div_limit
+bool has_enough_neg_div = tot_neg_divs >= min_div_limit
+
+// پایش بازه تلورانس (چند کندل خطا) برای همگام‌سازی پیوت‌های دیررس با ستاپ‌های سریع شما
+bool pos_div_in_window = nz(ta.barssince(has_enough_pos_div), 99999) <= lookback_window
+bool neg_div_in_window = nz(ta.barssince(has_enough_neg_div), 99999) <= lookback_window
+
+// سیگنال طلایی نهایی صادر شده با بازه تلورانس کندل‌ها (بدون ورود ++SN)
+bool golden_buy_trigger  = any_my_system_buy and pos_div_in_window
+bool golden_sell_trigger = any_my_system_sell and neg_div_in_window
+
+// چاپ سیگنال طلایی کاملاً هماهنگ با مقیاس قیمت ریاضی (اصلاح تورفتگی بلوک محلی به اندازه ۴ فاصله)
+if golden_buy_trigger and show_golden_sig
+    label.new(x=bar_index, y=low - (micro_gap * 2.5), text="🏆 G", style=label.style_label_up, color=#FFD700, textcolor=color.black, size=size.small)
+
+if golden_sell_trigger and show_golden_sig
+    label.new(x=bar_index, y=high + (micro_gap * 2.5), text="🏆 G", style=label.style_label_down, color=#FFA500, textcolor=color.black, size=size.small)
+
+// ثبت هشدارهای معاملاتی سیگنال طلایی در تریدینگ‌ویو
+alertcondition(golden_buy_trigger, title="🏆 Golden Buy Signal Triggered!", message="سیگنال خرید طلایی صادر شد.")
+alertcondition(golden_sell_trigger, title="🏆 Golden Sell Signal Triggered!", message="سیگنال فروش طلایی صادر شد.")
+//=============================================================================
+// Export plots for ICT Combo Engine (input.source wiring)
+//=============================================================================
+plot(golden_buy_trigger ? 1 : 0, title="GoldenBuySrc", display=display.none)
+plot(golden_sell_trigger ? 1 : 0, title="GoldenSellSrc", display=display.none)
+plot(any_my_system_buy ? 1 : 0, title="AnyBuySrc", display=display.none)
+plot(any_my_system_sell ? 1 : 0, title="AnySellSrc", display=display.none)
+plot(print_sw_buy or print_sniper_buy or print_sn_plus_buy or print_lq_buy ? 1 : 0, title="SniperBuySrc", display=display.none)
+plot(print_sw_sell or print_sniper_sell or print_sn_plus_sell or print_lq_sell ? 1 : 0, title="SniperSellSrc", display=display.none)
+plot(custom_cvd, title="CustomCVD", display=display.none)

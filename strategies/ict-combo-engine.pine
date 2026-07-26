@@ -5,10 +5,12 @@ strategy("ICT Combo Engine (Mitigation + Session Liq + CVD + Options)", overlay=
 // ترکیب لایه‌ای (بدون مگا-اسکریپت ۲۰۰۰ خطی):
 //   ۱) Entry: Failed-swing Mitigation + Rejection (نسخهٔ درست‌شده)
 //   ۲) Bias: سشن‌لیکوییدیتی PDH/PDL + S1–S4 sweep (از ماژول سشن‌ها)
-//   ۳) Confirm: CVD قدرت/واگرایی (تقریب volume-delta)
+//   ۳) Confirm: Sniper_CVD_v59 (Golden / Any / Setup) via input.source
 //   ۴) Magnets: Put Wall / Max Pain / Call Wall (+ احتمال مسیر) از API آپشن
 //
-// داده آپشن: GET /api/options-levels?currency=BTC → pine_inputs را اینجا پیست کن
+// CVD: اندیکاتور Sniper_CVD_v59 را روی چارت بگذار → در Inputs این استراتژی
+//      منبع GoldenBuySrc / GoldenSellSrc (یا AnyBuy/AnySell) را انتخاب کن
+// آپشن: GET /api/options-levels?currency=BTC → pine_inputs را اینجا پیست کن
 // =============================================================================
 
 string GRP_STR = "Structure / Mitigation"
@@ -31,11 +33,11 @@ bool use_session_bias = input.bool(true, "Require Session Sweep Bias", group=GRP
 int sweep_memory_bars = input.int(72, "Sweep Bias Memory (bars)", minval=5, group=GRP_SESS, tooltip="چند بار بایاس سوییپ معتبر بماند (~6h روی 5m)")
 int max_sweep_mins = input.int(145, "Max Bars After Sweep for IFVG", minval=10, group=GRP_SESS)
 
-bool use_cvd = input.bool(true, "Require CVD Agree or Div", group=GRP_CVD)
-int cvd_slope_len = input.int(10, "CVD Slope Length", minval=3, group=GRP_CVD)
-int cvd_pivot = input.int(5, "CVD Div Pivot", minval=2, group=GRP_CVD)
-bool cvd_allow_div = input.bool(true, "Allow Bull/Bear Divergence as Confirm", group=GRP_CVD)
-bool cvd_allow_strong = input.bool(true, "Allow Strong CVD Agreement", group=GRP_CVD)
+bool use_sniper_cvd = input.bool(true, "Require Sniper CVD Confirm", group=GRP_CVD, tooltip="اندیکاتور Sniper_CVD_v59 باید روی چارت باشد و سورس‌ها وصل شوند")
+string cvd_mode = input.string("Golden", "Confirm Mode", options=["Golden", "Any System", "Any Setup"], group=GRP_CVD, tooltip="Golden=سیگنال طلایی | Any System=SW/SN/LQ/REV/DL | Any Setup=SW/SN/SN++/LQ چاپ‌شده")
+int sniper_memory_bars = input.int(12, "Sniper Signal Memory (bars)", minval=1, maxval=100, group=GRP_CVD, tooltip="چند کندل بعد از پالس Sniper هنوز معتبر بماند")
+float sniperBuySrc = input.source(close, "Sniper BUY source (GoldenBuySrc / AnyBuySrc / SniperBuySrc)", group=GRP_CVD)
+float sniperSellSrc = input.source(close, "Sniper SELL source (GoldenSellSrc / AnySellSrc / SniperSellSrc)", group=GRP_CVD)
 
 float putWallIn = input.float(0.0, "Put Wall", group=GRP_OPT)
 float maxPainIn = input.float(0.0, "Max Pain", group=GRP_OPT)
@@ -343,46 +345,26 @@ bool sess_bias_short = not na(bias_short_until) and bar_index <= bias_short_unti
 
 //#endregion
 
-//#region CVD
-float bar_delta = close >= open ? volume : -volume
-float cvd = ta.cum(bar_delta)
-float cvd_sma = ta.sma(cvd, cvd_slope_len)
-float cvd_slope = cvd - cvd_sma
-float price_slope = close - ta.sma(close, cvd_slope_len)
-bool strong_bull = price_slope > 0 and cvd_slope > 0
-bool strong_bear = price_slope < 0 and cvd_slope < 0
+//#region Sniper CVD v59 (external — wired via input.source)
+// Pulse from Sniper plots (1 on signal bar). Keep memory so mitigation pullback can still confirm.
+var int sniper_buy_until = na
+var int sniper_sell_until = na
 
-float cvd_ph = ta.pivothigh(cvd, cvd_pivot, cvd_pivot)
-float cvd_pl = ta.pivotlow(cvd, cvd_pivot, cvd_pivot)
-float px_ph = ta.pivothigh(high, cvd_pivot, cvd_pivot)
-float px_pl = ta.pivotlow(low, cvd_pivot, cvd_pivot)
-var float last_px_h = na
-var float last_cvd_h = na
-var float last_px_l = na
-var float last_cvd_l = na
-var int bull_div_until = na
-var int bear_div_until = na
+bool sniper_buy_pulse = sniperBuySrc > 0
+bool sniper_sell_pulse = sniperSellSrc > 0
+if sniper_buy_pulse
+    sniper_buy_until := bar_index + sniper_memory_bars
+if sniper_sell_pulse
+    sniper_sell_until := bar_index + sniper_memory_bars
 
-if not na(px_ph)
-    float c_at = cvd[cvd_pivot]
-    if not na(last_px_h) and px_ph > last_px_h and not na(last_cvd_h) and c_at < last_cvd_h
-        bear_div_until := bar_index + sweep_memory_bars
-    last_px_h := px_ph
-    last_cvd_h := c_at
-if not na(px_pl)
-    float c_at = cvd[cvd_pivot]
-    if not na(last_px_l) and px_pl < last_px_l and not na(last_cvd_l) and c_at > last_cvd_l
-        bull_div_until := bar_index + sweep_memory_bars
-    last_px_l := px_pl
-    last_cvd_l := c_at
+bool sniper_buy_ok = not na(sniper_buy_until) and bar_index <= sniper_buy_until
+bool sniper_sell_ok = not na(sniper_sell_until) and bar_index <= sniper_sell_until
 
-bool bull_div = not na(bull_div_until) and bar_index <= bull_div_until
-bool bear_div = not na(bear_div_until) and bar_index <= bear_div_until
-
+// Mode note is for the user when wiring sources; logic is simply: wired source > 0
 cvd_ok_long() =>
-    not use_cvd or ((cvd_allow_strong and strong_bull) or (cvd_allow_div and bull_div))
+    not use_sniper_cvd or sniper_buy_ok
 cvd_ok_short() =>
-    not use_cvd or ((cvd_allow_strong and strong_bear) or (cvd_allow_div and bear_div))
+    not use_sniper_cvd or sniper_sell_ok
 
 //#endregion
 
@@ -518,7 +500,7 @@ pick_tp(bool is_long, float entry, float stop) =>
 
 filters_ok(bool is_long) =>
     bool sess_ok = not use_session_bias or (is_long ? sess_bias_long : sess_bias_short)
-    bool cvd_ok = is_long ? cvd_ok_long() : cvd_ok_short()
+    bool cvd_ok = is_long ? cvd_ok_long() : cvd_ok_short()  // Sniper_CVD_v59
     bool ema_ok = not use_ema or (is_long ? close > ema : close < ema)
     bool kz_ok = not use_killzone or in_killzone()
     bool opt_ok = options_bias_ok(is_long)
@@ -633,7 +615,9 @@ plotchar(show_debug ? fail_hh : false, title="Failed HH", char="H", location=loc
 plotchar(show_debug ? fail_ll : false, title="Failed LL", char="L", location=location.bottom, color=color.aqua, size=size.tiny)
 plotchar(show_debug ? pend_short : false, title="Pending Short", char="S", location=location.top, color=color.red, size=size.tiny)
 plotchar(show_debug ? pend_long : false, title="Pending Long", char="B", location=location.bottom, color=color.green, size=size.tiny)
-plotchar(show_debug ? (bull_div or bear_div) : false, title="CVD Div Active", char="D", location=location.absolute, color=color.purple, size=size.tiny)
+plotchar(show_debug ? (sniper_buy_ok or sniper_sell_ok) : false, title="Sniper CVD Active", char="C", location=location.absolute, color=color.purple, size=size.tiny)
+plotshape(show_debug and sniper_buy_pulse, title="Sniper Buy Pulse", style=shape.diamond, location=location.belowbar, color=color.new(#FFD700, 0), size=size.tiny)
+plotshape(show_debug and sniper_sell_pulse, title="Sniper Sell Pulse", style=shape.diamond, location=location.abovebar, color=color.new(#FFA500, 0), size=size.tiny)
 
 bgcolor(use_killzone and in_killzone() ? color.new(color.blue, 95) : na)
 

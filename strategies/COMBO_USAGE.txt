@@ -1,45 +1,47 @@
-ICT Combo Engine — how to use on TradingView
-=============================================
+ICT Combo Engine + YOUR Sniper CVD v59
+======================================
 
-Why old mitigation "compiled but did nothing"
----------------------------------------------
-Defaults required ALL of: failed-swing + breaker + fractal leave + rejection
-confirm. Fractal leave almost never unlocked, so Pending never became Entry.
-Fix: fractal default OFF; breaker arm no longer stuck on one-bar race.
+Chart stack (recommended)
+-------------------------
+1) BTCUSDT 5m
+2) Add indicator: Sniper_CVD_v59  (strategies/sniper-cvd-v59.pine)
+3) Add strategy: ICT Combo Engine (strategies/ict-combo-engine.pine)
+4) Optional: Options Levels overlay + session BSG indicator
 
-Files
+Wire Sniper → Combo (important)
+-------------------------------
+In Combo Engine inputs → group "CVD Confirm":
+
+  Confirm Mode tip:
+    Golden     → pick plot "GoldenBuySrc" / "GoldenSellSrc"
+    Any System → pick plot "AnyBuySrc" / "AnySellSrc"
+    Any Setup  → pick plot "SniperBuySrc" / "SniperSellSrc"
+
+  Sniper BUY source  → Sniper_CVD_v59 : GoldenBuySrc  (or Any/Sniper)
+  Sniper SELL source → Sniper_CVD_v59 : GoldenSellSrc (or Any/Sniper)
+
+If sources stay on `close`, CVD filter will almost never confirm (close is never a pulse).
+Start with Require Sniper CVD = OFF to verify mitigation fires, then turn ON after wiring.
+
+Layers
+------
+1 Entry   = Failed-swing mitigation + rejection (fixed)
+2 Bias    = Session PDH/PDL + S1–S4 sweep→IFVG
+3 Confirm = YOUR Sniper CVD (SW / Div / SN++ / LQ / Golden)
+4 Magnets = Options put / max pain / call (+ path %)
+5 Risk    = nearest-swing SL, killzone, EMA200, min RR
+
+Options
+-------
+GET /api/options-levels?currency=BTC → paste pine_inputs into Combo.
+
+Debug
 -----
-1) strategies/ict-combo-engine.pine     ← main strategy (use this)
-2) strategies/ict-liquidity-reversal.pine ← fixed standalone mitigation
-3) strategies/cvd-strength-divergence.pine ← real CVD pane (div/strength)
-4) strategies/cvd-ict-breakout-sessions.pine ← your session/BSG/LQR module
-5) strategies/options-levels.pine       ← overlay; paste API levels
+Data Window / shapes:
+  Failed HH/LL → Pending → Sess Bias → Sniper CVD Active (C) → MIT label
+  Gold diamonds = Sniper buy/sell pulse on that bar
 
-Recommended chart stack
------------------------
-- BTCUSDT 5m
-- Add: ICT Combo Engine (strategy)
-- Optional overlays: CVD_Div pane, Options Levels, CVD_BSG_Sessions
-
-Options wiring
---------------
-GET /api/options-levels?currency=BTC
-Copy pine_inputs → Combo Engine inputs:
-  Put Wall, Max Pain, Call Wall, P(Put→Max)%, P(Max→Call)%
-
-Suggested defaults (aligned with backtests)
--------------------------------------------
-- Require Session Sweep Bias: ON
-- Require CVD Agree or Div: ON
-- Only London/NY AM Killzone: ON
-- EMA Trend: ON (200)
-- SL Mode: nearest_swing
-- Min RR: 2.0–3.0
-- Rejection wick: 60%
-- Options TP magnet: ON
-- Options prob block: OFF at first (enable later)
-
-Debug (Data Window)
--------------------
-Failed HH/LL → Pending Short/Long → Sess Bias → CVD Div → trade label
-If Pending appears but no trade, a filter (session/CVD/KZ/EMA/options) is blocking.
+Why old mitigation did nothing
+------------------------------
+Fractal-leave default was ON and almost never unlocked. Fixed in
+ict-liquidity-reversal.pine (default OFF) and in Combo.

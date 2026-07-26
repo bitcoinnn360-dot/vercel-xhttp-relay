@@ -27,6 +27,18 @@ export function useMarketData() {
     try {
       const bundle = await loadDashboardBundle()
       if (!mounted.current) return
+      // Guard: never apply a payload that would blank the overview panels
+      const impacts = bundle.data?.impacts
+      if (
+        !impacts ||
+        !Array.isArray(impacts.boursePos) ||
+        !Array.isArray(impacts.bourseNeg) ||
+        !Array.isArray(impacts.ifbPos) ||
+        !Array.isArray(impacts.ifbNeg)
+      ) {
+        bundle.data.impacts = seedDashboard.impacts
+        if (bundle.data.overview) bundle.data.overview.impactsLive = false
+      }
       setData(bundle.data)
       setHistories(bundle.histories)
       setFred(bundle.fred)
@@ -35,6 +47,7 @@ export function useMarketData() {
       setError(null)
     } catch (e) {
       if (!mounted.current) return
+      // Keep previous UI on refresh failure; only surface error text
       setError(e instanceof Error ? e.message : 'خطا در بارگذاری داده')
     } finally {
       if (mounted.current) {

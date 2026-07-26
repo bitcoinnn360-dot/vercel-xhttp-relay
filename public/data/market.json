@@ -16786,37 +16786,68 @@
     "retailMoneyFlowDailyBillionToman": 6193.0,
     "retailMoneyFlowYtdFromPdf": true,
     "impacts": {
-      "positive": [
+      "boursePos": [
         {
-          "name": "وبملت",
+          "symbol": "وبملت",
           "impact": 15163.5
         },
         {
-          "name": "شپنا",
+          "symbol": "شپنا",
           "impact": 6489.83
         },
         {
-          "name": "شبندر",
+          "symbol": "شبندر",
           "impact": 4804.77
         },
         {
-          "name": "وپاسار",
+          "symbol": "وپاسار",
           "impact": 4048.02
         },
         {
-          "name": "شستا",
+          "symbol": "شستا",
           "impact": 3724.03
         },
         {
-          "name": "ونوین",
+          "symbol": "ونوین",
           "impact": 3700.18
         },
         {
-          "name": "شسپا",
+          "symbol": "شسپا",
           "impact": 3418.56
         }
       ],
-      "negative": []
+      "bourseNeg": [],
+      "ifbPos": [
+        {
+          "symbol": "مارون",
+          "impact": 64.95
+        },
+        {
+          "symbol": "کگهر",
+          "impact": 59.3
+        },
+        {
+          "symbol": "سامان",
+          "impact": 53.54
+        },
+        {
+          "symbol": "بپاس",
+          "impact": 50.66
+        },
+        {
+          "symbol": "آریا",
+          "impact": 50.48
+        },
+        {
+          "symbol": "نیشکر",
+          "impact": 34.65
+        },
+        {
+          "symbol": "آریان",
+          "impact": 33.89
+        }
+      ],
+      "ifbNeg": []
     },
     "impactsFromTsetmc": false,
     "impactsFromSourceArena": true,
@@ -17256,37 +17287,68 @@
     "totalTradeValueHmt": 33.8,
     "totalTradeValueSource": "sourcearena-bourse-only",
     "impacts": {
-      "positive": [
+      "boursePos": [
         {
-          "name": "وبملت",
+          "symbol": "وبملت",
           "impact": 15163.5
         },
         {
-          "name": "شپنا",
+          "symbol": "شپنا",
           "impact": 6489.83
         },
         {
-          "name": "شبندر",
+          "symbol": "شبندر",
           "impact": 4804.77
         },
         {
-          "name": "وپاسار",
+          "symbol": "وپاسار",
           "impact": 4048.02
         },
         {
-          "name": "شستا",
+          "symbol": "شستا",
           "impact": 3724.03
         },
         {
-          "name": "ونوین",
+          "symbol": "ونوین",
           "impact": 3700.18
         },
         {
-          "name": "شسپا",
+          "symbol": "شسپا",
           "impact": 3418.56
         }
       ],
-      "negative": []
+      "bourseNeg": [],
+      "ifbPos": [
+        {
+          "symbol": "مارون",
+          "impact": 64.95
+        },
+        {
+          "symbol": "کگهر",
+          "impact": 59.3
+        },
+        {
+          "symbol": "سامان",
+          "impact": 53.54
+        },
+        {
+          "symbol": "بپاس",
+          "impact": 50.66
+        },
+        {
+          "symbol": "آریا",
+          "impact": 50.48
+        },
+        {
+          "symbol": "نیشکر",
+          "impact": 34.65
+        },
+        {
+          "symbol": "آریان",
+          "impact": 33.89
+        }
+      ],
+      "ifbNeg": []
     },
     "impactsFromSourceArena": true
   },

@@ -204,14 +204,14 @@ export function MarketOverview({
       <div className="grid gap-3 lg:grid-cols-3">
         <ImpactPanel
           title="تأثیر مثبت/منفی بورس"
-          pos={data.impacts.boursePos}
-          neg={data.impacts.bourseNeg}
+          pos={data.impacts?.boursePos || []}
+          neg={data.impacts?.bourseNeg || []}
           live={Boolean(o.impactsLive)}
         />
         <ImpactPanel
           title="تأثیر مثبت/منفی فرابورس"
-          pos={data.impacts.ifbPos}
-          neg={data.impacts.ifbNeg}
+          pos={data.impacts?.ifbPos || []}
+          neg={data.impacts?.ifbNeg || []}
           live={Boolean(o.impactsLive)}
         />
         <TopTrades data={data} />
@@ -247,17 +247,17 @@ function ImpactPanel({
       </p>
       <div className="grid grid-cols-2 gap-3">
         <ul className="space-y-2">
-          {pos.map((s) => (
-            <li key={s.symbol} className="flex items-center justify-between text-sm">
-              <span className="font-semibold">{s.symbol}</span>
+          {(pos || []).map((s, i) => (
+            <li key={`${s.symbol || 'p'}-${i}`} className="flex items-center justify-between text-sm">
+              <span className="font-semibold">{s.symbol || '—'}</span>
               <span className="num pos">{fmtChange(s.impact)}</span>
             </li>
           ))}
         </ul>
         <ul className="space-y-2">
-          {neg.map((s) => (
-            <li key={s.symbol} className="flex items-center justify-between text-sm">
-              <span className="font-semibold">{s.symbol}</span>
+          {(neg || []).map((s, i) => (
+            <li key={`${s.symbol || 'n'}-${i}`} className="flex items-center justify-between text-sm">
+              <span className="font-semibold">{s.symbol || '—'}</span>
               <span className="num neg">{fmtChange(s.impact)}</span>
             </li>
           ))}

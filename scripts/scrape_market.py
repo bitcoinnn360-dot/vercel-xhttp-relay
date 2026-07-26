@@ -439,26 +439,49 @@ def scrape_sourcearena_glance(token: str | None = None) -> dict:
     if b_mv is None or f_mv is None:
         return {**out, "error": "missing market_value", "bourse": bourse, "ifb": ifb}
 
-    impacts: list[dict] = []
-    try:
-        ind = json.loads(
-            fetch_with_retries(
-                f"{SOURCEARENA_API}?token={urllib.parse.quote(tok)}&market=ind_namad_bourse",
-                timeout=25,
-                attempts=3,
+    def load_impacts(market_key: str) -> list[dict]:
+        rows_out: list[dict] = []
+        try:
+            ind = json.loads(
+                fetch_with_retries(
+                    f"{SOURCEARENA_API}?token={urllib.parse.quote(tok)}&market={market_key}",
+                    timeout=25,
+                    attempts=3,
+                )
             )
-        )
-        if isinstance(ind, list):
-            for row in ind[:12]:
-                if not isinstance(row, dict):
-                    continue
-                name = str(row.get("name") or "").strip()
-                effect = parse_sourcearena_billion_rial(row.get("effect"))
-                if not name or effect is None:
-                    continue
-                impacts.append({"name": name, "impact": effect})
-    except Exception as exc:  # noqa: BLE001
-        out["impactsError"] = str(exc)
+        except Exception as exc:  # noqa: BLE001
+            out[f"impactsError_{market_key}"] = str(exc)
+            return rows_out
+        if not isinstance(ind, list):
+            return rows_out
+        for row in ind[:16]:
+            if not isinstance(row, dict):
+                continue
+            name = str(row.get("name") or "").strip()
+            effect = parse_sourcearena_billion_rial(row.get("effect"))
+            if not name or effect is None:
+                continue
+            # UI expects { symbol, impact }
+            rows_out.append({"symbol": name, "impact": effect})
+        return rows_out
+
+    bourse_impacts = load_impacts("ind_namad_bourse")
+    ifb_impacts = load_impacts("ind_namad_farabourse")
+
+    def split_pos_neg(rows: list[dict]) -> tuple[list[dict], list[dict]]:
+        pos = sorted([x for x in rows if x["impact"] > 0], key=lambda x: -x["impact"])[:7]
+        neg = sorted([x for x in rows if x["impact"] < 0], key=lambda x: x["impact"])[:7]
+        return pos, neg
+
+    b_pos, b_neg = split_pos_neg(bourse_impacts)
+    f_pos, f_neg = split_pos_neg(ifb_impacts)
+    impacts_ui = {
+        "boursePos": b_pos,
+        "bourseNeg": b_neg,
+        "ifbPos": f_pos,
+        "ifbNeg": f_neg,
+    }
+    has_impacts = any(impacts_ui[k] for k in impacts_ui)
 
     total_mv = round(b_mv + f_mv, 1)
     # ارزش معاملات فرابورس «در یک نگاه» اغلب اوراق را هم دارد؛ اگر غیرعادی بزرگ بود فقط بورس را بگیر
@@ -470,9 +493,6 @@ def scrape_sourcearena_glance(token: str | None = None) -> dict:
     elif b_tr is not None:
         total_tr = b_tr
         trade_source = "sourcearena-bourse-only"
-
-    pos = sorted([x for x in impacts if x["impact"] > 0], key=lambda x: -x["impact"])[:7]
-    neg = sorted([x for x in impacts if x["impact"] < 0], key=lambda x: x["impact"])[:7]
 
     return {
         "ok": True,
@@ -494,8 +514,8 @@ def scrape_sourcearena_glance(token: str | None = None) -> dict:
         "totalMarketValueHmt": total_mv,
         "totalTradeValueHmt": total_tr,
         "totalTradeValueSource": trade_source,
-        "impacts": {"positive": pos, "negative": neg} if (pos or neg) else None,
-        "impactsFromSourceArena": bool(pos or neg),
+        "impacts": impacts_ui if has_impacts else None,
+        "impactsFromSourceArena": has_impacts,
     }
 
 

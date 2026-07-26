@@ -160,10 +160,11 @@ async function scrapeSourceArena(token) {
   const tok = (token || '').trim()
   if (!tok) return { ok: false, error: 'SOURCEARENA_TOKEN missing' }
 
-  const [bourseRes, ifbRes, indRes] = await Promise.allSettled([
+  const [bourseRes, ifbRes, indBourseRes, indIfbRes] = await Promise.allSettled([
     fetchJsonRetry(`${SOURCEARENA_API}?token=${encodeURIComponent(tok)}&market=market_bourse`),
     fetchJsonRetry(`${SOURCEARENA_API}?token=${encodeURIComponent(tok)}&market=market_farabourse`),
     fetchJsonRetry(`${SOURCEARENA_API}?token=${encodeURIComponent(tok)}&market=ind_namad_bourse`, 3),
+    fetchJsonRetry(`${SOURCEARENA_API}?token=${encodeURIComponent(tok)}&market=ind_namad_farabourse`, 3),
   ])
 
   if (bourseRes.status !== 'fulfilled' || ifbRes.status !== 'fulfilled') {
@@ -195,19 +196,30 @@ async function scrapeSourceArena(token) {
     tradeSource = 'sourcearena-bourse-only'
   }
 
-  const impacts = { positive: [], negative: [] }
-  if (indRes.status === 'fulfilled' && Array.isArray(indRes.value)) {
-    for (const row of indRes.value.slice(0, 12)) {
-      const name = String(row?.name || '').trim()
-      const effect = parseBillionRial(row?.effect)
-      if (!name || effect == null) continue
-      const item = { name, impact: effect }
-      if (effect >= 0) impacts.positive.push(item)
-      else impacts.negative.push(item)
+  function splitImpacts(rows) {
+    const list = Array.isArray(rows) ? rows : []
+    const mapped = []
+    for (const row of list.slice(0, 16)) {
+      const symbol = String(row?.name || row?.symbol || '').trim()
+      const effect = parseBillionRial(row?.effect ?? row?.impact)
+      if (!symbol || effect == null) continue
+      mapped.push({ symbol, impact: effect })
     }
-    impacts.positive.sort((a, b) => b.impact - a.impact)
-    impacts.negative.sort((a, b) => a.impact - b.impact)
+    return {
+      pos: mapped.filter((x) => x.impact > 0).sort((a, b) => b.impact - a.impact).slice(0, 7),
+      neg: mapped.filter((x) => x.impact < 0).sort((a, b) => a.impact - b.impact).slice(0, 7),
+    }
   }
+
+  const bImp = splitImpacts(indBourseRes.status === 'fulfilled' ? indBourseRes.value : [])
+  const fImp = splitImpacts(indIfbRes.status === 'fulfilled' ? indIfbRes.value : [])
+  const impacts = {
+    boursePos: bImp.pos,
+    bourseNeg: bImp.neg,
+    ifbPos: fImp.pos,
+    ifbNeg: fImp.neg,
+  }
+  const hasImpacts = Object.values(impacts).some((arr) => arr.length > 0)
 
   return {
     ok: true,
@@ -218,8 +230,8 @@ async function scrapeSourceArena(token) {
     totalTradeValueHmt: totalTrade,
     totalTradeValueSource: tradeSource,
     marketValueSource: 'sourcearena-bourse+ifb',
-    impacts: impacts.positive.length || impacts.negative.length ? impacts : null,
-    impactsFromSourceArena: Boolean(impacts.positive.length || impacts.negative.length),
+    impacts: hasImpacts ? impacts : null,
+    impactsFromSourceArena: hasImpacts,
   }
 }
 

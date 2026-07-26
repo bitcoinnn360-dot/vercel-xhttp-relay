@@ -414,6 +414,47 @@ function patchIndex(
   return true
 }
 
+type ImpactRow = { symbol: string; impact: number }
+
+/** Normalize SourceArena / legacy shapes into UI `{ boursePos, bourseNeg, ifbPos, ifbNeg }`. */
+function normalizeImpacts(raw: unknown): DashboardData['impacts'] | null {
+  if (!raw || typeof raw !== 'object') return null
+  const obj = raw as Record<string, unknown>
+
+  const toRows = (v: unknown): ImpactRow[] => {
+    if (!Array.isArray(v)) return []
+    return v
+      .map((row) => {
+        if (!row || typeof row !== 'object') return null
+        const r = row as Record<string, unknown>
+        const symbol = String(r.symbol ?? r.name ?? '').trim()
+        const impact = Number(r.impact ?? r.effect)
+        if (!symbol || !Number.isFinite(impact)) return null
+        return { symbol, impact }
+      })
+      .filter((x): x is ImpactRow => Boolean(x))
+  }
+
+  // Legacy mistaken shape from earlier SourceArena wiring
+  if ('positive' in obj || 'negative' in obj) {
+    const pos = toRows(obj.positive)
+    const neg = toRows(obj.negative)
+    if (!pos.length && !neg.length) return null
+    return { boursePos: pos, bourseNeg: neg, ifbPos: [], ifbNeg: [] }
+  }
+
+  const out = {
+    boursePos: toRows(obj.boursePos),
+    bourseNeg: toRows(obj.bourseNeg),
+    ifbPos: toRows(obj.ifbPos),
+    ifbNeg: toRows(obj.ifbNeg),
+  }
+  if (!out.boursePos.length && !out.bourseNeg.length && !out.ifbPos.length && !out.ifbNeg.length) {
+    return null
+  }
+  return out
+}
+
 function applyFreshOverview(base: DashboardData, api: OverviewApi | null, intradayFallback: IntradayPoint[]) {
   const o = base.overview
   const sources = { ...(o.fieldSources || {}) }
@@ -537,10 +578,11 @@ function applyOverviewLive(
   const liveAny = live as {
     impactsFromSourceArena?: boolean
     impactsFromTsetmc?: boolean
-    impacts?: DashboardData['impacts'] | null
+    impacts?: unknown
   }
-  if ((liveAny.impactsFromSourceArena || liveAny.impactsFromTsetmc) && liveAny.impacts) {
-    base.impacts = liveAny.impacts
+  const normalized = normalizeImpacts(liveAny.impacts)
+  if ((liveAny.impactsFromSourceArena || liveAny.impactsFromTsetmc) && normalized) {
+    base.impacts = normalized
     o.impactsLive = true
     sources.impacts = liveAny.impactsFromSourceArena ? 'sourcearena' : 'tsetmc'
   } else {
@@ -582,8 +624,9 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   const liveCount = applyLiveQuotes(base, current)
   const overviewLiveOk = applyOverviewLive(base, scraped?.overviewLive, scraped?.candles1401)
   const freshOk = applyFreshOverview(base, overviewApi, intradayFallback)
-  if (overviewApi?.impactsFromSourceArena && overviewApi.impacts) {
-    base.impacts = overviewApi.impacts
+  const apiImpacts = normalizeImpacts(overviewApi?.impacts)
+  if (overviewApi?.impactsFromSourceArena && apiImpacts) {
+    base.impacts = apiImpacts
     base.overview.impactsLive = true
     base.overview.fieldSources = {
       ...(base.overview.fieldSources || {}),

@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import type { DashboardData } from '../data/types'
 import type { HistoryPoint } from '../data/fetchers'
 import { changeClass, fmtChange, fmtInt, fmtNum, fmtPct } from '../lib/format'
-import { CandlestickChart, FlowBarChart } from './charts/Charts'
+import { CandlestickChart, FlowBarChart, PriceAreaChart } from './charts/Charts'
 import { TopTrades } from './StocksSection'
 
 function Kpi({
@@ -156,6 +156,20 @@ export function MarketOverview({
           </div>
           <div className="mt-1 text-[10px] text-[var(--color-muted)]">طبق گزارش PDF روزانه</div>
         </motion.div>
+      </div>
+
+      <div className="panel p-4">
+        <h3 className="mb-1 text-sm font-bold">روند شاخص کل در طول روز</h3>
+        <p className="mb-2 text-[10px] text-[var(--color-muted)]">
+          مسیر امروز از TGJU today-table (چنددقیقه‌ای) · دیتای دقیق ۵دقیقه TSETMC فعلاً از این سرور در دسترس نیست
+          {o.intradayIndex?.length ? ` · ${o.intradayIndex.length} نقطه` : ''}
+        </p>
+        <PriceAreaChart
+          data={(o.intradayIndex || []).map((x) => ({ label: x.time, value: x.value }))}
+          color="#0b3d6e"
+          height={240}
+          valueLabel="شاخص"
+        />
       </div>
 
       <div className="grid gap-3 lg:grid-cols-2">

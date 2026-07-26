@@ -50,12 +50,16 @@ export default function App() {
           )}
           <div className="space-y-10">
             <SourceBar sources={data.sources} />
-            {scrapeMeta.infra && (
+            {(scrapeMeta.infra || scrapeMeta.overviewApiAt || scrapeMeta.updatedAt) && (
               <div className="panel px-4 py-3 text-xs text-[var(--color-muted)]">
-                اسکرپر پایتون: TGJU فعال
-                {scrapeMeta.tsetmcOk ? ' · TSETMC وصل' : ' · TSETMC نیاز به اینترنت ایران'}
-                {scrapeMeta.imeOk ? ' · IME وصل' : ' · IME نیاز به اینترنت ایران'}
-                {scrapeMeta.updatedAt ? ` · آخرین فایل اسکرپر: ${new Date(scrapeMeta.updatedAt).toLocaleString('fa-IR')}` : ''}
+                بروزرسانی زنده از /api/overview هر ۲ دقیقه
+                {scrapeMeta.overviewApiAt
+                  ? ` · API: ${new Date(scrapeMeta.overviewApiAt).toLocaleString('fa-IR')}`
+                  : ' · API هنوز لود نشده'}
+                {scrapeMeta.tsetmcOk ? ' · TSETMC وصل' : ' · TSETMC/tradersarena قطع'}
+                {scrapeMeta.updatedAt
+                  ? ` · فایل اسکرپر: ${new Date(scrapeMeta.updatedAt).toLocaleString('fa-IR')}`
+                  : ''}
               </div>
             )}
             <MarketOverview data={data} histories={histories} />

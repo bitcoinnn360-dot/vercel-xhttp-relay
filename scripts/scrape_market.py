@@ -343,7 +343,10 @@ def scrape_parsistahlil_market_status() -> dict:
             # reverse order variants already covered
 
         date_j = None
-        m = re.search(r"مورخ\s*(\d{1,2}\s*تیر\s*\d{4}|\d{4}/\d{2}/\d{2})", text)
+        m = re.search(
+            r"مورخ\s*(\d{1,2}\s*(?:فروردین|اردیبهشت|خرداد|تیر|مرداد|شهریور|مهر|آبان|آذر|دی|بهمن|اسفند)\s*\d{4}|\d{4}/\d{2}/\d{2})",
+            text,
+        )
         if m:
             date_j = m.group(1).strip()
 
@@ -482,6 +485,29 @@ def candles_from_1401(ohlc: list[dict]) -> list[dict]:
     return [c for c in ohlc if (c.get("date") or "") >= TEDPIX_FROM_1401]
 
 
+def scrape_tgju_intraday(key: str = "bourse") -> list[dict]:
+    """Intraday path from TGJU today-table-data (multi-minute resolution)."""
+    url = f"https://api.tgju.org/v1/market/indicator/today-table-data/{key}?lang=fa"
+    try:
+        payload = json.loads(fetch(url, timeout=40))
+    except Exception as exc:  # noqa: BLE001
+        print(f"intraday {key}: {exc}")
+        return []
+    out: list[dict] = []
+    for row in payload.get("data") or []:
+        if not isinstance(row, list) or len(row) < 2:
+            continue
+        value = num(row[0])
+        time_s = str(row[1] or "").strip()
+        if value is None or not time_s:
+            continue
+        chg_html = str(row[2] or "")
+        chg = num(re.sub(r"<[^>]+>", "", chg_html))
+        out.append({"time": time_s[:5] if len(time_s) >= 5 else time_s, "value": value, "change": chg})
+    out.reverse()
+    return out
+
+
 def scrape_tsetmc() -> dict:
     endpoints = [
         "https://cdn.tsetmc.com/api/Index/GetIndexB1LastDay/32097828799138957",
@@ -571,11 +597,20 @@ def main() -> int:
     pars = scrape_parsistahlil_market_status()
     print("pars", {k: pars.get(k) for k in ("ok", "retailTradeValueBillionToman", "retailMoneyFlowDailyBillionToman", "totalTradeValueBillionToman", "dateJalali", "error")})
 
+    print("TGJU intraday…")
+    intraday = scrape_tgju_intraday("bourse")
+    print(f"intraday points={len(intraday)}")
+
     print("shakhesban board…")
     board = scrape_shakhesban_board()
 
     tsetmc = scrape_tsetmc()
     overview_live = build_overview_live(board, usd, indices, tedpix, pars, bool(tsetmc.get("ok")))
+    overview_live["intraday"] = {
+        "source": "tgju-today-table",
+        "note": "مسیر روزانه TGJU؛ ۵دقیقه دقیق TSETMC نیاز به IP ایران / لاگین tradersarena",
+        "points": intraday,
+    }
     print(
         f"MV={overview_live['totalMarketValueHmt']} همت | "
         f"USD={overview_live['totalMarketValueUsdM']} m$ | "
@@ -601,6 +636,7 @@ def main() -> int:
         "tgju": tgju,
         "histories": {k: v for k, v in histories.items() if v},
         "candles1401": candles,
+        "intraday": overview_live.get("intraday"),
         "overviewLive": overview_live,
         "sectors": sectors,
         "tsetmc": tsetmc,

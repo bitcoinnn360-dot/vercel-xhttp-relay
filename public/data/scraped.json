@@ -1,39 +1,39 @@
 {
-  "updatedAt": "2026-07-22T11:03:33.436138+00:00",
+  "updatedAt": "2026-07-26T13:10:49.341671+00:00",
   "indices": {
     "tedpix": {
       "name": "شاخص کل بورس",
-      "value": 4883977.03,
-      "change": -3574.68,
-      "changePct": -0.07,
+      "value": 5002329.94,
+      "change": 107876.76,
+      "changePct": 2.2,
       "source": "shakhesban",
       "slug": "ش-کل-بورس"
     },
     "equalWeight": {
       "name": "شاخص کل (هم وزن)",
-      "value": 1356054.21,
-      "change": 9331.28,
-      "changePct": 0.69,
+      "value": 1393502.72,
+      "change": 29582.31,
+      "changePct": 2.17,
       "source": "shakhesban",
       "slug": "ش-کل-هم-وزن"
     },
     "ifb": {
       "name": "شاخص کل فرابورس",
-      "value": 38852.45,
-      "change": 179.48,
-      "changePct": 0.46,
+      "value": 39787.24,
+      "change": 771.1,
+      "changePct": 1.98,
       "source": "shakhesban",
       "slug": "ش-کل-فرابورس"
     }
   },
   "overviewLive": {
     "totalMarketValueHmt": 8909.1,
-    "totalMarketValueUsdM": 46498.0,
-    "usdRate": 1916000.0,
-    "totalTradeValueHmt": 284.92,
-    "totalTradeValueSource": "parsistahlil",
-    "retailTradeValueBillionToman": 25015.0,
-    "retailMoneyFlowDailyBillionToman": -719.0,
+    "totalMarketValueUsdM": 47642.0,
+    "usdRate": 1870000.0,
+    "totalTradeValueHmt": 2.34,
+    "totalTradeValueSource": "shakhesban-board-interim",
+    "retailTradeValueBillionToman": 22331.0,
+    "retailMoneyFlowDailyBillionToman": 6193.0,
     "marketValueSource": "shakhesban-board-interim",
     "impactsFromTsetmc": false,
     "blocked": [
@@ -41,7 +41,7 @@
     ],
     "stockCount": 765
   },
-  "candles1401Count": 793,
+  "candles1401Count": 795,
   "tsetmc": {
     "ok": false,
     "source": "tsetmc",
@@ -57,11 +57,11 @@
   "parsistahlil": {
     "ok": true,
     "source": "parsistahlil.ir",
-    "contentId": "1178",
-    "url": "https://parsistahlil.ir/contents/1178-%DA%AF%D8%B2%D8%A7%D8%B1%D8%B4-%D9%88%D8%B6%D8%B9%DB%8C%D8%AA-%D8%A8%D8%A7%D8%B2%D8%A7%D8%B1-%D8%A7%D8%B1%D8%B2%D8%B4-%D9%85%D8%B9%D8%A7%D9%85%D9%84%D8%A7%D8%AA-%D8%AE%D8%B1%D8%AF-%D9%88-%D9%88%D8%B1%D9%88%D8%AF-%D9%88-%D8%AE%D8%B1%D9%88%D8%AC-%D9%BE%D9%88%D9%84-%D8%AD%D9%82%DB%8C%D9%82%DB%8C",
-    "dateJalali": "31 تیر 1405",
-    "retailTradeValueBillionToman": 25015.0,
-    "totalTradeValueBillionToman": 284916.0,
-    "retailMoneyFlowDailyBillionToman": -719.0
+    "contentId": "1180",
+    "url": "https://parsistahlil.ir/contents/1180-%DA%AF%D8%B2%D8%A7%D8%B1%D8%B4-%D9%88%D8%B6%D8%B9%DB%8C%D8%AA-%D8%A8%D8%A7%D8%B2%D8%A7%D8%B1-%D8%A7%D8%B1%D8%B2%D8%B4-%D9%85%D8%B9%D8%A7%D9%85%D9%84%D8%A7%D8%AA-%D8%AE%D8%B1%D8%AF-%D9%88-%D9%88%D8%B1%D9%88%D8%AF-%D9%88-%D8%AE%D8%B1%D9%88%D8%AC-%D9%BE%D9%88%D9%84-%D8%AD%D9%82%DB%8C%D9%82%DB%8C",
+    "dateJalali": "4 مرداد 1405",
+    "retailTradeValueBillionToman": 22331.0,
+    "totalTradeValueBillionToman": 250920.0,
+    "retailMoneyFlowDailyBillionToman": 6193.0
   }
 }

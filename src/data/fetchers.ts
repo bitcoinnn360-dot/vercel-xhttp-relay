@@ -61,6 +61,12 @@ export interface FredBundle {
   history: HistoryPoint[]
 }
 
+export interface IntradayPoint {
+  time: string
+  value: number
+  change?: number | null
+}
+
 export interface LiveBundle {
   data: DashboardData
   histories: Record<string, HistoryPoint[]>
@@ -71,6 +77,7 @@ export interface LiveBundle {
     tsetmcOk?: boolean
     imeOk?: boolean
     infra?: Record<string, string>
+    overviewApiAt?: string
   }
 }
 
@@ -340,6 +347,58 @@ async function fetchScrapedMarket(): Promise<{
   }
 }
 
+async function fetchTgjuIntraday(): Promise<IntradayPoint[]> {
+  try {
+    const res = await fetch('https://api.tgju.org/v1/market/indicator/today-table-data/bourse?lang=fa', {
+      headers: { Accept: 'application/json' },
+    })
+    if (!res.ok) return []
+    const json = (await res.json()) as { data?: string[][] }
+    const rows = json.data || []
+    const points = rows
+      .map((row) => ({
+        time: String(row[1] || '').trim(),
+        value: parseFaNumber(row[0]),
+        change: parseFaNumber(String(row[2] || '').replace(/<[^>]+>/g, '')),
+      }))
+      .filter((p) => p.time && Number.isFinite(p.value))
+    return points.reverse()
+  } catch {
+    return []
+  }
+}
+
+type OverviewApi = {
+  ok?: boolean
+  updatedAt?: string
+  indices?: {
+    tedpix?: { name?: string; value?: number; change?: number; changePct?: number; source?: string }
+    equalWeight?: { name?: string; value?: number; change?: number; changePct?: number; source?: string }
+    ifb?: { name?: string; value?: number; change?: number; changePct?: number; source?: string }
+  }
+  usdRate?: number
+  intraday?: { points?: IntradayPoint[]; note?: string; source?: string }
+  parsistahlil?: {
+    ok?: boolean
+    retailTradeValueBillionToman?: number
+    retailMoneyFlowDailyBillionToman?: number
+    dateJalali?: string
+    error?: string
+  }
+  blocked?: string[]
+  errors?: string[]
+}
+
+async function fetchOverviewApi(): Promise<OverviewApi | null> {
+  try {
+    const res = await fetch('/api/overview', { cache: 'no-store' })
+    if (!res.ok) return null
+    return (await res.json()) as OverviewApi
+  } catch {
+    return null
+  }
+}
+
 function patchIndex(
   target: { name: string; value: number; change: number; changePct: number },
   live?: { name?: string; value?: number; change?: number; changePct?: number },
@@ -350,6 +409,64 @@ function patchIndex(
   if (live.change != null && Number.isFinite(live.change)) target.change = live.change
   if (live.changePct != null && Number.isFinite(live.changePct)) target.changePct = live.changePct
   return true
+}
+
+function applyFreshOverview(base: DashboardData, api: OverviewApi | null, intradayFallback: IntradayPoint[]) {
+  const o = base.overview
+  const sources = { ...(o.fieldSources || {}) }
+  const notes = [...(o.liveNotes || [])]
+
+  if (api?.indices) {
+    if (patchIndex(o.tedpix, api.indices.tedpix)) sources.tedpix = api.indices.tedpix?.source || 'live'
+    if (patchIndex(o.equalWeight, api.indices.equalWeight)) sources.equalWeight = 'shakhesban-live'
+    if (patchIndex(o.ifb, api.indices.ifb)) sources.ifb = 'shakhesban-live'
+  }
+
+  if (api?.usdRate != null && Number.isFinite(api.usdRate)) {
+    o.usdRate = api.usdRate
+    sources.usdRate = 'tgju'
+    // refresh USD market value from current MV if possible
+    if (o.totalMarketValueHmt > 0) {
+      // همت → ریال = *1e13 ; / usd / 1e6 → میلیون دلار
+      o.totalMarketValueUsdM = Math.round((o.totalMarketValueHmt * 1e13) / api.usdRate / 1e6)
+      sources.usdMarketValue = 'marketValue÷tgjuUsd'
+    }
+  }
+
+  const pars = api?.parsistahlil
+  if (pars?.ok) {
+    if (pars.retailTradeValueBillionToman != null) {
+      o.retailTradeValueBillionToman = pars.retailTradeValueBillionToman
+      o.retailTradeValueHmt = pars.retailTradeValueBillionToman / 1000
+      sources.retailTrade = 'parsistahlil-live'
+    }
+    if (pars.retailMoneyFlowDailyBillionToman != null) {
+      o.retailMoneyFlowDaily = pars.retailMoneyFlowDailyBillionToman
+      sources.retailMoneyFlowDaily = 'parsistahlil-live'
+    }
+    notes.unshift(
+      `پارسیس زنده: خرد=${pars.retailTradeValueBillionToman ?? '—'} · پول حقیقی=${pars.retailMoneyFlowDailyBillionToman ?? '—'} میلیارد تومان` +
+        (pars.dateJalali ? ` (${pars.dateJalali})` : ''),
+    )
+  } else if (api) {
+    notes.unshift(`پارسیس در API زنده خوانده نشد${pars?.error ? `: ${pars.error}` : ''}`)
+  }
+
+  const intraday = api?.intraday?.points?.length ? api.intraday.points : intradayFallback
+  if (intraday.length) {
+    o.intradayIndex = intraday.map((p) => ({ time: p.time.slice(0, 5), value: p.value }))
+    sources.intraday = api?.intraday?.source || 'tgju-today-table'
+    notes.unshift(
+      api?.intraday?.note ||
+        'نمودار درون‌روزی از today-table TGJU (رزولوشن چنددقیقه‌ای). دیتای دقیق ۵دقیقه TSETMC نیاز به IP ایران دارد.',
+    )
+  }
+
+  if (api?.blocked?.length) o.blockedSources = api.blocked
+  o.fieldSources = sources
+  o.liveNotes = notes.slice(0, 12)
+  o.dataSource = 'live'
+  return Boolean(api?.ok) || intraday.length > 0
 }
 
 function applyOverviewLive(
@@ -413,6 +530,11 @@ function applyOverviewLive(
   }
 
   if (candles?.length) o.candles1401 = candles
+  const intradayPts = (live as { intraday?: { points?: { time: string; value: number }[] } }).intraday?.points
+  if (intradayPts?.length) {
+    o.intradayIndex = intradayPts.map((p) => ({ time: p.time.slice(0, 5), value: p.value }))
+    sources.intraday = 'tgju-today-table'
+  }
   o.liveNotes = live.notes
   o.fieldSources = sources
   o.blockedSources = live.blocked || []
@@ -424,24 +546,25 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   const base: DashboardData = structuredClone(seedDashboard)
   const now = new Date().toISOString()
 
-  const [current, histEntries, fredEntries, scraped] = await Promise.all([
+  const [current, histEntries, fredEntries, scraped, overviewApi, intradayFallback] = await Promise.all([
     fetchTgjuAjax(),
     Promise.all(HIST_KEYS.map(async (k) => [k, await fetchTgjuHistory(k)] as const)),
     Promise.all(FRED_SERIES.map(async (s) => [s.mapTo || s.id, await fetchFred(s.id, s.label)] as const)),
     fetchScrapedMarket(),
+    fetchOverviewApi(),
+    fetchTgjuIntraday(),
   ])
 
   const liveCount = applyLiveQuotes(base, current)
   const overviewLiveOk = applyOverviewLive(base, scraped?.overviewLive, scraped?.candles1401)
+  const freshOk = applyFreshOverview(base, overviewApi, intradayFallback)
 
   const histories: Record<string, HistoryPoint[]> = { ...(scraped?.histories || {}) }
   for (const [k, pts] of histEntries) {
-    // Prefer longer scraped bourse history (from 1401) over short client fetch
     if (k === 'bourse' && (histories.bourse?.length || 0) > pts.length) continue
     if (pts.length) histories[k] = pts
   }
 
-  // Enrich commodity sparkline histories
   for (const c of base.commodities) {
     const histKey = c.id === 'base-us-iron-ore' ? 'base-us-iron-ore' : c.id
     const pts = histories[histKey]
@@ -450,16 +573,17 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
     }
   }
 
-  // Intraday / long index chart from bourse history
   if (histories.bourse?.length) {
     base.overview.indexHistory = histories.bourse.slice(-36).map((p) => ({
       date: p.dateJalali || p.date,
       value: p.value,
     }))
-    base.overview.intradayIndex = histories.bourse.slice(-12).map((p, i) => ({
-      time: p.dateJalali || `${i}`,
-      value: p.value,
-    }))
+    if (!base.overview.intradayIndex?.length || base.overview.intradayIndex.length < 5) {
+      base.overview.intradayIndex = histories.bourse.slice(-12).map((p, i) => ({
+        time: p.dateJalali || `${i}`,
+        value: p.value,
+      }))
+    }
   }
 
   const fred: Record<string, FredBundle> = {}
@@ -471,7 +595,6 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
     }
   }
 
-  // Periodic macro refresh from FRED when available
   if (fred.fred_dxy?.last != null) {
     const row = base.periodic.find((p) => p.name === 'شاخص دلار')
     if (row) {
@@ -488,57 +611,61 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   }
 
   base.sources = markSources(base, liveCount, fredOk, now)
-  if (overviewLiveOk) {
-    const hasPars = Boolean(scraped?.overviewLive?.retailMoneyFlowDailyBillionToman != null
-      || scraped?.overviewLive?.retailTradeValueBillionToman != null)
+  const hasPars = Boolean(
+    base.overview.retailMoneyFlowDaily != null || base.overview.retailTradeValueBillionToman != null,
+  )
+  if (overviewLiveOk || freshOk) {
     base.sources = [
       ...base.sources.filter((s) => s.id !== 'shakhesban' && s.id !== 'parsistahlil'),
       {
         id: 'shakhesban',
         name: 'شاخص‌بان',
         status: 'live',
-        note: 'هم‌وزن + فرابورس + تجمیع تابلو (موقت برای ارزش بازار)',
-        lastOk: scraped?.overviewLive?.asOf || now,
+        note: 'هم‌وزن + فرابورس (API زنده / اسکرپر)',
+        lastOk: overviewApi?.updatedAt || scraped?.overviewLive?.asOf || now,
       },
       {
         id: 'parsistahlil',
         name: 'پارسیس‌تحلیل',
         status: hasPars ? 'live' : 'blocked',
-        note: hasPars ? 'معاملات خرد + خالص پول حقیقی روزانه' : 'گزارش وضعیت بازار خوانده نشد',
-        lastOk: hasPars ? scraped?.overviewLive?.asOf || now : undefined,
+        note: hasPars
+          ? `معاملات خرد + پول حقیقی${overviewApi?.parsistahlil?.dateJalali ? ` · ${overviewApi.parsistahlil.dateJalali}` : ''}`
+          : overviewApi?.parsistahlil?.error || 'گزارش وضعیت بازار خوانده نشد',
+        lastOk: hasPars ? overviewApi?.updatedAt || now : undefined,
       },
     ]
   }
-  if (scraped?.meta) {
-    base.sources = base.sources.map((s) => {
-      if (s.id === 'tsetmc') {
-        return {
-          ...s,
-          status: scraped.meta.tsetmcOk ? 'live' : 'blocked',
-          note: scraped.meta.tsetmcOk
-            ? 'در یک نگاه + تاثیر شاخص'
-            : 'قطع از این سرور — ارزش بازار/معاملات/تاثیر رسمی نیاز به IP ایران',
-        }
+  base.sources = base.sources.map((s) => {
+    if (s.id === 'tsetmc') {
+      return {
+        ...s,
+        status: scraped?.meta?.tsetmcOk ? 'live' : 'blocked',
+        note: scraped?.meta?.tsetmcOk
+          ? 'در یک نگاه + تاثیر شاخص'
+          : 'قطع — tradersarena هم بدون لاگین /data نمی‌دهد؛ نیاز به IP ایران',
       }
-      if (s.id === 'ime') {
-        return {
-          ...s,
-          status: scraped.meta.imeOk ? 'live' : 'seed',
-          note: scraped.meta.imeOk ? 'اسکرپر IME موفق' : 'IME از گزارش؛ اسکرپر کامل با IP ایران',
-        }
+    }
+    if (s.id === 'ime') {
+      return {
+        ...s,
+        status: scraped?.meta?.imeOk ? 'live' : 'seed',
+        note: scraped?.meta?.imeOk ? 'اسکرپر IME موفق' : 'IME از گزارش؛ اسکرپر کامل با IP ایران',
       }
-      return s
-    })
-  }
-  base.updatedAt = now
+    }
+    return s
+  })
+  base.updatedAt = overviewApi?.updatedAt || now
 
   return {
     data: base,
     histories,
     fred,
     sectors: scraped?.sectors || [],
-    scrapeMeta: scraped?.meta || {},
+    scrapeMeta: {
+      ...(scraped?.meta || {}),
+      overviewApiAt: overviewApi?.updatedAt,
+    },
   }
 }
 
-export const REFRESH_MS = 3 * 60 * 1000
+export const REFRESH_MS = 2 * 60 * 1000

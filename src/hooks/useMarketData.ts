@@ -15,6 +15,7 @@ export function useMarketData() {
     tsetmcOk?: boolean
     imeOk?: boolean
     infra?: Record<string, string>
+    overviewApiAt?: string
   }>({})
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)

@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-07-22T11:04:37.856904+00:00",
+  "updatedAt": "2026-07-26T13:10:49.341671+00:00",
   "infra": {
     "tgju": "TEDPIX + USD live",
     "shakhesban": "equal-weight + IFB indices + board aggregate (interim MV/trades)",
@@ -13,39 +13,39 @@
   "tgju": {
     "quotes": {
       "bourse": {
-        "value": 4883977.0,
-        "change": -3574.7,
-        "changePct": -0.07,
-        "high": 4908598.5,
-        "low": 4883508.2,
-        "time": "۱۲:۳۹:۰۴",
+        "value": 5002329.9,
+        "change": 107876.8,
+        "changePct": 2.2,
+        "high": 5002825.7,
+        "low": 4975013.0,
+        "time": "۱۶:۱۶:۰۴",
         "source": "tgju"
       },
       "price_dollar_rl": {
-        "value": 1916000.0,
-        "change": 13000.0,
-        "changePct": 0.68,
-        "high": 1920200.0,
-        "low": 1900800.0,
-        "time": "۱۴:۳۱:۴۹",
+        "value": 1870000.0,
+        "change": -27000.0,
+        "changePct": -1.44,
+        "high": 1892000.0,
+        "low": 1868800.0,
+        "time": "۱۶:۳۸:۴۸",
         "source": "tgju"
       },
       "ons": {
-        "value": 4117.9,
-        "change": 42.08,
-        "changePct": 1.03,
-        "high": 4132.43,
-        "low": 4008.29,
-        "time": "۱۴:۲۰:۲۳",
+        "value": 4052.85,
+        "change": 0.0,
+        "changePct": 0.0,
+        "high": 4056.25,
+        "low": 4052.57,
+        "time": "۳ مرداد",
         "source": "tgju"
       },
       "sekee": {
-        "value": 1880050000.0,
-        "change": 20150000.0,
-        "changePct": 1.08,
-        "high": 1900100000.0,
-        "low": 1879800000.0,
-        "time": "۱۴:۳۲:۰۸",
+        "value": 1824900000.0,
+        "change": -19900000.0,
+        "changePct": -1.09,
+        "high": 1825100000.0,
+        "low": 1799800000.0,
+        "time": "۱۶:۳۹:۱۸",
         "source": "tgju"
       },
       "copper": {
@@ -58,12 +58,12 @@
         "source": "tgju"
       },
       "aluminium": {
-        "value": 3137.5,
+        "value": 3165.05,
         "change": 0.0,
         "changePct": 0.0,
-        "high": 3161.5,
-        "low": 3130.98,
-        "time": "۲۹ تیر",
+        "high": 3165.05,
+        "low": 3165.05,
+        "time": "۳ مرداد",
         "source": "tgju"
       },
       "zinc": {
@@ -76,39 +76,39 @@
         "source": "tgju"
       },
       "oil_brent": {
-        "value": 94.35,
-        "change": 3.17,
-        "changePct": 3.48,
-        "high": 94.73,
+        "value": 96.78,
+        "change": 0.0,
+        "changePct": 0.0,
+        "high": 96.78,
         "low": 88.12,
-        "time": "۱۴:۲۰:۲۳",
+        "time": "۰۹:۲۷:۵۱",
         "source": "tgju"
       },
       "crypto-bitcoin": {
-        "value": 66029.95,
-        "change": -365.31,
-        "changePct": -0.55,
-        "high": 66725.8,
-        "low": 65763.33,
-        "time": "۱۴:۲۹:۱۶",
+        "value": 64418.75,
+        "change": 41.36,
+        "changePct": 0.06,
+        "high": 64628.12,
+        "low": 64271.85,
+        "time": "۱۶:۳۸:۱۱",
         "source": "tgju"
       },
       "base-us-iron-ore": {
-        "value": 98.7,
+        "value": 98.42,
         "change": 0.0,
         "changePct": 0.0,
-        "high": 98.7,
-        "low": 98.7,
-        "time": "۲۹ تیر",
+        "high": 98.42,
+        "low": 98.42,
+        "time": "۳ مرداد",
         "source": "tgju"
       },
       "base-us-steel-coil": {
-        "value": 1193.0,
+        "value": 1199.95,
         "change": 0.0,
         "changePct": 0.0,
-        "high": 1193.0,
-        "low": 1193.0,
-        "time": "۳۰ تیر",
+        "high": 1199.95,
+        "low": 1199.95,
+        "time": "۳ مرداد",
         "source": "tgju"
       },
       "base-us-aluminum": {
@@ -1517,7 +1517,7 @@
       {
         "date": "2023/06/10",
         "dateJalali": "1402/03/20",
-        "value": 2208212.5
+        "value": 2212470.0
       },
       {
         "date": "2023/06/11",
@@ -1942,7 +1942,7 @@
       {
         "date": "2024/02/04",
         "dateJalali": "1402/11/15",
-        "value": 2098471.96
+        "value": 2097247.43
       },
       {
         "date": "2024/02/06",
@@ -4098,29 +4098,19 @@
         "date": "2026/07/21",
         "dateJalali": "1405/04/30",
         "value": 4887551.71
+      },
+      {
+        "date": "2026/07/22",
+        "dateJalali": "1405/04/31",
+        "value": 4884000.87
+      },
+      {
+        "date": "2026/07/25",
+        "dateJalali": "1405/05/03",
+        "value": 4894453.18
       }
     ],
     "ons": [
-      {
-        "date": "2026/02/25",
-        "dateJalali": "1404/12/06",
-        "value": 5171.16
-      },
-      {
-        "date": "2026/02/26",
-        "dateJalali": "1404/12/07",
-        "value": 5194.88
-      },
-      {
-        "date": "2026/02/27",
-        "dateJalali": "1404/12/08",
-        "value": 5251.91
-      },
-      {
-        "date": "2026/02/28",
-        "dateJalali": "1404/12/09",
-        "value": 5277.9
-      },
       {
         "date": "2026/03/02",
         "dateJalali": "1404/12/11",
@@ -4700,24 +4690,29 @@
         "date": "2026/07/21",
         "dateJalali": "1405/04/30",
         "value": 4075.82
+      },
+      {
+        "date": "2026/07/22",
+        "dateJalali": "1405/04/31",
+        "value": 4137.085
+      },
+      {
+        "date": "2026/07/23",
+        "dateJalali": "1405/05/01",
+        "value": 4049.21
+      },
+      {
+        "date": "2026/07/24",
+        "dateJalali": "1405/05/02",
+        "value": 4053.64
+      },
+      {
+        "date": "2026/07/25",
+        "dateJalali": "1405/05/03",
+        "value": 4052.845
       }
     ],
     "price_dollar_rl": [
-      {
-        "date": "2026/02/23",
-        "dateJalali": "1404/12/04",
-        "value": 1634700.0
-      },
-      {
-        "date": "2026/02/24",
-        "dateJalali": "1404/12/05",
-        "value": 1639450.0
-      },
-      {
-        "date": "2026/02/25",
-        "dateJalali": "1404/12/06",
-        "value": 1651300.0
-      },
       {
         "date": "2026/02/26",
         "dateJalali": "1404/12/07",
@@ -5302,24 +5297,24 @@
         "date": "2026/07/21",
         "dateJalali": "1405/04/30",
         "value": 1903000.0
+      },
+      {
+        "date": "2026/07/22",
+        "dateJalali": "1405/04/31",
+        "value": 1924050.0
+      },
+      {
+        "date": "2026/07/23",
+        "dateJalali": "1405/05/01",
+        "value": 1931150.0
+      },
+      {
+        "date": "2026/07/25",
+        "dateJalali": "1405/05/03",
+        "value": 1897000.0
       }
     ],
     "sekee": [
-      {
-        "date": "2026/02/24",
-        "dateJalali": "1404/12/05",
-        "value": 2000100000.0
-      },
-      {
-        "date": "2026/02/25",
-        "dateJalali": "1404/12/06",
-        "value": 2050050000.0
-      },
-      {
-        "date": "2026/02/26",
-        "dateJalali": "1404/12/07",
-        "value": 2014900000.0
-      },
       {
         "date": "2026/02/28",
         "dateJalali": "1404/12/09",
@@ -5904,6 +5899,21 @@
         "date": "2026/07/21",
         "dateJalali": "1405/04/30",
         "value": 1859900000.0
+      },
+      {
+        "date": "2026/07/22",
+        "dateJalali": "1405/04/31",
+        "value": 1890100000.0
+      },
+      {
+        "date": "2026/07/23",
+        "dateJalali": "1405/05/01",
+        "value": 1885100000.0
+      },
+      {
+        "date": "2026/07/25",
+        "dateJalali": "1405/05/03",
+        "value": 1844800000.0
       }
     ],
     "copper": [
@@ -6510,11 +6520,6 @@
     ],
     "aluminium": [
       {
-        "date": "2026/01/26",
-        "dateJalali": "1404/11/06",
-        "value": 3199.3501
-      },
-      {
         "date": "2026/01/27",
         "dateJalali": "1404/11/07",
         "value": 3210.3501
@@ -7108,6 +7113,11 @@
         "date": "2026/07/20",
         "dateJalali": "1405/04/29",
         "value": 3137.5
+      },
+      {
+        "date": "2026/07/25",
+        "dateJalali": "1405/05/03",
+        "value": 3165.05
       }
     ],
     "zinc": [
@@ -7714,26 +7724,6 @@
     ],
     "oil_brent": [
       {
-        "date": "2026/03/01",
-        "dateJalali": "1404/12/10",
-        "value": 72.48
-      },
-      {
-        "date": "2026/03/02",
-        "dateJalali": "1404/12/11",
-        "value": 79.02
-      },
-      {
-        "date": "2026/03/03",
-        "dateJalali": "1404/12/12",
-        "value": 80.06
-      },
-      {
-        "date": "2026/03/04",
-        "dateJalali": "1404/12/13",
-        "value": 81.76
-      },
-      {
         "date": "2026/03/05",
         "dateJalali": "1404/12/14",
         "value": 84.69
@@ -8312,29 +8302,29 @@
         "date": "2026/07/21",
         "dateJalali": "1405/04/30",
         "value": 91.18
+      },
+      {
+        "date": "2026/07/22",
+        "dateJalali": "1405/04/31",
+        "value": 94.35
+      },
+      {
+        "date": "2026/07/23",
+        "dateJalali": "1405/05/01",
+        "value": 98.45
+      },
+      {
+        "date": "2026/07/24",
+        "dateJalali": "1405/05/02",
+        "value": 96.1
+      },
+      {
+        "date": "2026/07/25",
+        "dateJalali": "1405/05/03",
+        "value": 96.78
       }
     ],
     "crypto-bitcoin": [
-      {
-        "date": "2026/03/20",
-        "dateJalali": "1404/12/29",
-        "value": 70011.19
-      },
-      {
-        "date": "2026/03/21",
-        "dateJalali": "1405/01/01",
-        "value": 70457.41
-      },
-      {
-        "date": "2026/03/22",
-        "dateJalali": "1405/01/02",
-        "value": 68361.19
-      },
-      {
-        "date": "2026/03/23",
-        "dateJalali": "1405/01/03",
-        "value": 70767.52
-      },
       {
         "date": "2026/03/24",
         "dateJalali": "1405/01/04",
@@ -8914,14 +8904,29 @@
         "date": "2026/07/21",
         "dateJalali": "1405/04/30",
         "value": 66395.26
+      },
+      {
+        "date": "2026/07/22",
+        "dateJalali": "1405/04/31",
+        "value": 65975.96
+      },
+      {
+        "date": "2026/07/23",
+        "dateJalali": "1405/05/01",
+        "value": 65150.84
+      },
+      {
+        "date": "2026/07/24",
+        "dateJalali": "1405/05/02",
+        "value": 64252.4
+      },
+      {
+        "date": "2026/07/25",
+        "dateJalali": "1405/05/03",
+        "value": 64377.39
       }
     ],
     "base-us-iron-ore": [
-      {
-        "date": "2026/01/06",
-        "dateJalali": "1404/10/16",
-        "value": 106.79
-      },
       {
         "date": "2026/01/07",
         "dateJalali": "1404/10/17",
@@ -9516,14 +9521,14 @@
         "date": "2026/07/20",
         "dateJalali": "1405/04/29",
         "value": 98.7
+      },
+      {
+        "date": "2026/07/25",
+        "dateJalali": "1405/05/03",
+        "value": 98.42
       }
     ],
     "base-us-steel-coil": [
-      {
-        "date": "2026/02/11",
-        "dateJalali": "1404/11/22",
-        "value": 974.0
-      },
       {
         "date": "2026/02/12",
         "dateJalali": "1404/11/23",
@@ -10118,6 +10123,11 @@
         "date": "2026/07/21",
         "dateJalali": "1405/04/30",
         "value": 1193.0
+      },
+      {
+        "date": "2026/07/25",
+        "dateJalali": "1405/05/03",
+        "value": 1199.95
       }
     ]
   },
@@ -12333,10 +12343,10 @@
     {
       "date": "2023/06/10",
       "dateJalali": "1402/03/20",
-      "open": 2213392.6,
-      "high": 2213926.1,
-      "low": 2208206.0,
-      "close": 2208212.5
+      "open": 2212974.5,
+      "high": 2212974.5,
+      "low": 2212147.4,
+      "close": 2212470.0
     },
     {
       "date": "2023/06/11",
@@ -13015,8 +13025,8 @@
       "dateJalali": "1402/11/15",
       "open": 2098748.41,
       "high": 2099632.93,
-      "low": 2098316.91,
-      "close": 2098471.96
+      "low": 2097246.91,
+      "close": 2097247.43
     },
     {
       "date": "2024/02/06",
@@ -16465,33 +16475,295 @@
       "high": 4887748.81,
       "low": 4873381.27,
       "close": 4887551.71
+    },
+    {
+      "date": "2026/07/22",
+      "dateJalali": "1405/04/31",
+      "open": 4908598.53,
+      "high": 4908598.53,
+      "low": 4883508.16,
+      "close": 4884000.87
+    },
+    {
+      "date": "2026/07/25",
+      "dateJalali": "1405/05/03",
+      "open": 4919003.5,
+      "high": 4919003.5,
+      "low": 4879912.49,
+      "close": 4894453.18
     }
   ],
+  "intraday": {
+    "source": "tgju-today-table",
+    "note": "مسیر روزانه TGJU؛ ۵دقیقه دقیق TSETMC نیاز به IP ایران / لاگین tradersarena",
+    "points": [
+      {
+        "time": "09:09",
+        "value": 4975013.04,
+        "change": null
+      },
+      {
+        "time": "09:14",
+        "value": 4975639.46,
+        "change": 626.42
+      },
+      {
+        "time": "09:18",
+        "value": 4975917.31,
+        "change": 277.85
+      },
+      {
+        "time": "09:24",
+        "value": 4976262.74,
+        "change": 345.43
+      },
+      {
+        "time": "09:28",
+        "value": 4976421.73,
+        "change": 158.99
+      },
+      {
+        "time": "09:32",
+        "value": 4976576.93,
+        "change": 155.2
+      },
+      {
+        "time": "09:39",
+        "value": 4976664.64,
+        "change": 87.71
+      },
+      {
+        "time": "09:42",
+        "value": 4976711.56,
+        "change": 46.92
+      },
+      {
+        "time": "09:48",
+        "value": 4976779.82,
+        "change": 68.26
+      },
+      {
+        "time": "09:52",
+        "value": 4976822.57,
+        "change": 42.75
+      },
+      {
+        "time": "09:58",
+        "value": 4976807.12,
+        "change": 15.45
+      },
+      {
+        "time": "10:03",
+        "value": 4976817.62,
+        "change": 10.5
+      },
+      {
+        "time": "10:09",
+        "value": 4976791.58,
+        "change": 26.04
+      },
+      {
+        "time": "10:13",
+        "value": 4976773.76,
+        "change": 17.82
+      },
+      {
+        "time": "10:19",
+        "value": 4977918.47,
+        "change": 1144.71
+      },
+      {
+        "time": "10:23",
+        "value": 4977810.59,
+        "change": 107.88
+      },
+      {
+        "time": "10:29",
+        "value": 4978990.13,
+        "change": 1179.54
+      },
+      {
+        "time": "10:33",
+        "value": 4978740.74,
+        "change": 249.39
+      },
+      {
+        "time": "10:38",
+        "value": 4978509.75,
+        "change": 230.99
+      },
+      {
+        "time": "10:43",
+        "value": 4978171.57,
+        "change": 338.18
+      },
+      {
+        "time": "10:49",
+        "value": 4977892.87,
+        "change": 278.7
+      },
+      {
+        "time": "10:53",
+        "value": 4977674.51,
+        "change": 218.36
+      },
+      {
+        "time": "10:59",
+        "value": 4977439.0,
+        "change": 235.51
+      },
+      {
+        "time": "11:03",
+        "value": 4977323.96,
+        "change": 115.04
+      },
+      {
+        "time": "11:12",
+        "value": 4977231.13,
+        "change": 92.83
+      },
+      {
+        "time": "11:17",
+        "value": 4977147.83,
+        "change": 83.3
+      },
+      {
+        "time": "11:19",
+        "value": 4976944.58,
+        "change": 203.25
+      },
+      {
+        "time": "11:24",
+        "value": 4992516.98,
+        "change": 15572.4
+      },
+      {
+        "time": "11:28",
+        "value": 4992563.05,
+        "change": 46.07
+      },
+      {
+        "time": "11:32",
+        "value": 4996449.93,
+        "change": 3886.88
+      },
+      {
+        "time": "11:38",
+        "value": 4997271.65,
+        "change": 821.72
+      },
+      {
+        "time": "11:42",
+        "value": 4997645.8,
+        "change": 374.15
+      },
+      {
+        "time": "11:49",
+        "value": 4998143.25,
+        "change": 497.45
+      },
+      {
+        "time": "11:54",
+        "value": 4998276.15,
+        "change": 132.9
+      },
+      {
+        "time": "11:59",
+        "value": 4998178.26,
+        "change": 97.89
+      },
+      {
+        "time": "12:05",
+        "value": 5002640.69,
+        "change": 4462.43
+      },
+      {
+        "time": "12:09",
+        "value": 5002626.7,
+        "change": 13.99
+      },
+      {
+        "time": "12:13",
+        "value": 5002422.32,
+        "change": 204.38
+      },
+      {
+        "time": "12:19",
+        "value": 5002825.65,
+        "change": 403.33
+      },
+      {
+        "time": "12:28",
+        "value": 5002381.38,
+        "change": 444.27
+      },
+      {
+        "time": "12:34",
+        "value": 5002358.46,
+        "change": 22.92
+      },
+      {
+        "time": "12:34",
+        "value": 5002209.66,
+        "change": 148.8
+      },
+      {
+        "time": "12:39",
+        "value": 5002209.49,
+        "change": 0.17
+      },
+      {
+        "time": "14:47",
+        "value": 5002210.02,
+        "change": 0.53
+      },
+      {
+        "time": "15:02",
+        "value": 5002292.61,
+        "change": 82.59
+      },
+      {
+        "time": "15:17",
+        "value": 5002338.3,
+        "change": 45.69
+      },
+      {
+        "time": "16:02",
+        "value": 5002338.31,
+        "change": 0.01
+      },
+      {
+        "time": "16:16",
+        "value": 5002329.94,
+        "change": 8.37
+      }
+    ]
+  },
   "overviewLive": {
     "ok": true,
-    "asOf": "2026-07-22T11:04:37.856904+00:00",
+    "asOf": "2026-07-26T13:10:43.838047+00:00",
     "indices": {
       "tedpix": {
         "name": "شاخص کل بورس",
-        "value": 4883977.03,
-        "change": -3574.68,
-        "changePct": -0.07,
+        "value": 5002329.94,
+        "change": 107876.76,
+        "changePct": 2.2,
         "source": "shakhesban",
         "slug": "ش-کل-بورس"
       },
       "equalWeight": {
         "name": "شاخص کل (هم وزن)",
-        "value": 1356054.21,
-        "change": 9331.28,
-        "changePct": 0.69,
+        "value": 1393502.72,
+        "change": 29582.31,
+        "changePct": 2.17,
         "source": "shakhesban",
         "slug": "ش-کل-هم-وزن"
       },
       "ifb": {
         "name": "شاخص کل فرابورس",
-        "value": 38852.45,
-        "change": 179.48,
-        "changePct": 0.46,
+        "value": 39787.24,
+        "change": 771.1,
+        "changePct": 1.98,
         "source": "shakhesban",
         "slug": "ش-کل-فرابورس"
       }
@@ -16503,15 +16775,15 @@
     "tsetmcTradeValueHmt": null,
     "impactsFromTsetmc": false,
     "totalMarketValueHmt": 8909.1,
-    "totalMarketValueUsdM": 46523.0,
+    "totalMarketValueUsdM": 47642.0,
     "marketValueSource": "shakhesban-board-interim",
-    "usdRate": 1915000.0,
+    "usdRate": 1870000.0,
     "totalTradeValueHmt": 2.34,
     "totalTradeValueSource": "shakhesban-board-interim",
     "totalTradeValueBillionToman": 2340.0,
-    "retailTradeValueBillionToman": 25015.0,
-    "retailTradeValueHmt": 25.02,
-    "retailMoneyFlowDailyBillionToman": -719.0,
+    "retailTradeValueBillionToman": 22331.0,
+    "retailTradeValueHmt": 22.33,
+    "retailMoneyFlowDailyBillionToman": 6193.0,
     "retailMoneyFlowYtdFromPdf": true,
     "impacts": null,
     "topTrades": [
@@ -16580,12 +16852,12 @@
     "parsistahlil": {
       "ok": true,
       "source": "parsistahlil.ir",
-      "contentId": "1178",
-      "url": "https://parsistahlil.ir/contents/1178-%DA%AF%D8%B2%D8%A7%D8%B1%D8%B4-%D9%88%D8%B6%D8%B9%DB%8C%D8%AA-%D8%A8%D8%A7%D8%B2%D8%A7%D8%B1-%D8%A7%D8%B1%D8%B2%D8%B4-%D9%85%D8%B9%D8%A7%D9%85%D9%84%D8%A7%D8%AA-%D8%AE%D8%B1%D8%AF-%D9%88-%D9%88%D8%B1%D9%88%D8%AF-%D9%88-%D8%AE%D8%B1%D9%88%D8%AC-%D9%BE%D9%88%D9%84-%D8%AD%D9%82%DB%8C%D9%82%DB%8C",
-      "dateJalali": "31 تیر 1405",
-      "retailTradeValueBillionToman": 25015.0,
-      "totalTradeValueBillionToman": 284916.0,
-      "retailMoneyFlowDailyBillionToman": -719.0
+      "contentId": "1180",
+      "url": "https://parsistahlil.ir/contents/1180-%DA%AF%D8%B2%D8%A7%D8%B1%D8%B4-%D9%88%D8%B6%D8%B9%DB%8C%D8%AA-%D8%A8%D8%A7%D8%B2%D8%A7%D8%B1-%D8%A7%D8%B1%D8%B2%D8%B4-%D9%85%D8%B9%D8%A7%D9%85%D9%84%D8%A7%D8%AA-%D8%AE%D8%B1%D8%AF-%D9%88-%D9%88%D8%B1%D9%88%D8%AF-%D9%88-%D8%AE%D8%B1%D9%88%D8%AC-%D9%BE%D9%88%D9%84-%D8%AD%D9%82%DB%8C%D9%82%DB%8C",
+      "dateJalali": "4 مرداد 1405",
+      "retailTradeValueBillionToman": 22331.0,
+      "totalTradeValueBillionToman": 250920.0,
+      "retailMoneyFlowDailyBillionToman": 6193.0
     },
     "blocked": [
       "tsetmc"
@@ -16595,17 +16867,263 @@
       "ارزش بازار فعلی (8909.1 همت) تجمیع تابلوی شاخص‌بان (سهام بورس+فرابورس) است؛ با عدد رسمی TSETMC ممکن است فرق کند.",
       "ارزش دلاری = همین ارزش بازار ÷ دلار آزاد TGJU.",
       "شاخص کل / هم‌وزن / فرابورس از شاخص‌بان (آینه بازار، نه PDF).",
-      "پارسیس‌تحلیل: معاملات خرد=25015.0 و خالص پول حقیقی روزانه=-719.0 میلیارد تومان (31 تیر 1405).",
+      "پارسیس‌تحلیل: معاملات خرد=22331.0 و خالص پول حقیقی روزانه=6193.0 میلیارد تومان (4 مرداد 1405).",
       "خالص ورود/خروج از ابتدای ۱۴۰۴ از گزارش PDF نگه داشته شده.",
       "تاثیر مثبت/منفی تا دسترسی TSETMC از seed گزارش می‌ماند (سورت پروکسی حذف شد)."
-    ]
+    ],
+    "intraday": {
+      "source": "tgju-today-table",
+      "note": "مسیر روزانه TGJU؛ ۵دقیقه دقیق TSETMC نیاز به IP ایران / لاگین tradersarena",
+      "points": [
+        {
+          "time": "09:09",
+          "value": 4975013.04,
+          "change": null
+        },
+        {
+          "time": "09:14",
+          "value": 4975639.46,
+          "change": 626.42
+        },
+        {
+          "time": "09:18",
+          "value": 4975917.31,
+          "change": 277.85
+        },
+        {
+          "time": "09:24",
+          "value": 4976262.74,
+          "change": 345.43
+        },
+        {
+          "time": "09:28",
+          "value": 4976421.73,
+          "change": 158.99
+        },
+        {
+          "time": "09:32",
+          "value": 4976576.93,
+          "change": 155.2
+        },
+        {
+          "time": "09:39",
+          "value": 4976664.64,
+          "change": 87.71
+        },
+        {
+          "time": "09:42",
+          "value": 4976711.56,
+          "change": 46.92
+        },
+        {
+          "time": "09:48",
+          "value": 4976779.82,
+          "change": 68.26
+        },
+        {
+          "time": "09:52",
+          "value": 4976822.57,
+          "change": 42.75
+        },
+        {
+          "time": "09:58",
+          "value": 4976807.12,
+          "change": 15.45
+        },
+        {
+          "time": "10:03",
+          "value": 4976817.62,
+          "change": 10.5
+        },
+        {
+          "time": "10:09",
+          "value": 4976791.58,
+          "change": 26.04
+        },
+        {
+          "time": "10:13",
+          "value": 4976773.76,
+          "change": 17.82
+        },
+        {
+          "time": "10:19",
+          "value": 4977918.47,
+          "change": 1144.71
+        },
+        {
+          "time": "10:23",
+          "value": 4977810.59,
+          "change": 107.88
+        },
+        {
+          "time": "10:29",
+          "value": 4978990.13,
+          "change": 1179.54
+        },
+        {
+          "time": "10:33",
+          "value": 4978740.74,
+          "change": 249.39
+        },
+        {
+          "time": "10:38",
+          "value": 4978509.75,
+          "change": 230.99
+        },
+        {
+          "time": "10:43",
+          "value": 4978171.57,
+          "change": 338.18
+        },
+        {
+          "time": "10:49",
+          "value": 4977892.87,
+          "change": 278.7
+        },
+        {
+          "time": "10:53",
+          "value": 4977674.51,
+          "change": 218.36
+        },
+        {
+          "time": "10:59",
+          "value": 4977439.0,
+          "change": 235.51
+        },
+        {
+          "time": "11:03",
+          "value": 4977323.96,
+          "change": 115.04
+        },
+        {
+          "time": "11:12",
+          "value": 4977231.13,
+          "change": 92.83
+        },
+        {
+          "time": "11:17",
+          "value": 4977147.83,
+          "change": 83.3
+        },
+        {
+          "time": "11:19",
+          "value": 4976944.58,
+          "change": 203.25
+        },
+        {
+          "time": "11:24",
+          "value": 4992516.98,
+          "change": 15572.4
+        },
+        {
+          "time": "11:28",
+          "value": 4992563.05,
+          "change": 46.07
+        },
+        {
+          "time": "11:32",
+          "value": 4996449.93,
+          "change": 3886.88
+        },
+        {
+          "time": "11:38",
+          "value": 4997271.65,
+          "change": 821.72
+        },
+        {
+          "time": "11:42",
+          "value": 4997645.8,
+          "change": 374.15
+        },
+        {
+          "time": "11:49",
+          "value": 4998143.25,
+          "change": 497.45
+        },
+        {
+          "time": "11:54",
+          "value": 4998276.15,
+          "change": 132.9
+        },
+        {
+          "time": "11:59",
+          "value": 4998178.26,
+          "change": 97.89
+        },
+        {
+          "time": "12:05",
+          "value": 5002640.69,
+          "change": 4462.43
+        },
+        {
+          "time": "12:09",
+          "value": 5002626.7,
+          "change": 13.99
+        },
+        {
+          "time": "12:13",
+          "value": 5002422.32,
+          "change": 204.38
+        },
+        {
+          "time": "12:19",
+          "value": 5002825.65,
+          "change": 403.33
+        },
+        {
+          "time": "12:28",
+          "value": 5002381.38,
+          "change": 444.27
+        },
+        {
+          "time": "12:34",
+          "value": 5002358.46,
+          "change": 22.92
+        },
+        {
+          "time": "12:34",
+          "value": 5002209.66,
+          "change": 148.8
+        },
+        {
+          "time": "12:39",
+          "value": 5002209.49,
+          "change": 0.17
+        },
+        {
+          "time": "14:47",
+          "value": 5002210.02,
+          "change": 0.53
+        },
+        {
+          "time": "15:02",
+          "value": 5002292.61,
+          "change": 82.59
+        },
+        {
+          "time": "15:17",
+          "value": 5002338.3,
+          "change": 45.69
+        },
+        {
+          "time": "16:02",
+          "value": 5002338.31,
+          "change": 0.01
+        },
+        {
+          "time": "16:16",
+          "value": 5002329.94,
+          "change": 8.37
+        }
+      ]
+    }
   },
   "sectors": [
     {
       "name": "بورس ایران",
       "color": "#0b3d6e",
       "count": 1,
-      "avgChangePct": -0.07,
+      "avgChangePct": 2.2,
       "members": [
         "bourse"
       ]
@@ -16625,7 +17143,7 @@
       "name": "انرژی",
       "color": "#1e3a5f",
       "count": 1,
-      "avgChangePct": 3.48,
+      "avgChangePct": 0.0,
       "members": [
         "oil_brent"
       ]
@@ -16634,7 +17152,7 @@
       "name": "ارز و طلا",
       "color": "#0e7490",
       "count": 3,
-      "avgChangePct": 0.93,
+      "avgChangePct": -0.84,
       "members": [
         "price_dollar_rl",
         "ons",
@@ -16655,7 +17173,7 @@
       "name": "کریپتو",
       "color": "#c2410c",
       "count": 1,
-      "avgChangePct": -0.55,
+      "avgChangePct": 0.06,
       "members": [
         "crypto-bitcoin"
       ]
@@ -16676,11 +17194,11 @@
   "parsistahlil": {
     "ok": true,
     "source": "parsistahlil.ir",
-    "contentId": "1178",
-    "url": "https://parsistahlil.ir/contents/1178-%DA%AF%D8%B2%D8%A7%D8%B1%D8%B4-%D9%88%D8%B6%D8%B9%DB%8C%D8%AA-%D8%A8%D8%A7%D8%B2%D8%A7%D8%B1-%D8%A7%D8%B1%D8%B2%D8%B4-%D9%85%D8%B9%D8%A7%D9%85%D9%84%D8%A7%D8%AA-%D8%AE%D8%B1%D8%AF-%D9%88-%D9%88%D8%B1%D9%88%D8%AF-%D9%88-%D8%AE%D8%B1%D9%88%D8%AC-%D9%BE%D9%88%D9%84-%D8%AD%D9%82%DB%8C%D9%82%DB%8C",
-    "dateJalali": "31 تیر 1405",
-    "retailTradeValueBillionToman": 25015.0,
-    "totalTradeValueBillionToman": 284916.0,
-    "retailMoneyFlowDailyBillionToman": -719.0
+    "contentId": "1180",
+    "url": "https://parsistahlil.ir/contents/1180-%DA%AF%D8%B2%D8%A7%D8%B1%D8%B4-%D9%88%D8%B6%D8%B9%DB%8C%D8%AA-%D8%A8%D8%A7%D8%B2%D8%A7%D8%B1-%D8%A7%D8%B1%D8%B2%D8%B4-%D9%85%D8%B9%D8%A7%D9%85%D9%84%D8%A7%D8%AA-%D8%AE%D8%B1%D8%AF-%D9%88-%D9%88%D8%B1%D9%88%D8%AF-%D9%88-%D8%AE%D8%B1%D9%88%D8%AC-%D9%BE%D9%88%D9%84-%D8%AD%D9%82%DB%8C%D9%82%DB%8C",
+    "dateJalali": "4 مرداد 1405",
+    "retailTradeValueBillionToman": 22331.0,
+    "totalTradeValueBillionToman": 250920.0,
+    "retailMoneyFlowDailyBillionToman": 6193.0
   }
 }

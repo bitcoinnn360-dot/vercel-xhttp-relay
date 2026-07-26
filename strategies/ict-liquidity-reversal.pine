@@ -488,6 +488,8 @@ var float pend_mit_sl = na
 var float pend_mit_ob_top = na
 var float pend_mit_ob_bot = na
 var float pend_mit_fail_px = na
+var float pend_mit_arm_high = na
+var float pend_mit_arm_low = na
 var bool pend_mit_fractal_ready = false
 var bool pend_mit_left_liq = false
 var float pend_mit_left_liq_px = na
@@ -554,16 +556,20 @@ level_still_untouched_low(float px, int from_bar) =>
         ta.lowest(low, len) >= px
 
 get_failed_swing_high() =>
+    // فقط وقتی قبلاً HH بوده (شورتِ بدِ انتهای نزول حذف شود):
+    // sh0 < sh1 (HH) و بعد sh2 < sh1 (failure) و BSLِ sh1 دست‌نخورده
     float sh1_px = na
     int sh1_bar = na
     float sh2_px = na
     int sh2_bar = na
     bool ok = false
-    if array.size(swing_highs) >= 2
+    if array.size(swing_highs) >= 3
         SwingMem sh2 = array.get(swing_highs, array.size(swing_highs) - 1)
         SwingMem sh1 = array.get(swing_highs, array.size(swing_highs) - 2)
+        SwingMem sh0 = array.get(swing_highs, array.size(swing_highs) - 3)
         int gap = sh2.bar_idx - sh1.bar_idx
-        if gap > 0 and gap <= max_failed_swing_gap and sh2.price < sh1.price and level_still_untouched_high(sh1.price, sh1.bar_idx)
+        bool prior_hh = sh1.price > sh0.price
+        if prior_hh and gap > 0 and gap <= max_failed_swing_gap and sh2.price < sh1.price and level_still_untouched_high(sh1.price, sh1.bar_idx)
             ok := true
             sh1_px := sh1.price
             sh1_bar := sh1.bar_idx
@@ -572,16 +578,19 @@ get_failed_swing_high() =>
     [ok, sh1_px, sh1_bar, sh2_px, sh2_bar]
 
 get_failed_swing_low() =>
+    // فقط وقتی قبلاً LL بوده: sl0 > sl1 (LL) و بعد sl2 > sl1 (failure) و SSLِ sl1 دست‌نخورده
     float sl1_px = na
     int sl1_bar = na
     float sl2_px = na
     int sl2_bar = na
     bool ok = false
-    if array.size(swing_lows) >= 2
+    if array.size(swing_lows) >= 3
         SwingMem s2 = array.get(swing_lows, array.size(swing_lows) - 1)
         SwingMem s1 = array.get(swing_lows, array.size(swing_lows) - 2)
+        SwingMem s0 = array.get(swing_lows, array.size(swing_lows) - 3)
         int gap = s2.bar_idx - s1.bar_idx
-        if gap > 0 and gap <= max_failed_swing_gap and s2.price > s1.price and level_still_untouched_low(s1.price, s1.bar_idx)
+        bool prior_ll = s1.price < s0.price
+        if prior_ll and gap > 0 and gap <= max_failed_swing_gap and s2.price > s1.price and level_still_untouched_low(s1.price, s1.bar_idx)
             ok := true
             sl1_px := s1.price
             sl1_bar := s1.bar_idx
@@ -658,26 +667,34 @@ if pend_brk_short and not na(pend_brk_sl) and high > pend_brk_sl
 if pend_brk_long and not na(pend_brk_sl) and low < pend_brk_sl
     pend_brk_long := false
 
-// فرکتال بعد از بریکر: جا گذاشتن SSL/BSL تازه + HH/LL ریزروند
+// فرکتال بعد از بریکر با extremeهای همان بازه (بدون وابستگی به تأخیر pivot)
+// لانگ: بعد از arm یک HH بالاتر از highِ کندلِ بریکر + پولبک که بالای SSLِ نزده بماند
+// شورت: قرینه
 if pend_mit_long and not na(pend_mit_arm_bar)
-    if not na(pl) and (bar_index - pivot_len) > pend_mit_arm_bar
-        float micro_ssl = pl
-        if na(pend_mit_fail_px) or micro_ssl > pend_mit_fail_px
-            pend_mit_left_liq := true
-            pend_mit_left_liq_px := micro_ssl
-    if not na(ph) and (bar_index - pivot_len) > pend_mit_arm_bar
-        if na(pend_mit_left_liq_px) or ph > pend_mit_left_liq_px
+    int n = bar_index - pend_mit_arm_bar
+    if n >= 1
+        int len = math.min(n, 300)
+        float hh = ta.highest(high, len)
+        float ll = ta.lowest(low, len)
+        if not na(pend_mit_arm_high) and hh > pend_mit_arm_high
             pend_mit_fractal_ready := true
+        // SSL تازه جا مانده: از HH پولبک کرده ولی fail SSL را نزده
+        if pend_mit_fractal_ready and not na(pend_mit_fail_px) and ll > pend_mit_fail_px and ll < hh
+            pend_mit_left_liq := true
+            pend_mit_left_liq_px := ll
 
 if pend_mit_short and not na(pend_mit_arm_bar)
-    if not na(ph) and (bar_index - pivot_len) > pend_mit_arm_bar
-        float micro_bsl = ph
-        if na(pend_mit_fail_px) or micro_bsl < pend_mit_fail_px
-            pend_mit_left_liq := true
-            pend_mit_left_liq_px := micro_bsl
-    if not na(pl) and (bar_index - pivot_len) > pend_mit_arm_bar
-        if na(pend_mit_left_liq_px) or pl < pend_mit_left_liq_px
+    int n = bar_index - pend_mit_arm_bar
+    if n >= 1
+        int len = math.min(n, 300)
+        float hh = ta.highest(high, len)
+        float ll = ta.lowest(low, len)
+        if not na(pend_mit_arm_low) and ll < pend_mit_arm_low
             pend_mit_fractal_ready := true
+        // BSL تازه جا مانده: از LL برگشته ولی fail BSL را نزده
+        if pend_mit_fractal_ready and not na(pend_mit_fail_px) and hh < pend_mit_fail_px and hh > ll
+            pend_mit_left_liq := true
+            pend_mit_left_liq_px := hh
 
 bool fractal_ok_long = not require_fractal_leave or (pend_mit_fractal_ready and pend_mit_left_liq)
 bool fractal_ok_short = not require_fractal_leave or (pend_mit_fractal_ready and pend_mit_left_liq)
@@ -703,6 +720,8 @@ if enable_mitigation and array.size(ob_array) > 0
                     pend_mit_ob_top := ob.top
                     pend_mit_ob_bot := ob.bottom
                     pend_mit_fail_px := fh1_px
+                    pend_mit_arm_high := high
+                    pend_mit_arm_low := low
                     pend_mit_fractal_ready := false
                     pend_mit_left_liq := false
                     pend_mit_left_liq_px := na
@@ -741,6 +760,8 @@ if enable_mitigation and array.size(ob_array) > 0
                     pend_mit_ob_top := ob.top
                     pend_mit_ob_bot := ob.bottom
                     pend_mit_fail_px := fl1_px
+                    pend_mit_arm_high := high
+                    pend_mit_arm_low := low
                     pend_mit_fractal_ready := false
                     pend_mit_left_liq := false
                     pend_mit_left_liq_px := na
@@ -950,9 +971,7 @@ if fired
         color sig_col = sig_is_mitigation ? (sig_is_long ? mit_long_col : mit_short_col) : (sig_is_long ? brk_long_col : brk_short_col)
         string sig_kind = sig_is_mitigation ? "MITIGATION" : "BREAKER"
         string sig_side = sig_is_long ? "LONG" : "SHORT"
-        string sig_txt = sig_kind + " " + sig_side + "\nEntry " + str.tostring(sig_entry, format.mintick) + "\nSL " + str.tostring(sig_sl, format.mintick) + "\nTP " + str.tostring(sig_tp, format.mintick)
-        if sig_is_mitigation
-            sig_txt := sig_txt + (sig_is_long ? "\nTarget BSL" : "\nTarget SSL")
+        string sig_txt = sig_kind + " " + sig_side
         label lbl = label.new(bar_index, sig_is_long ? low : high, sig_txt, style=sig_is_long ? label.style_label_up : label.style_label_down, color=sig_col, textcolor=color.white, size=size.tiny)
         line sln = line.new(bar_index, sig_sl, bar_index + 15, sig_sl, color=color.red, style=line.style_solid, width=1)
         line tpn = line.new(bar_index, sig_tp, bar_index + 15, sig_tp, color=color.teal, style=line.style_dotted, width=1)

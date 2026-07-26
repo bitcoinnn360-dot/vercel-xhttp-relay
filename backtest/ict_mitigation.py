@@ -32,6 +32,8 @@ class Params:
     require_mss: bool = True
     sl_buffer_pct: float = 0.0005  # 0.05% beyond liquidity
     rr_fallback: float = 2.0
+    # Skip BSL/SSL/FVG targets closer than this RR; search farther levels.
+    min_tp_rr: float = 1.5
     prefer_liq_tp: bool = True
     prefer_fvg_tp: bool = True
     min_fvg_pct: float = 0.0003
@@ -39,6 +41,12 @@ class Params:
     one_trade_at_a_time: bool = True
     fee_bps: float = 4.0  # 0.04% per side approx
     max_hold_bars: int = 500
+    # Optional filters
+    use_ema_filter: bool = False
+    ema_len: int = 200
+    # UTC hour window inclusive start, exclusive end (e.g. London+NY 7-16)
+    session_start_hour: int = -1  # -1 = off
+    session_end_hour: int = -1
 
 
 @dataclass
@@ -201,47 +209,64 @@ def run_backtest(df: pd.DataFrame, p: Params) -> tuple[list[Trade], dict]:
             return True, sh1.price, sh1.bar, sh2.price, sh2.bar
         return False, None, None, None, None
 
-    def nearest_unswept(want_high: bool, below: bool, ref: float) -> Optional[float]:
-        best = None
+    def liq_targets(want_high: bool, below: bool, ref: float) -> list[float]:
+        out = []
         for lv in liqs:
             if lv.is_high != want_high or lv.swept:
                 continue
             if below and lv.price < ref:
-                best = lv.price if best is None else max(best, lv.price)
+                out.append(lv.price)
             if not below and lv.price > ref:
-                best = lv.price if best is None else min(best, lv.price)
-        return best
+                out.append(lv.price)
+        # nearest first
+        out.sort(reverse=below)
+        return out
 
-    def nearest_fvg(want_bull: bool, below: bool, ref: float) -> Optional[float]:
-        best = None
+    def fvg_targets(want_bull: bool, below: bool, ref: float) -> list[float]:
+        out = []
         for f in fvgs:
             if f.is_bull != want_bull or f.touched:
                 continue
-            edge = f.top if want_bull else f.bottom
+            # For long: target into bullish FVG mid/top above; for short: bearish FVG mid/bottom below
+            edge = (f.top + f.bottom) / 2.0
             if below and edge < ref:
-                best = edge if best is None else max(best, edge)
+                out.append(edge)
             if not below and edge > ref:
-                best = edge if best is None else min(best, edge)
-        return best
+                out.append(edge)
+        out.sort(reverse=below)
+        return out
 
     def pick_tp(is_long: bool, entry: float, stop: float) -> tuple[float, str]:
-        # Buy-side target = BSL above; sell-side target = SSL below.
-        # Else nearest untouched opposing FVG edge; else RR fallback.
-        liq = nearest_unswept(True, False, entry) if is_long else nearest_unswept(False, True, entry)
-        fvg = nearest_fvg(True, False, entry) if is_long else nearest_fvg(False, True, entry)
+        # Buy-side = BSL above; sell-side = SSL below.
+        # Require min_tp_rr so we don't take micro RR into the nearest wick.
+        # Else untouched opposing FVG; else RR fallback.
+        risk = abs(entry - stop)
+        if risk <= 0:
+            return entry, "rr"
+        min_dist = risk * p.min_tp_rr
+
+        def ok(px: float) -> bool:
+            return (px - entry) >= min_dist if is_long else (entry - px) >= min_dist
+
         tp = None
         src = "rr"
-        if p.prefer_liq_tp and liq is not None:
-            if (is_long and liq > entry) or (not is_long and liq < entry):
-                tp = liq
-                src = "bsl" if is_long else "ssl"
-        if tp is None and p.prefer_fvg_tp and fvg is not None:
-            if (is_long and fvg > entry) or (not is_long and fvg < entry):
-                tp = fvg
-                src = "fvg"
+        if p.prefer_liq_tp:
+            cands = liq_targets(True, False, entry) if is_long else liq_targets(False, True, entry)
+            for px in cands:
+                if ok(px):
+                    tp = px
+                    src = "bsl" if is_long else "ssl"
+                    break
+        if tp is None and p.prefer_fvg_tp:
+            cands = fvg_targets(True, False, entry) if is_long else fvg_targets(False, True, entry)
+            for px in cands:
+                if ok(px):
+                    tp = px
+                    src = "fvg"
+                    break
         if tp is None:
-            risk = abs(entry - stop)
-            tp = entry + risk * p.rr_fallback if is_long else entry - risk * p.rr_fallback
+            rr = max(p.rr_fallback, p.min_tp_rr)
+            tp = entry + risk * rr if is_long else entry - risk * rr
             src = "rr"
         return float(tp), src
 
@@ -266,6 +291,20 @@ def run_backtest(df: pd.DataFrame, p: Params) -> tuple[list[Trade], dict]:
             return False
         if not is_long and not (tp < entry < stop):
             return False
+        if p.use_ema_filter and ema is not None:
+            if is_long and entry < ema[i]:
+                return False
+            if (not is_long) and entry > ema[i]:
+                return False
+        if hours is not None:
+            h = int(hours[i])
+            s0, s1 = p.session_start_hour, p.session_end_hour
+            if s0 <= s1:
+                in_sess = s0 <= h < s1
+            else:
+                in_sess = h >= s0 or h < s1
+            if not in_sess:
+                return False
         open_trade = Trade(
             side="long" if is_long else "short",
             entry_bar=i,
@@ -278,6 +317,19 @@ def run_backtest(df: pd.DataFrame, p: Params) -> tuple[list[Trade], dict]:
         last_signal_bar = i
         pend_long = pend_short = False
         return True
+
+    # EMA for optional trend filter
+    ema = None
+    if p.use_ema_filter:
+        ema = df["close"].ewm(span=p.ema_len, adjust=False).mean().to_numpy()
+
+    # session hours from index if available
+    hours = None
+    if p.session_start_hour >= 0 and p.session_end_hour >= 0:
+        try:
+            hours = df.index.hour.to_numpy()
+        except Exception:
+            hours = None
 
     for i in range(n):
         # pivots confirmed with lag

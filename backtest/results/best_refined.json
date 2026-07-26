@@ -1,0 +1,17 @@
+{
+  "trades": 368,
+  "wins": 190,
+  "losses": 178,
+  "winrate": 51.63,
+  "profit_factor": 0.515,
+  "net_R": -60.069,
+  "avg_R": -0.163,
+  "max_dd_R": 62.081,
+  "tp_exits": 268,
+  "sl_exits": 99,
+  "tp_bsl": 177,
+  "tp_ssl": 189,
+  "tp_fvg": 0,
+  "tp_rr": 2,
+  "name": "E_wick60+sl10"
+}

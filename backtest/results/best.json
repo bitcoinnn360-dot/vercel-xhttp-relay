@@ -1,0 +1,39 @@
+{
+  "name": "E_wick60",
+  "metrics": {
+    "trades": 364,
+    "wins": 185,
+    "losses": 179,
+    "winrate": 50.82,
+    "profit_factor": 0.523,
+    "net_R": -62.945,
+    "avg_R": -0.173,
+    "max_dd_R": 65.447,
+    "tp_exits": 261,
+    "sl_exits": 102,
+    "tp_bsl": 176,
+    "tp_ssl": 186,
+    "tp_fvg": 0,
+    "tp_rr": 2,
+    "name": "E_wick60"
+  },
+  "params": {
+    "pivot_len": 2,
+    "max_failed_swing_gap": 20,
+    "ob_engulf_lookback": 30,
+    "require_fractal_leave": true,
+    "require_rejection": true,
+    "rej_wick_pct": 60.0,
+    "rej_close_in_half": true,
+    "require_mss": true,
+    "sl_buffer_pct": 0.0005,
+    "rr_fallback": 2.0,
+    "prefer_liq_tp": true,
+    "prefer_fvg_tp": true,
+    "min_fvg_pct": 0.0003,
+    "cooldown_bars": 10,
+    "one_trade_at_a_time": true,
+    "fee_bps": 4.0,
+    "max_hold_bars": 288
+  }
+}

@@ -56,7 +56,6 @@ export default function App() {
                 {scrapeMeta.overviewApiAt
                   ? ` · API: ${new Date(scrapeMeta.overviewApiAt).toLocaleString('fa-IR')}`
                   : ' · API هنوز لود نشده'}
-                {scrapeMeta.tsetmcOk ? ' · TSETMC وصل' : ' · TSETMC/tradersarena قطع'}
                 {scrapeMeta.updatedAt
                   ? ` · فایل اسکرپر: ${new Date(scrapeMeta.updatedAt).toLocaleString('fa-IR')}`
                   : ''}
@@ -74,7 +73,7 @@ export default function App() {
             <footer className="border-t border-[var(--color-line)] pt-5 text-center text-xs text-[var(--color-muted)]">
               <p>معاونت مالی و اقتصادی — واحد سرمایه‌گذاری · توسعه معادن و فلزات</p>
               <p className="mt-1">
-                برای TSETMC و IME یک سیستم همیشه روشن داخل ایران (حتی یک VPS ارزان) با cron روی
+                ارزش بازار از SourceArena (بورس+فرابورس). برای IME در صورت نیاز یک VPS داخل ایران با cron روی
                 scripts/scrape_market.py کافی است.
               </p>
             </footer>

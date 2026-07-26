@@ -66,7 +66,7 @@ export function MarketOverview({
         <h2 className="section-title">خلاصه بازار سرمایه ایران</h2>
         <p className="section-sub">
           {live
-            ? 'شاخص‌ها زنده · ارزش بازار رسمی TSETMC تا IP ایران موقت از تابلو · پول حقیقی از پارسیس'
+            ? 'شاخص‌ها زنده · ارزش بازار = بورس+فرابورس (SourceArena) · پول حقیقی از پارسیس'
             : 'در حال بارگذاری داده زنده…'}
         </p>
       </div>
@@ -102,9 +102,11 @@ export function MarketOverview({
           unit="همت"
           delay={0.1}
           hint={
-            blocked.includes('tsetmc')
-              ? 'موقت: تابلو شاخص‌بان — رسمی TSETMC قطع است'
-              : src.marketValue || '—'
+            (src.marketValue || '').includes('sourcearena')
+              ? 'بورس + فرابورس · SourceArena'
+              : blocked.includes('sourcearena')
+                ? 'موقت: تابلو شاخص‌بان'
+                : src.marketValue || '—'
           }
         />
       </div>
@@ -122,10 +124,10 @@ export function MarketOverview({
           value={fmtNum(o.totalTradeValueHmt, 2)}
           unit="همت"
           hint={
-            src.totalTrade === 'parsistahlil'
-              ? 'پارسیس (کل بازار گزارش)'
-              : blocked.includes('tsetmc')
-                ? 'موقت — رسمی TSETMC قطع'
+            (src.totalTrade || '').includes('sourcearena')
+              ? 'SourceArena · در یک نگاه'
+              : src.totalTrade === 'parsistahlil'
+                ? 'پارسیس (کل بازار گزارش)'
                 : src.totalTrade || '—'
           }
         />
@@ -161,7 +163,7 @@ export function MarketOverview({
       <div className="panel p-4">
         <h3 className="mb-1 text-sm font-bold">روند شاخص کل در طول روز</h3>
         <p className="mb-2 text-[10px] text-[var(--color-muted)]">
-          مسیر امروز از TGJU today-table (چنددقیقه‌ای) · دیتای دقیق ۵دقیقه TSETMC فعلاً از این سرور در دسترس نیست
+          مسیر امروز از TGJU today-table (رزولوشن چنددقیقه‌ای)
           {o.intradayIndex?.length ? ` · ${o.intradayIndex.length} نقطه` : ''}
         </p>
         <PriceAreaChart
@@ -241,7 +243,7 @@ function ImpactPanel({
     <div className="panel p-4">
       <h3 className="mb-1 text-sm font-bold">{title}</h3>
       <p className="mb-3 text-[10px] text-[var(--color-muted)]">
-        {live ? 'سورت واقعی تاثیر بر شاخص · TSETMC' : 'فعلاً از گزارش PDF — سورت زنده TSETMC قطع است'}
+        {live ? 'سورت تاثیر بر شاخص · SourceArena' : 'فعلاً از گزارش PDF — در انتظار داده زنده'}
       </p>
       <div className="grid grid-cols-2 gap-3">
         <ul className="space-y-2">

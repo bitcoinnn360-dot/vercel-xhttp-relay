@@ -235,14 +235,6 @@ function markSources(base: DashboardData, liveCount: number, fredOk: number, now
         lastOk: liveCount > 0 ? now : s.lastOk,
       }
     }
-    if (s.id === 'tsetmc') {
-      return {
-        ...s,
-        status: liveCount > 0 ? 'live' : 'seed',
-        note: 'شاخص کل از TGJU (آینه بورس) — جزئیات نمادها از گزارش/اسکرپر',
-        lastOk: liveCount > 0 ? now : s.lastOk,
-      }
-    }
     if (s.id === 'tradingeconomics') {
       return {
         ...s,
@@ -281,6 +273,7 @@ async function fetchScrapedMarket(): Promise<{
     retailTradeValueHmt?: number
     impacts?: DashboardData['impacts'] | null
     impactsFromTsetmc?: boolean
+    impactsFromSourceArena?: boolean
     topTrades?: DashboardData['topTrades']
     topTradesSource?: string
     indices?: {
@@ -317,6 +310,7 @@ async function fetchScrapedMarket(): Promise<{
         retailTradeValueHmt?: number
         impacts?: DashboardData['impacts'] | null
         impactsFromTsetmc?: boolean
+        impactsFromSourceArena?: boolean
         topTrades?: DashboardData['topTrades']
         topTradesSource?: string
         indices?: {
@@ -377,6 +371,15 @@ type OverviewApi = {
     ifb?: { name?: string; value?: number; change?: number; changePct?: number; source?: string }
   }
   usdRate?: number
+  bourseMarketValueHmt?: number
+  ifbMarketValueHmt?: number
+  totalMarketValueHmt?: number
+  totalMarketValueUsdM?: number
+  marketValueSource?: string
+  totalTradeValueHmt?: number
+  totalTradeValueSource?: string
+  impacts?: DashboardData['impacts'] | null
+  impactsFromSourceArena?: boolean
   intraday?: { points?: IntradayPoint[]; note?: string; source?: string }
   parsistahlil?: {
     ok?: boolean
@@ -422,15 +425,35 @@ function applyFreshOverview(base: DashboardData, api: OverviewApi | null, intrad
     if (patchIndex(o.ifb, api.indices.ifb)) sources.ifb = 'shakhesban-live'
   }
 
+  if (api?.totalMarketValueHmt != null && Number.isFinite(api.totalMarketValueHmt)) {
+    o.totalMarketValueHmt = api.totalMarketValueHmt
+    sources.marketValue = api.marketValueSource || 'sourcearena-bourse+ifb'
+    notes.unshift(
+      `ارزش بازار: بورس ${api.bourseMarketValueHmt ?? '—'} + فرابورس ${api.ifbMarketValueHmt ?? '—'} = ${api.totalMarketValueHmt} همت (SourceArena)`,
+    )
+  }
+  if (api?.totalMarketValueUsdM != null && Number.isFinite(api.totalMarketValueUsdM)) {
+    o.totalMarketValueUsdM = api.totalMarketValueUsdM
+    sources.usdMarketValue = 'marketValue÷tgjuUsd'
+  }
+  if (api?.totalTradeValueHmt != null && Number.isFinite(api.totalTradeValueHmt)) {
+    o.totalTradeValueHmt = api.totalTradeValueHmt
+    sources.totalTrade = api.totalTradeValueSource || 'sourcearena'
+  }
+
   if (api?.usdRate != null && Number.isFinite(api.usdRate)) {
     o.usdRate = api.usdRate
     sources.usdRate = 'tgju'
-    // refresh USD market value from current MV if possible
-    if (o.totalMarketValueHmt > 0) {
-      // همت → ریال = *1e13 ; / usd / 1e6 → میلیون دلار
+    if (o.totalMarketValueHmt > 0 && (api.totalMarketValueUsdM == null || !Number.isFinite(api.totalMarketValueUsdM))) {
       o.totalMarketValueUsdM = Math.round((o.totalMarketValueHmt * 1e13) / api.usdRate / 1e6)
       sources.usdMarketValue = 'marketValue÷tgjuUsd'
     }
+  }
+
+  if (api?.impactsFromSourceArena && api.impacts) {
+    // applied on base via caller — store flag on overview
+    o.impactsLive = true
+    sources.impacts = 'sourcearena'
   }
 
   const pars = api?.parsistahlil
@@ -456,10 +479,7 @@ function applyFreshOverview(base: DashboardData, api: OverviewApi | null, intrad
   if (intraday.length) {
     o.intradayIndex = intraday.map((p) => ({ time: p.time.slice(0, 5), value: p.value }))
     sources.intraday = api?.intraday?.source || 'tgju-today-table'
-    notes.unshift(
-      api?.intraday?.note ||
-        'نمودار درون‌روزی از today-table TGJU (رزولوشن چنددقیقه‌ای). دیتای دقیق ۵دقیقه TSETMC نیاز به IP ایران دارد.',
-    )
+    notes.unshift(api?.intraday?.note || 'نمودار درون‌روزی از today-table TGJU (رزولوشن چنددقیقه‌ای).')
   }
 
   if (api?.blocked?.length) o.blockedSources = api.blocked
@@ -514,14 +534,18 @@ function applyOverviewLive(
   }
   sources.retailMoneyFlowYtd = 'pdf-seed'
 
-  // Only replace impacts when real TSETMC data arrives
-  if (live.impactsFromTsetmc && live.impacts) {
-    base.impacts = live.impacts
+  const liveAny = live as {
+    impactsFromSourceArena?: boolean
+    impactsFromTsetmc?: boolean
+    impacts?: DashboardData['impacts'] | null
+  }
+  if ((liveAny.impactsFromSourceArena || liveAny.impactsFromTsetmc) && liveAny.impacts) {
+    base.impacts = liveAny.impacts
     o.impactsLive = true
-    sources.impacts = 'tsetmc'
+    sources.impacts = liveAny.impactsFromSourceArena ? 'sourcearena' : 'tsetmc'
   } else {
     o.impactsLive = false
-    sources.impacts = 'pdf-seed (waiting TSETMC)'
+    sources.impacts = 'pdf-seed'
   }
 
   if (live.topTrades?.length) {
@@ -558,6 +582,14 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   const liveCount = applyLiveQuotes(base, current)
   const overviewLiveOk = applyOverviewLive(base, scraped?.overviewLive, scraped?.candles1401)
   const freshOk = applyFreshOverview(base, overviewApi, intradayFallback)
+  if (overviewApi?.impactsFromSourceArena && overviewApi.impacts) {
+    base.impacts = overviewApi.impacts
+    base.overview.impactsLive = true
+    base.overview.fieldSources = {
+      ...(base.overview.fieldSources || {}),
+      impacts: 'sourcearena-live',
+    }
+  }
 
   const histories: Record<string, HistoryPoint[]> = { ...(scraped?.histories || {}) }
   for (const [k, pts] of histEntries) {
@@ -614,9 +646,26 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   const hasPars = Boolean(
     base.overview.retailMoneyFlowDaily != null || base.overview.retailTradeValueBillionToman != null,
   )
+  const hasArenaMv = Boolean(
+    overviewApi?.totalMarketValueHmt != null ||
+      (scraped?.overviewLive?.marketValueSource || '').includes('sourcearena'),
+  )
   if (overviewLiveOk || freshOk) {
     base.sources = [
-      ...base.sources.filter((s) => s.id !== 'shakhesban' && s.id !== 'parsistahlil'),
+      ...base.sources.filter(
+        (s) => s.id !== 'shakhesban' && s.id !== 'parsistahlil' && s.id !== 'tsetmc' && s.id !== 'sourcearena',
+      ),
+      {
+        id: 'sourcearena',
+        name: 'SourceArena / TradersArena',
+        status: hasArenaMv ? 'live' : 'blocked',
+        note: hasArenaMv
+          ? `ارزش بازار بورس+فرابورس${
+              overviewApi?.totalMarketValueHmt != null ? ` · ${overviewApi.totalMarketValueHmt} همت` : ''
+            }`
+          : 'در یک نگاه خوانده نشد',
+        lastOk: hasArenaMv ? overviewApi?.updatedAt || scraped?.overviewLive?.asOf || now : undefined,
+      },
       {
         id: 'shakhesban',
         name: 'شاخص‌بان',
@@ -636,15 +685,6 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
     ]
   }
   base.sources = base.sources.map((s) => {
-    if (s.id === 'tsetmc') {
-      return {
-        ...s,
-        status: scraped?.meta?.tsetmcOk ? 'live' : 'blocked',
-        note: scraped?.meta?.tsetmcOk
-          ? 'در یک نگاه + تاثیر شاخص'
-          : 'قطع — tradersarena هم بدون لاگین /data نمی‌دهد؛ نیاز به IP ایران',
-      }
-    }
     if (s.id === 'ime') {
       return {
         ...s,

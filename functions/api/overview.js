@@ -6,14 +6,16 @@
  *  - TGJU quotes (TEDPIX, USD)
  *  - TGJU today-table-data (intraday index path)
  *  - shakhesban indices (equal-weight, IFB)
+ *  - SourceArena market_bourse + market_farabourse (official MV sum)
  *  - parsistahlil.ir latest retail / money-flow report
- *
- * Heavy board aggregation stays in scraped market.json.
  */
 const TGJU_AJAX = 'https://call2.tgju.org/ajax.json'
 const TGJU_TODAY = 'https://api.tgju.org/v1/market/indicator/today-table-data/bourse?lang=fa'
 const SHAKH_INDEX = 'https://www.shakhesban.com/markets/index'
 const PARSIS_HOME = 'https://parsistahlil.ir/'
+const SOURCEARENA_API = 'https://apis.sourcearena.ir/api/'
+const BILLION_RIAL_PER_HEMAT = 10000
+const RIAL_PER_HEMAT = 1e13
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
@@ -22,6 +24,18 @@ function parseNum(raw) {
   if (raw == null) return null
   const n = Number(String(raw).replace(/,/g, '').replace(/[^\d.eE+-]/g, ''))
   return Number.isFinite(n) ? n : null
+}
+
+function parseBillionRial(raw) {
+  if (raw == null) return null
+  const s = String(raw).trim().replace(/,/g, '').replace(/\s/g, '').replace(/[Bb]$/, '')
+  const n = Number(s)
+  return Number.isFinite(n) ? n : null
+}
+
+function toHmt(billionRial) {
+  if (billionRial == null) return null
+  return Math.round((billionRial / BILLION_RIAL_PER_HEMAT) * 10) / 10
 }
 
 function stripHtml(s) {
@@ -45,6 +59,27 @@ async function fetchJson(url) {
   })
   if (!res.ok) throw new Error(`${url} ${res.status}`)
   return res.json()
+}
+
+async function fetchJsonRetry(url, attempts = 4) {
+  let lastErr
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': UA,
+          Referer: 'https://sourcearena.ir/',
+        },
+      })
+      if (!res.ok) throw new Error(`${url} ${res.status}`)
+      return await res.json()
+    } catch (e) {
+      lastErr = e
+      await new Promise((r) => setTimeout(r, 400 * (i + 1)))
+    }
+  }
+  throw lastErr
 }
 
 function tgjuQuote(row, id, name) {
@@ -117,9 +152,75 @@ function parseIntraday(payload) {
     const chg = parseNum(stripHtml(row[2]))
     points.push({ time, value, change: chg })
   }
-  // API returns newest-first; chart wants chronological
   points.reverse()
   return points
+}
+
+async function scrapeSourceArena(token) {
+  const tok = (token || '').trim()
+  if (!tok) return { ok: false, error: 'SOURCEARENA_TOKEN missing' }
+
+  const [bourseRes, ifbRes, indRes] = await Promise.allSettled([
+    fetchJsonRetry(`${SOURCEARENA_API}?token=${encodeURIComponent(tok)}&market=market_bourse`),
+    fetchJsonRetry(`${SOURCEARENA_API}?token=${encodeURIComponent(tok)}&market=market_farabourse`),
+    fetchJsonRetry(`${SOURCEARENA_API}?token=${encodeURIComponent(tok)}&market=ind_namad_bourse`, 3),
+  ])
+
+  if (bourseRes.status !== 'fulfilled' || ifbRes.status !== 'fulfilled') {
+    const err =
+      (bourseRes.status === 'rejected' && String(bourseRes.reason)) ||
+      (ifbRes.status === 'rejected' && String(ifbRes.reason)) ||
+      'sourcearena failed'
+    return { ok: false, error: err }
+  }
+
+  const bourse = bourseRes.value?.bourse
+  const ifb = ifbRes.value?.['fara-bourse']
+  if (!bourse || !ifb) return { ok: false, error: 'unexpected sourcearena payload' }
+
+  const bMv = toHmt(parseBillionRial(bourse.market_value))
+  const fMv = toHmt(parseBillionRial(ifb.market_value))
+  const bTr = toHmt(parseBillionRial(bourse.trade_value))
+  const fTr = toHmt(parseBillionRial(ifb.trade_value))
+  if (bMv == null || fMv == null) return { ok: false, error: 'missing market_value' }
+
+  let totalTrade = null
+  let tradeSource = null
+  // ارزش معاملات فرابورس «در یک نگاه» اغلب اوراق را هم دارد؛ فقط وقتی معقول است جمع کن
+  if (bTr != null && fTr != null && fTr <= Math.max(bTr * 4, 80)) {
+    totalTrade = Math.round((bTr + fTr) * 100) / 100
+    tradeSource = 'sourcearena-bourse+ifb'
+  } else if (bTr != null) {
+    totalTrade = bTr
+    tradeSource = 'sourcearena-bourse-only'
+  }
+
+  const impacts = { positive: [], negative: [] }
+  if (indRes.status === 'fulfilled' && Array.isArray(indRes.value)) {
+    for (const row of indRes.value.slice(0, 12)) {
+      const name = String(row?.name || '').trim()
+      const effect = parseBillionRial(row?.effect)
+      if (!name || effect == null) continue
+      const item = { name, impact: effect }
+      if (effect >= 0) impacts.positive.push(item)
+      else impacts.negative.push(item)
+    }
+    impacts.positive.sort((a, b) => b.impact - a.impact)
+    impacts.negative.sort((a, b) => a.impact - b.impact)
+  }
+
+  return {
+    ok: true,
+    source: 'sourcearena',
+    bourseMarketValueHmt: bMv,
+    ifbMarketValueHmt: fMv,
+    totalMarketValueHmt: Math.round((bMv + fMv) * 10) / 10,
+    totalTradeValueHmt: totalTrade,
+    totalTradeValueSource: tradeSource,
+    marketValueSource: 'sourcearena-bourse+ifb',
+    impacts: impacts.positive.length || impacts.negative.length ? impacts : null,
+    impactsFromSourceArena: Boolean(impacts.positive.length || impacts.negative.length),
+  }
 }
 
 async function scrapeParsistahlil() {
@@ -176,18 +277,24 @@ async function scrapeParsistahlil() {
   return { ok: false, error: lastErr }
 }
 
-export async function onRequestGet() {
+export async function onRequestGet(context) {
   const errors = []
   let quotes = {}
   let indices = {}
   let intraday = []
   let parsistahlil = { ok: false }
+  let sourcearena = { ok: false }
+
+  const token =
+    context?.env?.SOURCEARENA_TOKEN ||
+    'bba6d330a87bac533f18cc245d3baeaa'
 
   const tasks = await Promise.allSettled([
     fetchJson(TGJU_AJAX),
     fetchJson(TGJU_TODAY),
     fetchText(SHAKH_INDEX),
     scrapeParsistahlil(),
+    scrapeSourceArena(token),
   ])
 
   if (tasks[0].status === 'fulfilled') {
@@ -213,6 +320,14 @@ export async function onRequestGet() {
     errors.push(`parsistahlil: ${tasks[3].reason}`)
   }
 
+  if (tasks[4].status === 'fulfilled') {
+    sourcearena = tasks[4].value
+    if (!sourcearena.ok) errors.push(`sourcearena: ${sourcearena.error}`)
+  } else {
+    sourcearena = { ok: false, error: String(tasks[4].reason) }
+    errors.push(`sourcearena: ${tasks[4].reason}`)
+  }
+
   const usd = quotes.price_dollar_rl?.value ?? null
   const tedpix = indices.tedpix || (quotes.bourse
     ? {
@@ -223,6 +338,16 @@ export async function onRequestGet() {
         source: 'tgju',
       }
     : null)
+
+  let totalMarketValueUsdM = null
+  if (sourcearena.ok && sourcearena.totalMarketValueHmt != null && usd > 0) {
+    totalMarketValueUsdM = Math.round((sourcearena.totalMarketValueHmt * RIAL_PER_HEMAT) / usd / 1e6)
+  }
+
+  const blocked = [
+    ...(sourcearena.ok ? [] : ['sourcearena']),
+    ...(parsistahlil.ok ? [] : ['parsistahlil']),
+  ]
 
   return Response.json(
     {
@@ -236,13 +361,23 @@ export async function onRequestGet() {
       },
       intraday: {
         source: 'tgju-today-table',
-        note: 'مسیر روزانه TGJU (نزدیک به رزولوشن چنددقیقه‌ای). دیتای دقیق ۵دقیقه TSETMC نیاز به IP ایران / tradersarena auth دارد.',
+        note: 'مسیر روزانه TGJU (رزولوشن چنددقیقه‌ای).',
         points: intraday,
       },
+      sourcearena,
+      bourseMarketValueHmt: sourcearena.bourseMarketValueHmt ?? null,
+      ifbMarketValueHmt: sourcearena.ifbMarketValueHmt ?? null,
+      totalMarketValueHmt: sourcearena.totalMarketValueHmt ?? null,
+      totalMarketValueUsdM,
+      marketValueSource: sourcearena.marketValueSource ?? null,
+      totalTradeValueHmt: sourcearena.totalTradeValueHmt ?? null,
+      totalTradeValueSource: sourcearena.totalTradeValueSource ?? null,
+      impacts: sourcearena.impacts ?? null,
+      impactsFromSourceArena: Boolean(sourcearena.impactsFromSourceArena),
       parsistahlil,
       usdRate: usd,
       errors,
-      blocked: ['tsetmc', ...(parsistahlil.ok ? [] : ['parsistahlil']), 'tradersarena'],
+      blocked,
     },
     {
       headers: {

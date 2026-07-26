@@ -6,14 +6,15 @@ Works from most cloud/VPS hosts:
   - TGJU live quotes + OHLC histories (bourse, FX, metals, …)
   - shakhesban indices (TEDPIX / equal-weight / IFB) + board aggregate
   - parsistahlil.ir public «گزارش وضعیت بازار» (retail trades + daily money flow)
+  - SourceArena (اکوسیستم Traders Arena) «در یک نگاه» بورس + فرابورس → ارزش بازار رسمی
 
-Needs Iran IP:
-  - TSETMC «در یک نگاه» (official market value + TSE/IFB trade value + index impacts)
-  - IME, tradersarena /data
+Needs Iran IP / login:
+  - IME, tradersarena /data (بدون لاگین 404)
 """
 from __future__ import annotations
 
 import json
+import os
 import re
 import time
 import urllib.error
@@ -32,10 +33,15 @@ UA = {
     )
 }
 
-# 1 همت = 10^13 ریال | 1 میلیارد تومان = 10^10 ریال
+# 1 همت = 10^13 ریال | 1 میلیارد تومان = 10^10 ریال | 1 همت = 10_000 میلیارد ریال
 RIAL_PER_HEMAT = 1e13
 RIAL_PER_BILLION_TOMAN = 1e10
+BILLION_RIAL_PER_HEMAT = 10_000.0
 TEDPIX_FROM_1401 = "2022/03/21"
+
+# Demo/public token used in SourceArena docs — override with SOURCEARENA_TOKEN
+SOURCEARENA_TOKEN = os.environ.get("SOURCEARENA_TOKEN", "bba6d330a87bac533f18cc245d3baeaa")
+SOURCEARENA_API = "https://apis.sourcearena.ir/api/"
 
 TGJU_LIVE_KEYS = [
     "bourse",
@@ -365,13 +371,141 @@ def scrape_parsistahlil_market_status() -> dict:
     return {"ok": False, "error": last_err}
 
 
+def parse_sourcearena_billion_rial(raw) -> float | None:
+    """Parse values like '143,915,447.992B' (میلیارد ریال)."""
+    if raw is None:
+        return None
+    s = str(raw).strip().replace(",", "").replace(" ", "")
+    s = re.sub(r"[Bb]$", "", s)
+    try:
+        n = float(s)
+    except ValueError:
+        return None
+    return n if n == n else None  # NaN guard
+
+
+def billion_rial_to_hmt(billion_rial: float | None) -> float | None:
+    if billion_rial is None:
+        return None
+    return round(billion_rial / BILLION_RIAL_PER_HEMAT, 1)
+
+
+def fetch_with_retries(url: str, timeout: int = 30, attempts: int = 4) -> bytes:
+    last: Exception | None = None
+    for i in range(attempts):
+        try:
+            return fetch(
+                url,
+                timeout=timeout,
+                headers={"Accept": "application/json", "Referer": "https://sourcearena.ir/"},
+            )
+        except Exception as exc:  # noqa: BLE001
+            last = exc
+            time.sleep(0.6 * (i + 1))
+    raise last or RuntimeError("fetch failed")
+
+
+def scrape_sourcearena_glance(token: str | None = None) -> dict:
+    """Official TSE + IFB «در یک نگاه» via SourceArena (Traders Arena API)."""
+    tok = (token or SOURCEARENA_TOKEN or "").strip()
+    if not tok:
+        return {"ok": False, "error": "SOURCEARENA_TOKEN missing"}
+
+    out: dict = {"ok": False, "source": "sourcearena", "tokenHint": tok[:8]}
+    try:
+        bourse_raw = json.loads(
+            fetch_with_retries(
+                f"{SOURCEARENA_API}?token={urllib.parse.quote(tok)}&market=market_bourse",
+            )
+        )
+        ifb_raw = json.loads(
+            fetch_with_retries(
+                f"{SOURCEARENA_API}?token={urllib.parse.quote(tok)}&market=market_farabourse",
+            )
+        )
+    except Exception as exc:  # noqa: BLE001
+        return {**out, "error": str(exc)}
+
+    bourse = bourse_raw.get("bourse") if isinstance(bourse_raw, dict) else None
+    ifb = ifb_raw.get("fara-bourse") if isinstance(ifb_raw, dict) else None
+    if not isinstance(bourse, dict) or not isinstance(ifb, dict):
+        return {**out, "error": f"unexpected payload keys: {list(bourse_raw) if isinstance(bourse_raw, dict) else type(bourse_raw)}"}
+
+    b_mv = billion_rial_to_hmt(parse_sourcearena_billion_rial(bourse.get("market_value")))
+    f_mv = billion_rial_to_hmt(parse_sourcearena_billion_rial(ifb.get("market_value")))
+    b_tr = billion_rial_to_hmt(parse_sourcearena_billion_rial(bourse.get("trade_value")))
+    f_tr = billion_rial_to_hmt(parse_sourcearena_billion_rial(ifb.get("trade_value")))
+
+    if b_mv is None or f_mv is None:
+        return {**out, "error": "missing market_value", "bourse": bourse, "ifb": ifb}
+
+    impacts: list[dict] = []
+    try:
+        ind = json.loads(
+            fetch_with_retries(
+                f"{SOURCEARENA_API}?token={urllib.parse.quote(tok)}&market=ind_namad_bourse",
+                timeout=25,
+                attempts=3,
+            )
+        )
+        if isinstance(ind, list):
+            for row in ind[:12]:
+                if not isinstance(row, dict):
+                    continue
+                name = str(row.get("name") or "").strip()
+                effect = parse_sourcearena_billion_rial(row.get("effect"))
+                if not name or effect is None:
+                    continue
+                impacts.append({"name": name, "impact": effect})
+    except Exception as exc:  # noqa: BLE001
+        out["impactsError"] = str(exc)
+
+    total_mv = round(b_mv + f_mv, 1)
+    # ارزش معاملات فرابورس «در یک نگاه» اغلب اوراق را هم دارد؛ اگر غیرعادی بزرگ بود فقط بورس را بگیر
+    total_tr = None
+    trade_source = None
+    if b_tr is not None and f_tr is not None and f_tr <= max(b_tr * 4, 80):
+        total_tr = round(b_tr + f_tr, 2)
+        trade_source = "sourcearena-bourse+ifb"
+    elif b_tr is not None:
+        total_tr = b_tr
+        trade_source = "sourcearena-bourse-only"
+
+    pos = sorted([x for x in impacts if x["impact"] > 0], key=lambda x: -x["impact"])[:7]
+    neg = sorted([x for x in impacts if x["impact"] < 0], key=lambda x: x["impact"])[:7]
+
+    return {
+        "ok": True,
+        "source": "sourcearena",
+        "bourse": {
+            "state": bourse.get("state"),
+            "index": parse_sourcearena_billion_rial(bourse.get("index")),
+            "marketValueHmt": b_mv,
+            "tradeValueHmt": b_tr,
+            "raw": bourse,
+        },
+        "ifb": {
+            "state": ifb.get("state"),
+            "index": parse_sourcearena_billion_rial(ifb.get("index")),
+            "marketValueHmt": f_mv,
+            "tradeValueHmt": f_tr,
+            "raw": ifb,
+        },
+        "totalMarketValueHmt": total_mv,
+        "totalTradeValueHmt": total_tr,
+        "totalTradeValueSource": trade_source,
+        "impacts": {"positive": pos, "negative": neg} if (pos or neg) else None,
+        "impactsFromSourceArena": bool(pos or neg),
+    }
+
+
 def build_overview_live(
     stocks_all: list[dict],
     usd_rial: float | None,
     indices: dict,
     tgju_tedpix: dict | None,
     pars: dict,
-    tsetmc_ok: bool,
+    glance: dict | None,
 ) -> dict:
     stocks = [s for s in stocks_all if s.get("marketFa") == "سهام"]
     bourse = [s for s in stocks if "فرابورس" not in (s.get("flow") or "")]
@@ -380,11 +514,7 @@ def build_overview_live(
     sum_mv = sum(s["marketValue"] for s in stocks)
     sum_trade = sum(s["tradeValue"] for s in stocks)
 
-    usd_m = None
-    if usd_rial and usd_rial > 0 and sum_mv > 0:
-        usd_m = round(sum_mv / usd_rial / 1e6, 0)
-
-    # Top trades by value (تابلو) — not the same as TSETMC impact list
+    # Top trades by value (تابلو)
     top_trades = sorted(stocks, key=lambda s: s["tradeValue"], reverse=True)[:15]
     top_trades_out = [
         {"name": s["symbol"], "valueBr": round(s["tradeValue"] / RIAL_PER_BILLION_TOMAN, 1)}
@@ -406,29 +536,47 @@ def build_overview_live(
 
     board_mv = round(sum_mv / RIAL_PER_HEMAT, 1)
     board_trade = round(sum_trade / RIAL_PER_HEMAT, 2)
+    glance = glance or {}
 
-    # Prefer parsistahlil retail flow/trades when available
     retail_flow = pars.get("retailMoneyFlowDailyBillionToman") if pars.get("ok") else None
     retail_trades_bt = pars.get("retailTradeValueBillionToman") if pars.get("ok") else None
-    # کل معاملات رسمی باید از TSETMC باشد؛ پارسیس «کل بازار» شامل اوراق و غیره است
-    total_trade_hmt = None
-    total_trade_source = None
-    if tsetmc_ok:
-        total_trade_source = "tsetmc"
+
+    notes = []
+    blocked = []
+
+    if glance.get("ok") and glance.get("totalMarketValueHmt") is not None:
+        total_mv = glance["totalMarketValueHmt"]
+        mv_source = "sourcearena-bourse+ifb"
+        b_mv = (glance.get("bourse") or {}).get("marketValueHmt")
+        f_mv = (glance.get("ifb") or {}).get("marketValueHmt")
+        notes.append(
+            f"ارزش بازار = بورس ({b_mv} همت) + فرابورس ({f_mv} همت) از SourceArena/TradersArena = {total_mv} همت."
+        )
+    else:
+        total_mv = board_mv
+        mv_source = "shakhesban-board-interim"
+        blocked.append("sourcearena")
+        notes.append(
+            f"SourceArena خوانده نشد ({glance.get('error')}) — موقت تجمیع تابلوی شاخص‌بان ({board_mv} همت)."
+        )
+
+    usd_m = None
+    if usd_rial and usd_rial > 0 and total_mv and total_mv > 0:
+        usd_m = round(total_mv * RIAL_PER_HEMAT / usd_rial / 1e6, 0)
+
+    ifb_board_trade = round(sum(s["tradeValue"] for s in ifb) / RIAL_PER_HEMAT, 2)
+    if glance.get("ok") and glance.get("totalTradeValueHmt") is not None:
+        total_trade_hmt = glance["totalTradeValueHmt"]
+        total_trade_source = glance.get("totalTradeValueSource") or "sourcearena"
+        # اگر فرابورس رسمی اوراق را قاطی کرده، معاملات سهام فرابورس را از تابلو جمع بزن
+        if total_trade_source == "sourcearena-bourse-only" and ifb_board_trade > 0:
+            b_tr = (glance.get("bourse") or {}).get("tradeValueHmt") or total_trade_hmt
+            total_trade_hmt = round(float(b_tr) + ifb_board_trade, 2)
+            total_trade_source = "sourcearena-bourse+shakhesban-ifb"
     else:
         total_trade_hmt = board_trade
         total_trade_source = "shakhesban-board-interim"
 
-    notes = []
-    blocked = []
-    if not tsetmc_ok:
-        blocked.append("tsetmc")
-        notes.append(
-            "TSETMC از این سرور قطع است (Connection reset) — ارزش بازار/معاملات/تاثیر رسمی «در یک نگاه» و سورت تاثیر نیاز به IP ایران دارد."
-        )
-    notes.append(
-        f"ارزش بازار فعلی ({board_mv} همت) تجمیع تابلوی شاخص‌بان (سهام بورس+فرابورس) است؛ با عدد رسمی TSETMC ممکن است فرق کند."
-    )
     if usd_m is not None:
         notes.append("ارزش دلاری = همین ارزش بازار ÷ دلار آزاد TGJU.")
     if indices:
@@ -443,7 +591,12 @@ def build_overview_live(
         blocked.append("parsistahlil")
         notes.append(f"پارسیس‌تحلیل خوانده نشد: {pars.get('error')}")
     notes.append("خالص ورود/خروج از ابتدای ۱۴۰۴ از گزارش PDF نگه داشته شده.")
-    notes.append("تاثیر مثبت/منفی تا دسترسی TSETMC از seed گزارش می‌ماند (سورت پروکسی حذف شد).")
+
+    impacts = glance.get("impacts") if glance.get("impactsFromSourceArena") else None
+    if impacts:
+        notes.append("تاثیر در شاخص از SourceArena (ind_namad_bourse).")
+    else:
+        notes.append("تاثیر مثبت/منفی در صورت نبود SourceArena از seed گزارش می‌ماند.")
 
     return {
         "ok": True,
@@ -456,14 +609,11 @@ def build_overview_live(
         "stockCount": len(stocks),
         "bourseCount": len(bourse),
         "ifbCount": len(ifb),
-        # Official TSETMC glance fields — null until Iran IP
-        "tsetmcMarketValueHmt": None,
-        "tsetmcTradeValueHmt": None,
-        "impactsFromTsetmc": False,
-        # Interim board aggregate
-        "totalMarketValueHmt": board_mv,
+        "bourseMarketValueHmt": (glance.get("bourse") or {}).get("marketValueHmt"),
+        "ifbMarketValueHmt": (glance.get("ifb") or {}).get("marketValueHmt"),
+        "totalMarketValueHmt": total_mv,
         "totalMarketValueUsdM": usd_m,
-        "marketValueSource": "shakhesban-board-interim",
+        "marketValueSource": mv_source,
         "usdRate": usd_rial,
         "totalTradeValueHmt": total_trade_hmt,
         "totalTradeValueSource": total_trade_source,
@@ -472,9 +622,12 @@ def build_overview_live(
         "retailTradeValueHmt": round(retail_trades_bt / 1000.0, 2) if retail_trades_bt else None,
         "retailMoneyFlowDailyBillionToman": retail_flow,
         "retailMoneyFlowYtdFromPdf": True,
-        "impacts": None,  # do not overwrite seed with fake proxy
+        "impacts": impacts,
+        "impactsFromTsetmc": False,
+        "impactsFromSourceArena": bool(impacts),
         "topTrades": top_trades_out,
         "topTradesSource": "shakhesban-board",
+        "sourcearena": {"ok": bool(glance.get("ok")), "error": glance.get("error")},
         "parsistahlil": pars,
         "blocked": blocked,
         "notes": notes,
@@ -604,15 +757,28 @@ def main() -> int:
     print("shakhesban board…")
     board = scrape_shakhesban_board()
 
-    tsetmc = scrape_tsetmc()
-    overview_live = build_overview_live(board, usd, indices, tedpix, pars, bool(tsetmc.get("ok")))
+    print("SourceArena glance (bourse + farabourse)…")
+    glance = scrape_sourcearena_glance()
+    print(
+        "sourcearena",
+        {
+            "ok": glance.get("ok"),
+            "mv": glance.get("totalMarketValueHmt"),
+            "bourse": (glance.get("bourse") or {}).get("marketValueHmt"),
+            "ifb": (glance.get("ifb") or {}).get("marketValueHmt"),
+            "error": glance.get("error"),
+        },
+    )
+
+    tsetmc = scrape_tsetmc()  # optional probe only
+    overview_live = build_overview_live(board, usd, indices, tedpix, pars, glance)
     overview_live["intraday"] = {
         "source": "tgju-today-table",
-        "note": "مسیر روزانه TGJU؛ ۵دقیقه دقیق TSETMC نیاز به IP ایران / لاگین tradersarena",
+        "note": "مسیر روزانه TGJU (رزولوشن چنددقیقه‌ای).",
         "points": intraday,
     }
     print(
-        f"MV={overview_live['totalMarketValueHmt']} همت | "
+        f"MV={overview_live['totalMarketValueHmt']} همت ({overview_live['marketValueSource']}) | "
         f"USD={overview_live['totalMarketValueUsdM']} m$ | "
         f"trade={overview_live['totalTradeValueHmt']} همت ({overview_live['totalTradeValueSource']}) | "
         f"retailFlow={overview_live['retailMoneyFlowDailyBillionToman']}"
@@ -625,11 +791,12 @@ def main() -> int:
         "updatedAt": datetime.now(timezone.utc).isoformat(),
         "infra": {
             "tgju": "TEDPIX + USD live",
-            "shakhesban": "equal-weight + IFB indices + board aggregate (interim MV/trades)",
+            "shakhesban": "equal-weight + IFB indices + board (top trades)",
             "parsistahlil": "retail trades + daily real-money flow from public report pages (.ir)",
-            "tsetmc": "BLOCKED from this host — needs Iran IP for در یک نگاه + index impacts",
+            "sourcearena": "بازار بورس+فرابورس در یک نگاه → مجموع ارزش بازار",
+            "tradersarena": "UI؛ دادهٔ در یک نگاه از API سورس‌آرنا",
+            "tsetmc": "از این مسیر استفاده نمی‌شود (جایگزین: SourceArena)",
             "ime": "usually needs Iran IP",
-            "tradersarena": "/data endpoints need auth",
             "custeel": "paid; interim uses TGJU iron-ore/steel-coil + FRED",
             "fred": "scripts/fetch_fred.py",
         },
@@ -639,6 +806,7 @@ def main() -> int:
         "intraday": overview_live.get("intraday"),
         "overviewLive": overview_live,
         "sectors": sectors,
+        "sourcearena": glance,
         "tsetmc": tsetmc,
         "ime": ime,
         "parsistahlil": pars,
@@ -658,12 +826,15 @@ def main() -> int:
                 "retailTradeValueBillionToman",
                 "retailMoneyFlowDailyBillionToman",
                 "marketValueSource",
-                "impactsFromTsetmc",
+                "bourseMarketValueHmt",
+                "ifbMarketValueHmt",
+                "impactsFromSourceArena",
                 "blocked",
                 "stockCount",
             )
         },
         "candles1401Count": len(candles),
+        "sourcearena": {"ok": glance.get("ok"), "totalMarketValueHmt": glance.get("totalMarketValueHmt")},
         "tsetmc": tsetmc,
         "ime": ime,
         "parsistahlil": pars,

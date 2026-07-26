@@ -1132,10 +1132,10 @@ export const seedDashboard: DashboardData = {
       note: 'بورس + کامودیتی + سنگ‌آهن/ورق (زنده)',
     },
     {
-      id: 'tsetmc',
-      name: 'TSETMC',
+      id: 'sourcearena',
+      name: 'SourceArena / TradersArena',
       status: 'seed',
-      note: 'شاخص از آینه TGJU — جزئیات با اسکرپر',
+      note: 'ارزش بازار بورس+فرابورس در یک نگاه',
     },
     {
       id: 'tradingeconomics',

@@ -1,9 +1,8 @@
 //@version=5
-indicator("CVD Strength / Divergence", shorttitle="CVD_Div", overlay=false, max_labels_count=100)
+indicator("CVD Strength / Divergence (simple fallback)", shorttitle="CVD_Div", overlay=false, max_labels_count=100)
 
 // =============================================================================
-// CVD تقریبی از حجم کندل + قدرت/ضعف + واگرایی با قیمت
-// (فایل cvd-ict-breakout-sessions سشن/BSG است، نه CVD واقعی — این یکی CVD است)
+// FALLBACK ساده — برای Combo از Sniper_CVD_v59 استفاده کن (strategies/sniper-cvd-v59.pine)
 // =============================================================================
 
 string GRP = "CVD"

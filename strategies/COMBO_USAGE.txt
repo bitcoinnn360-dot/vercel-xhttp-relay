@@ -1,0 +1,45 @@
+ICT Combo Engine — how to use on TradingView
+=============================================
+
+Why old mitigation "compiled but did nothing"
+---------------------------------------------
+Defaults required ALL of: failed-swing + breaker + fractal leave + rejection
+confirm. Fractal leave almost never unlocked, so Pending never became Entry.
+Fix: fractal default OFF; breaker arm no longer stuck on one-bar race.
+
+Files
+-----
+1) strategies/ict-combo-engine.pine     ← main strategy (use this)
+2) strategies/ict-liquidity-reversal.pine ← fixed standalone mitigation
+3) strategies/cvd-strength-divergence.pine ← real CVD pane (div/strength)
+4) strategies/cvd-ict-breakout-sessions.pine ← your session/BSG/LQR module
+5) strategies/options-levels.pine       ← overlay; paste API levels
+
+Recommended chart stack
+-----------------------
+- BTCUSDT 5m
+- Add: ICT Combo Engine (strategy)
+- Optional overlays: CVD_Div pane, Options Levels, CVD_BSG_Sessions
+
+Options wiring
+--------------
+GET /api/options-levels?currency=BTC
+Copy pine_inputs → Combo Engine inputs:
+  Put Wall, Max Pain, Call Wall, P(Put→Max)%, P(Max→Call)%
+
+Suggested defaults (aligned with backtests)
+-------------------------------------------
+- Require Session Sweep Bias: ON
+- Require CVD Agree or Div: ON
+- Only London/NY AM Killzone: ON
+- EMA Trend: ON (200)
+- SL Mode: nearest_swing
+- Min RR: 2.0–3.0
+- Rejection wick: 60%
+- Options TP magnet: ON
+- Options prob block: OFF at first (enable later)
+
+Debug (Data Window)
+-------------------
+Failed HH/LL → Pending Short/Long → Sess Bias → CVD Div → trade label
+If Pending appears but no trade, a filter (session/CVD/KZ/EMA/options) is blocking.

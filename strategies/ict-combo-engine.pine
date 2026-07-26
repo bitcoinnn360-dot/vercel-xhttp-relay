@@ -1,0 +1,638 @@
+//@version=5
+strategy("ICT Combo Engine (Mitigation + Session Liq + CVD + Options)", overlay=true, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, commission_type=strategy.commission.percent, commission_value=0.1, pyramiding=0, process_orders_on_close=true, max_boxes_count=200, max_lines_count=200, max_labels_count=200)
+
+// =============================================================================
+// ترکیب لایه‌ای (بدون مگا-اسکریپت ۲۰۰۰ خطی):
+//   ۱) Entry: Failed-swing Mitigation + Rejection (نسخهٔ درست‌شده)
+//   ۲) Bias: سشن‌لیکوییدیتی PDH/PDL + S1–S4 sweep (از ماژول سشن‌ها)
+//   ۳) Confirm: CVD قدرت/واگرایی (تقریب volume-delta)
+//   ۴) Magnets: Put Wall / Max Pain / Call Wall (+ احتمال مسیر) از API آپشن
+//
+// داده آپشن: GET /api/options-levels?currency=BTC → pine_inputs را اینجا پیست کن
+// =============================================================================
+
+string GRP_STR = "Structure / Mitigation"
+string GRP_REJ = "Rejection"
+string GRP_SESS = "Session Liquidity Bias"
+string GRP_CVD = "CVD Confirm"
+string GRP_OPT = "Options Levels (manual)"
+string GRP_EXIT = "Exits / Risk"
+string GRP_VIS = "Visuals"
+
+int pivot_len = input.int(5, "Pivot Length", minval=2, group=GRP_STR)
+int max_fail_gap = input.int(50, "Max Bars Between Failed Swings", minval=3, group=GRP_STR)
+int ob_lookback = input.int(30, "OB Search Depth", minval=5, group=GRP_STR)
+bool require_mss = input.bool(true, "Require MSS", group=GRP_STR)
+bool require_rejection = input.bool(true, "Require Rejection Confirm", group=GRP_REJ)
+float rej_wick_pct = input.float(60.0, "Rejection Wick %", minval=30, maxval=90, step=5, group=GRP_REJ)
+bool rej_close_half = input.bool(true, "Close in Favorable Half", group=GRP_REJ)
+
+bool use_session_bias = input.bool(true, "Require Session Sweep Bias", group=GRP_SESS, tooltip="لانگ فقط بعد از PDL/Sn low sweep؛ شورت بعد از PDH/Sn high sweep")
+int sweep_memory_bars = input.int(72, "Sweep Bias Memory (bars)", minval=5, group=GRP_SESS, tooltip="چند بار بایاس سوییپ معتبر بماند (~6h روی 5m)")
+int max_sweep_mins = input.int(145, "Max Bars After Sweep for IFVG", minval=10, group=GRP_SESS)
+
+bool use_cvd = input.bool(true, "Require CVD Agree or Div", group=GRP_CVD)
+int cvd_slope_len = input.int(10, "CVD Slope Length", minval=3, group=GRP_CVD)
+int cvd_pivot = input.int(5, "CVD Div Pivot", minval=2, group=GRP_CVD)
+bool cvd_allow_div = input.bool(true, "Allow Bull/Bear Divergence as Confirm", group=GRP_CVD)
+bool cvd_allow_strong = input.bool(true, "Allow Strong CVD Agreement", group=GRP_CVD)
+
+float putWallIn = input.float(0.0, "Put Wall", group=GRP_OPT)
+float maxPainIn = input.float(0.0, "Max Pain", group=GRP_OPT)
+float callWallIn = input.float(0.0, "Call Wall", group=GRP_OPT)
+float pPutToMax = input.float(0.0, "P(Put→Max)%", minval=0, maxval=100, group=GRP_OPT)
+float pMaxToCall = input.float(0.0, "P(Max→Call)%", minval=0, maxval=100, group=GRP_OPT)
+bool use_options_tp = input.bool(true, "Prefer Options Level as TP Magnet", group=GRP_OPT)
+bool use_options_bias = input.bool(false, "Block Trades Against Higher Prob Path", group=GRP_OPT, tooltip="اگر احتمال مسیر خلاف جهت ترید خیلی بالاتر باشد، بلاک")
+float opt_prob_edge = input.float(10.0, "Min Prob Edge % to Block", minval=0, maxval=50, group=GRP_OPT)
+
+string sl_mode = input.string("nearest_swing", "SL Mode", options=["nearest_swing", "reject", "failed_liq"], group=GRP_EXIT)
+float sl_buffer_ticks = input.float(3, "SL Buffer (ticks)", minval=0, group=GRP_EXIT)
+float min_tp_rr = input.float(2.0, "Min RR for Structural/Options TP", minval=0.5, step=0.1, group=GRP_EXIT)
+float rr_fallback = input.float(2.5, "RR Fallback", minval=0.5, step=0.1, group=GRP_EXIT)
+int cooldown = input.int(10, "Signal Cooldown", minval=0, group=GRP_EXIT)
+bool one_trade = input.bool(true, "One Trade at a Time", group=GRP_EXIT)
+bool use_ema = input.bool(true, "EMA Trend Filter", group=GRP_EXIT)
+int ema_len = input.int(200, "EMA Length", minval=20, group=GRP_EXIT)
+bool use_killzone = input.bool(true, "Only London/NY AM Killzone (NY time)", group=GRP_EXIT)
+
+bool show_levels = input.bool(true, "Show Options Levels", group=GRP_VIS)
+bool show_labels = input.bool(true, "Show Trade Labels", group=GRP_VIS)
+bool show_debug = input.bool(true, "Debug Stage Plots (Data Window)", group=GRP_VIS)
+
+//#region Helpers
+float sl_pad = sl_buffer_ticks * syminfo.mintick
+float wick_need = rej_wick_pct / 100.0
+float ema = ta.ema(close, ema_len)
+float putWall = putWallIn > 0 ? putWallIn : na
+float maxPain = maxPainIn > 0 ? maxPainIn : na
+float callWall = callWallIn > 0 ? callWallIn : na
+
+in_killzone() =>
+    int mins = hour(time, "America/New_York") * 60 + minute(time, "America/New_York")
+    bool london = mins >= 2 * 60 and mins < 5 * 60
+    bool ny_am = mins >= 7 * 60 and mins < 10 * 60
+    london or ny_am
+
+is_bull_rej() =>
+    float rng = high - low
+    rng > 0 and (math.min(open, close) - low) >= rng * wick_need and (not rej_close_half or close >= low + rng * 0.5)
+
+is_bear_rej() =>
+    float rng = high - low
+    rng > 0 and (high - math.max(open, close)) >= rng * wick_need and (not rej_close_half or close <= high - rng * 0.5)
+
+//#endregion
+
+//#region Structure / OB / Failed swing
+float ph = ta.pivothigh(high, pivot_len, pivot_len)
+float pl = ta.pivotlow(low, pivot_len, pivot_len)
+
+var float last_ph = na
+var int last_ph_bar = na
+var float last_pl = na
+var int last_pl_bar = na
+var float sh0 = na
+var float sh1 = na
+var float sh2 = na
+var int sh0b = na
+var int sh1b = na
+var int sh2b = na
+var float sl0 = na
+var float sl1 = na
+var float sl2 = na
+var int sl0b = na
+var int sl1b = na
+var int sl2b = na
+
+if not na(ph)
+    sh0 := sh1
+    sh0b := sh1b
+    sh1 := sh2
+    sh1b := sh2b
+    sh2 := ph
+    sh2b := bar_index - pivot_len
+    last_ph := ph
+    last_ph_bar := bar_index - pivot_len
+if not na(pl)
+    sl0 := sl1
+    sl0b := sl1b
+    sl1 := sl2
+    sl1b := sl2b
+    sl2 := pl
+    sl2b := bar_index - pivot_len
+    last_pl := pl
+    last_pl_bar := bar_index - pivot_len
+
+untouched_high(float px, int from_bar) =>
+    int len = math.max(bar_index - from_bar + 1, 1)
+    len <= 300 and ta.highest(high, math.min(len, 300)) <= px
+
+untouched_low(float px, int from_bar) =>
+    int len = math.max(bar_index - from_bar + 1, 1)
+    len <= 300 and ta.lowest(low, math.min(len, 300)) >= px
+
+bool fail_hh = not na(sh0) and not na(sh1) and not na(sh2) and sh1 > sh0 and sh2 < sh1 and (sh2b - sh1b) > 0 and (sh2b - sh1b) <= max_fail_gap and untouched_high(sh1, sh1b)
+bool fail_ll = not na(sl0) and not na(sl1) and not na(sl2) and sl1 < sl0 and sl2 > sl1 and (sl2b - sl1b) > 0 and (sl2b - sl1b) <= max_fail_gap and untouched_low(sl1, sl1b)
+
+// OB: last opposite candle before BOS
+var float bull_ob_top = na
+var float bull_ob_bot = na
+var int bull_ob_start = na
+var bool bull_ob_breaker = false
+var float bear_ob_top = na
+var float bear_ob_bot = na
+var int bear_ob_start = na
+var bool bear_ob_breaker = false
+var bool bull_just_broke = false
+var bool bear_just_broke = false
+
+bull_just_broke := false
+bear_just_broke := false
+
+find_ob(bool want_bear_candle) =>
+    float oh = na
+    float ol = na
+    int oi = na
+    for j = 1 to math.min(ob_lookback, bar_index)
+        bool match = want_bear_candle ? close[j] < open[j] : close[j] > open[j]
+        if match and na(oi)
+            oh := high[j]
+            ol := low[j]
+            oi := bar_index - j
+    [oh, ol, oi]
+
+bool bull_bos = not na(last_ph) and close[1] < last_ph and close >= last_ph
+bool bear_bos = not na(last_pl) and close[1] > last_pl and close <= last_pl
+if bull_bos
+    [oh, ol, oi] = find_ob(true)
+    if not na(oi)
+        bull_ob_top := oh
+        bull_ob_bot := ol
+        bull_ob_start := oi
+        bull_ob_breaker := false
+    last_ph := na
+if bear_bos
+    [oh, ol, oi] = find_ob(false)
+    if not na(oi)
+        bear_ob_top := oh
+        bear_ob_bot := ol
+        bear_ob_start := oi
+        bear_ob_breaker := false
+    last_pl := na
+
+if not na(bull_ob_bot) and not bull_ob_breaker and close < bull_ob_bot
+    bull_ob_breaker := true
+    bull_just_broke := true
+if not na(bear_ob_top) and not bear_ob_breaker and close > bear_ob_top
+    bear_ob_breaker := true
+    bear_just_broke := true
+
+bool mss_bear = not na(sl2) and close < sl2
+bool mss_bull = not na(sh2) and close > sh2
+
+// Liquidity for TP
+var float near_bsl = na
+var float near_ssl = na
+if not na(sh2)
+    near_bsl := sh2
+if not na(sl2)
+    near_ssl := sl2
+if not na(near_bsl) and high > near_bsl
+    near_bsl := na
+if not na(near_ssl) and low < near_ssl
+    near_ssl := na
+
+//#endregion
+
+//#region Session liquidity sweeps (compact)
+string NY = "America/New_York"
+in_sess(string s) => not na(time(timeframe.period, s, NY))
+
+bool in_s1 = in_sess("0000-0600")
+bool in_s2 = in_sess("0600-1200")
+bool in_s3 = in_sess("1200-1800")
+bool in_s4 = in_sess("1800-0000")
+
+var float s1_hi = na
+var float s1_lo = na
+var float s2_hi = na
+var float s2_lo = na
+var float s3_hi = na
+var float s3_lo = na
+var float s4_hi = na
+var float s4_lo = na
+var float pdh = na
+var float pdl = na
+var float day_hi = na
+var float day_lo = na
+var int day_id = na
+
+int cur_day = year(time, NY) * 10000 + month(time, NY) * 100 + dayofmonth(time, NY)
+// custom day ~20:00 NY like original
+int ny_mins = hour(time, NY) * 60 + minute(time, NY)
+int custom_day = ny_mins >= 20 * 60 ? cur_day : cur_day - 1
+
+if na(day_id) or custom_day != day_id
+    if not na(day_hi)
+        pdh := day_hi
+        pdl := day_lo
+    day_id := custom_day
+    day_hi := high
+    day_lo := low
+else
+    day_hi := math.max(nz(day_hi, high), high)
+    day_lo := math.min(nz(day_lo, low), low)
+
+update_box(bool in_s, bool was_in, float hi, float lo) =>
+    float nhi = hi
+    float nlo = lo
+    if in_s
+        if not was_in
+            nhi := high
+            nlo := low
+        else
+            nhi := math.max(nz(hi, high), high)
+            nlo := math.min(nz(lo, low), low)
+    [nhi, nlo]
+
+[s1_hi, s1_lo] := update_box(in_s1, in_s1[1], s1_hi, s1_lo)
+[s2_hi, s2_lo] := update_box(in_s2, in_s2[1], s2_hi, s2_lo)
+[s3_hi, s3_lo] := update_box(in_s3, in_s3[1], s3_hi, s3_lo)
+[s4_hi, s4_lo] := update_box(in_s4, in_s4[1], s4_hi, s4_lo)
+
+bull_ifvg() =>
+    low > high[2] and (close - open) > 0
+bear_ifvg() =>
+    high < low[2] and (open - close) > 0
+
+var int bias_long_until = na
+var int bias_short_until = na
+var int pdh_sw_bar = na
+var int pdl_sw_bar = na
+var bool pdh_sw_act = false
+var bool pdl_sw_act = false
+
+if not na(pdh) and high > pdh and close < pdh
+    pdh_sw_act := true
+    pdh_sw_bar := bar_index
+if not na(pdl) and low < pdl and close > pdl
+    pdl_sw_act := true
+    pdl_sw_bar := bar_index
+
+if pdh_sw_act
+    if bar_index - pdh_sw_bar > max_sweep_mins
+        pdh_sw_act := false
+    else if bear_ifvg()
+        bias_short_until := bar_index + sweep_memory_bars
+        pdh_sw_act := false
+if pdl_sw_act
+    if bar_index - pdl_sw_bar > max_sweep_mins
+        pdl_sw_act := false
+    else if bull_ifvg()
+        bias_long_until := bar_index + sweep_memory_bars
+        pdl_sw_act := false
+
+// After a session ends, watch that session's H/L for sweep + IFVG reclaim
+var float watch_hi = na
+var float watch_lo = na
+var int watch_hi_bar = na
+var int watch_lo_bar = na
+
+bool s1_end = in_s1[1] and not in_s1
+bool s2_end = in_s2[1] and not in_s2
+bool s3_end = in_s3[1] and not in_s3
+bool s4_end = in_s4[1] and not in_s4
+
+if s1_end
+    watch_hi := s1_hi
+    watch_lo := s1_lo
+    watch_hi_bar := bar_index
+    watch_lo_bar := bar_index
+if s2_end
+    watch_hi := s2_hi
+    watch_lo := s2_lo
+    watch_hi_bar := bar_index
+    watch_lo_bar := bar_index
+if s3_end
+    watch_hi := s3_hi
+    watch_lo := s3_lo
+    watch_hi_bar := bar_index
+    watch_lo_bar := bar_index
+if s4_end
+    watch_hi := s4_hi
+    watch_lo := s4_lo
+    watch_hi_bar := bar_index
+    watch_lo_bar := bar_index
+
+if not na(watch_hi) and not na(watch_hi_bar)
+    if bar_index - watch_hi_bar > max_sweep_mins
+        watch_hi := na
+    else if high > watch_hi and close < watch_hi and bear_ifvg()
+        bias_short_until := bar_index + sweep_memory_bars
+        watch_hi := na
+if not na(watch_lo) and not na(watch_lo_bar)
+    if bar_index - watch_lo_bar > max_sweep_mins
+        watch_lo := na
+    else if low < watch_lo and close > watch_lo and bull_ifvg()
+        bias_long_until := bar_index + sweep_memory_bars
+        watch_lo := na
+
+bool sess_bias_long = not na(bias_long_until) and bar_index <= bias_long_until
+bool sess_bias_short = not na(bias_short_until) and bar_index <= bias_short_until
+
+//#endregion
+
+//#region CVD
+float bar_delta = close >= open ? volume : -volume
+float cvd = ta.cum(bar_delta)
+float cvd_sma = ta.sma(cvd, cvd_slope_len)
+float cvd_slope = cvd - cvd_sma
+float price_slope = close - ta.sma(close, cvd_slope_len)
+bool strong_bull = price_slope > 0 and cvd_slope > 0
+bool strong_bear = price_slope < 0 and cvd_slope < 0
+
+float cvd_ph = ta.pivothigh(cvd, cvd_pivot, cvd_pivot)
+float cvd_pl = ta.pivotlow(cvd, cvd_pivot, cvd_pivot)
+float px_ph = ta.pivothigh(high, cvd_pivot, cvd_pivot)
+float px_pl = ta.pivotlow(low, cvd_pivot, cvd_pivot)
+var float last_px_h = na
+var float last_cvd_h = na
+var float last_px_l = na
+var float last_cvd_l = na
+var int bull_div_until = na
+var int bear_div_until = na
+
+if not na(px_ph)
+    float c_at = cvd[cvd_pivot]
+    if not na(last_px_h) and px_ph > last_px_h and not na(last_cvd_h) and c_at < last_cvd_h
+        bear_div_until := bar_index + sweep_memory_bars
+    last_px_h := px_ph
+    last_cvd_h := c_at
+if not na(px_pl)
+    float c_at = cvd[cvd_pivot]
+    if not na(last_px_l) and px_pl < last_px_l and not na(last_cvd_l) and c_at > last_cvd_l
+        bull_div_until := bar_index + sweep_memory_bars
+    last_px_l := px_pl
+    last_cvd_l := c_at
+
+bool bull_div = not na(bull_div_until) and bar_index <= bull_div_until
+bool bear_div = not na(bear_div_until) and bar_index <= bear_div_until
+
+cvd_ok_long() =>
+    not use_cvd or ((cvd_allow_strong and strong_bull) or (cvd_allow_div and bull_div))
+cvd_ok_short() =>
+    not use_cvd or ((cvd_allow_strong and strong_bear) or (cvd_allow_div and bear_div))
+
+//#endregion
+
+//#region Options magnets / bias
+options_tp(bool is_long, float entry) =>
+    float tp = na
+    if use_options_tp
+        if is_long
+            // prefer max pain then call wall above entry
+            if not na(maxPain) and maxPain > entry
+                tp := maxPain
+            if na(tp) and not na(callWall) and callWall > entry
+                tp := callWall
+        else
+            if not na(maxPain) and maxPain < entry
+                tp := maxPain
+            if na(tp) and not na(putWall) and putWall < entry
+                tp := putWall
+    tp
+
+options_bias_ok(bool is_long) =>
+    bool ok = true
+    if use_options_bias and pPutToMax > 0 and pMaxToCall > 0
+        // rough: if between put and call, prefer path with higher transition prob
+        if not na(putWall) and not na(maxPain) and not na(callWall)
+            if close >= putWall and close < maxPain
+                // upside path Put→Max vs downside Max→Put (~100-pPutToMax)
+                float up = pPutToMax
+                float down = 100.0 - pPutToMax
+                if is_long and down > up + opt_prob_edge
+                    ok := false
+                if not is_long and up > down + opt_prob_edge
+                    ok := false
+            if close >= maxPain and close < callWall
+                float up = pMaxToCall
+                float down = 100.0 - pMaxToCall
+                if is_long and down > up + opt_prob_edge
+                    ok := false
+                if not is_long and up > down + opt_prob_edge
+                    ok := false
+    ok
+
+//#endregion
+
+//#region Mitigation pending + entry
+var bool pend_short = false
+var bool pend_long = false
+var int arm_bar = na
+var float fail_px = na
+var float ob_top = na
+var float ob_bot = na
+var float rej_hi = na
+var float rej_lo = na
+var int rej_bar = na
+var bool rej_short = false
+var bool rej_long = false
+var int last_sig = na
+
+can_signal() => na(last_sig) or (bar_index - last_sig) >= cooldown
+flat_ok() => not one_trade or strategy.position_size == 0
+
+// invalidate
+if pend_short and not na(fail_px) and high > fail_px
+    pend_short := false
+    rej_short := false
+if pend_long and not na(fail_px) and low < fail_px
+    pend_long := false
+    rej_long := false
+
+// arm short
+if fail_hh and bull_ob_breaker and not na(bull_ob_start) and bull_ob_start <= sh1b
+    bool mss_ok = not require_mss or mss_bear or close < bull_ob_bot
+    if mss_ok and high < sh1 and (bull_just_broke or not pend_short)
+        pend_short := true
+        pend_long := false
+        arm_bar := bar_index
+        fail_px := sh1
+        ob_top := bull_ob_top
+        ob_bot := bull_ob_bot
+        rej_short := false
+        rej_long := false
+        rej_bar := na
+
+// arm long
+if fail_ll and bear_ob_breaker and not na(bear_ob_start) and bear_ob_start <= sl1b and not (pend_short and arm_bar == bar_index)
+    bool mss_ok = not require_mss or mss_bull or close > bear_ob_top
+    if mss_ok and low > sl1 and (bear_just_broke or not pend_long)
+        pend_long := true
+        pend_short := false
+        arm_bar := bar_index
+        fail_px := sl1
+        ob_top := bear_ob_top
+        ob_bot := bear_ob_bot
+        rej_short := false
+        rej_long := false
+        rej_bar := na
+
+zone_touch() => high >= ob_bot and low <= ob_top
+
+compute_sl(bool is_long, float entry) =>
+    float buf = sl_pad
+    float stop = na
+    if sl_mode == "failed_liq" and not na(fail_px)
+        stop := is_long ? fail_px - buf : fail_px + buf
+    else if sl_mode == "reject" and not na(rej_hi)
+        stop := is_long ? rej_lo - buf : rej_hi + buf
+    else
+        // nearest swing
+        if is_long and not na(sl2) and sl2 < entry
+            stop := sl2 - buf
+        if not is_long and not na(sh2) and sh2 > entry
+            stop := sh2 + buf
+        if na(stop) and not na(rej_hi)
+            stop := is_long ? rej_lo - buf : rej_hi + buf
+        if na(stop) and not na(fail_px)
+            stop := is_long ? fail_px - buf : fail_px + buf
+    stop
+
+pick_tp(bool is_long, float entry, float stop) =>
+    float risk = math.abs(entry - stop)
+    float min_dist = risk * min_tp_rr
+    float tp = options_tp(is_long, entry)
+    if not na(tp) and math.abs(tp - entry) < min_dist
+        tp := na
+    if na(tp)
+        float liq = is_long ? near_bsl : near_ssl
+        if not na(liq) and (is_long ? liq > entry : liq < entry) and math.abs(liq - entry) >= min_dist
+            tp := liq
+    if na(tp)
+        float rr = math.max(rr_fallback, min_tp_rr)
+        tp := is_long ? entry + risk * rr : entry - risk * rr
+    tp
+
+filters_ok(bool is_long) =>
+    bool sess_ok = not use_session_bias or (is_long ? sess_bias_long : sess_bias_short)
+    bool cvd_ok = is_long ? cvd_ok_long() : cvd_ok_short()
+    bool ema_ok = not use_ema or (is_long ? close > ema : close < ema)
+    bool kz_ok = not use_killzone or in_killzone()
+    bool opt_ok = options_bias_ok(is_long)
+    sess_ok and cvd_ok and ema_ok and kz_ok and opt_ok
+
+bool fired = false
+bool sig_long = false
+float sig_sl = na
+float sig_tp = na
+
+try_enter(bool is_long) =>
+    float entry = close
+    float stop = compute_sl(is_long, entry)
+    float tp = not na(stop) ? pick_tp(is_long, entry, stop) : na
+    bool geom = not na(stop) and not na(tp) and (is_long ? stop < entry and tp > entry : stop > entry and tp < entry)
+    geom and filters_ok(is_long) and can_signal() and flat_ok() ? [true, stop, tp] : [false, stop, tp]
+
+if pend_short and bar_index > arm_bar and (na(fail_px) or high < fail_px)
+    bool in_zone = zone_touch()
+    if require_rejection
+        if rej_short and not na(rej_bar) and bar_index > rej_bar
+            if close < rej_lo
+                [ok, stop, tp] = try_enter(false)
+                if ok
+                    fired := true
+                    sig_long := false
+                    sig_sl := stop
+                    sig_tp := tp
+                    last_sig := bar_index
+                    pend_short := false
+                    rej_short := false
+            else if close > rej_hi
+                rej_short := false
+                rej_bar := na
+        if not fired and in_zone and is_bear_rej()
+            rej_short := true
+            rej_long := false
+            rej_hi := high
+            rej_lo := low
+            rej_bar := bar_index
+    else if in_zone
+        [ok, stop, tp] = try_enter(false)
+        if ok
+            fired := true
+            sig_long := false
+            sig_sl := stop
+            sig_tp := tp
+            last_sig := bar_index
+            pend_short := false
+
+if not fired and pend_long and bar_index > arm_bar and (na(fail_px) or low > fail_px)
+    bool in_zone = zone_touch()
+    if require_rejection
+        if rej_long and not na(rej_bar) and bar_index > rej_bar
+            if close > rej_hi
+                [ok, stop, tp] = try_enter(true)
+                if ok
+                    fired := true
+                    sig_long := true
+                    sig_sl := stop
+                    sig_tp := tp
+                    last_sig := bar_index
+                    pend_long := false
+                    rej_long := false
+            else if close < rej_lo
+                rej_long := false
+                rej_bar := na
+        if not fired and in_zone and is_bull_rej()
+            rej_long := true
+            rej_short := false
+            rej_hi := high
+            rej_lo := low
+            rej_bar := bar_index
+    else if in_zone
+        [ok, stop, tp] = try_enter(true)
+        if ok
+            fired := true
+            sig_long := true
+            sig_sl := stop
+            sig_tp := tp
+            last_sig := bar_index
+            pend_long := false
+
+if fired
+    if sig_long
+        strategy.entry("MIT_L", strategy.long)
+        strategy.exit("MIT_LX", "MIT_L", stop=sig_sl, limit=sig_tp)
+        if show_labels
+            label.new(bar_index, low, "MIT LONG", style=label.style_label_up, color=color.new(#66bb6a, 0), textcolor=color.white, size=size.small)
+    else
+        strategy.entry("MIT_S", strategy.short)
+        strategy.exit("MIT_SX", "MIT_S", stop=sig_sl, limit=sig_tp)
+        if show_labels
+            label.new(bar_index, high, "MIT SHORT", style=label.style_label_down, color=color.new(#ff7043, 0), textcolor=color.white, size=size.small)
+
+//#endregion
+
+//#region Visuals / debug
+plot(show_levels ? putWall : na, "Put Wall", color=color.new(#42a5f5, 0), linewidth=2)
+plot(show_levels ? maxPain : na, "Max Pain", color=color.new(#ffca28, 0), linewidth=2)
+plot(show_levels ? callWall : na, "Call Wall", color=color.new(#ef5350, 0), linewidth=2)
+plot(use_ema ? ema : na, "EMA", color=color.new(color.gray, 40))
+
+plotshape(sess_bias_long and show_debug, title="Sess Bias Long", style=shape.circle, location=location.bottom, color=color.new(color.teal, 0), size=size.tiny)
+plotshape(sess_bias_short and show_debug, title="Sess Bias Short", style=shape.circle, location=location.top, color=color.new(color.orange, 0), size=size.tiny)
+
+plotchar(show_debug ? fail_hh : false, title="Failed HH", char="H", location=location.top, color=color.orange, size=size.tiny)
+plotchar(show_debug ? fail_ll : false, title="Failed LL", char="L", location=location.bottom, color=color.aqua, size=size.tiny)
+plotchar(show_debug ? pend_short : false, title="Pending Short", char="S", location=location.top, color=color.red, size=size.tiny)
+plotchar(show_debug ? pend_long : false, title="Pending Long", char="B", location=location.bottom, color=color.green, size=size.tiny)
+plotchar(show_debug ? (bull_div or bear_div) : false, title="CVD Div Active", char="D", location=location.absolute, color=color.purple, size=size.tiny)
+
+bgcolor(use_killzone and in_killzone() ? color.new(color.blue, 95) : na)
+
+alertcondition(fired and sig_long, "Combo MIT Long", "ICT Combo mitigation long")
+alertcondition(fired and not sig_long, "Combo MIT Short", "ICT Combo mitigation short")
+//#endregion

@@ -1,0 +1,76 @@
+//@version=5
+indicator("CVD Strength / Divergence", shorttitle="CVD_Div", overlay=false, max_labels_count=100)
+
+// =============================================================================
+// CVD تقریبی از حجم کندل + قدرت/ضعف + واگرایی با قیمت
+// (فایل cvd-ict-breakout-sessions سشن/BSG است، نه CVD واقعی — این یکی CVD است)
+// =============================================================================
+
+string GRP = "CVD"
+int pivot_len = input.int(5, "Swing Pivot for Divergence", minval=2, group=GRP)
+int slope_len = input.int(10, "Strength Slope Length", minval=3, group=GRP)
+float weak_thr = input.float(0.25, "Weak Momentum Threshold", minval=0.05, step=0.05, group=GRP)
+bool show_div_labels = input.bool(true, "Show Divergence Labels", group=GRP)
+
+// Approximate delta: up-close volume as buy, down-close as sell
+float bar_delta = close >= open ? volume : -volume
+float cvd = ta.cum(bar_delta)
+float cvd_sma = ta.sma(cvd, slope_len)
+float cvd_slope = cvd - cvd_sma
+float price_slope = close - ta.sma(close, slope_len)
+
+// Strength: CVD agreeing with price
+bool strong_bull = price_slope > 0 and cvd_slope > 0
+bool strong_bear = price_slope < 0 and cvd_slope < 0
+bool weak_bull = price_slope > 0 and cvd_slope < 0
+bool weak_bear = price_slope < 0 and cvd_slope > 0
+
+float ph = ta.pivothigh(high, pivot_len, pivot_len)
+float pl = ta.pivotlow(low, pivot_len, pivot_len)
+float cvd_ph = ta.pivothigh(cvd, pivot_len, pivot_len)
+float cvd_pl = ta.pivotlow(cvd, pivot_len, pivot_len)
+
+var float last_price_high = na
+var float last_cvd_high = na
+var float last_price_low = na
+var float last_cvd_low = na
+var bool bear_div = false
+var bool bull_div = false
+
+bear_div := false
+bull_div := false
+
+if not na(ph)
+    float cvd_at = cvd[pivot_len]
+    if not na(last_price_high) and ph > last_price_high and not na(last_cvd_high) and cvd_at < last_cvd_high
+        bear_div := true
+        if show_div_labels
+            label.new(bar_index - pivot_len, cvd_at, "Bear Div", style=label.style_label_down, color=color.red, textcolor=color.white, size=size.tiny)
+    last_price_high := ph
+    last_cvd_high := cvd_at
+
+if not na(pl)
+    float cvd_at = cvd[pivot_len]
+    if not na(last_price_low) and pl < last_price_low and not na(last_cvd_low) and cvd_at > last_cvd_low
+        bull_div := true
+        if show_div_labels
+            label.new(bar_index - pivot_len, cvd_at, "Bull Div", style=label.style_label_up, color=color.green, textcolor=color.white, size=size.tiny)
+    last_price_low := pl
+    last_cvd_low := cvd_at
+
+plot(cvd, "CVD", color=color.new(color.aqua, 0), linewidth=2)
+plot(cvd_sma, "CVD SMA", color=color.new(color.gray, 30))
+
+bgcolor(strong_bull ? color.new(color.green, 92) : strong_bear ? color.new(color.red, 92) : weak_bull or weak_bear ? color.new(color.orange, 94) : na)
+
+plotshape(bull_div, title="Bull Divergence", style=shape.triangleup, location=location.bottom, color=color.lime, size=size.tiny)
+plotshape(bear_div, title="Bear Divergence", style=shape.triangledown, location=location.top, color=color.red, size=size.tiny)
+
+// Expose for strategy external inputs / alerts
+plot(strong_bull ? 1 : strong_bear ? -1 : 0, "Strength Side", display=display.none)
+plot(bull_div ? 1 : bear_div ? -1 : 0, "Divergence Side", display=display.none)
+
+alertcondition(bull_div, "CVD Bull Divergence", "Bullish CVD divergence")
+alertcondition(bear_div, "CVD Bear Divergence", "Bearish CVD divergence")
+alertcondition(strong_bull, "CVD Strong Bull", "CVD agrees with upside")
+alertcondition(strong_bear, "CVD Strong Bear", "CVD agrees with downside")

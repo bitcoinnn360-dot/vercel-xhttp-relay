@@ -30,7 +30,7 @@ def get_df() -> pd.DataFrame:
         df = pd.read_csv(DATA, parse_dates=["open_time"], index_col="open_time")
         return df
     print("Downloading BTCUSDT 5m (~1 year) from Binance...")
-    end = pd.Timestamp.utcnow()
+    end = pd.Timestamp.now("UTC")
     start = end - pd.Timedelta(days=365)
     df = fetch_klines(
         "BTCUSDT",

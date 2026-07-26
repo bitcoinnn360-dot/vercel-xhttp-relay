@@ -10,7 +10,8 @@ from pathlib import Path
 import pandas as pd
 import requests
 
-BASE = "https://api.binance.com/api/v3/klines"
+# data-api.binance.vision works in regions where api.binance.com returns 451
+BASE = "https://data-api.binance.vision/api/v3/klines"
 
 
 def fetch_klines(symbol: str, interval: str, start_ms: int, end_ms: int) -> pd.DataFrame:
@@ -76,7 +77,7 @@ def main() -> None:
     ap.add_argument("--out", default="")
     args = ap.parse_args()
 
-    end = pd.Timestamp.utcnow()
+    end = pd.Timestamp.now("UTC")
     start = end - pd.Timedelta(days=args.days)
     out = Path(args.out or f"backtest/data/{args.symbol}_{args.interval}_{args.days}d.csv")
     out.parent.mkdir(parents=True, exist_ok=True)

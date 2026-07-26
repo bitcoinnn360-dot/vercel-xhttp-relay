@@ -235,6 +235,83 @@ async function scrapeSourceArena(token) {
   }
 }
 
+const JALALI_MONTHS = {
+  فروردین: 1,
+  اردیبهشت: 2,
+  خرداد: 3,
+  تیر: 4,
+  مرداد: 5,
+  شهریور: 6,
+  مهر: 7,
+  آبان: 8,
+  آذر: 9,
+  دی: 10,
+  بهمن: 11,
+  اسفند: 12,
+}
+
+function parseJalaliDate(raw) {
+  if (!raw) return null
+  const s = String(raw).trim()
+  let m = s.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/)
+  if (m) {
+    const y = Number(m[1])
+    const mo = Number(m[2])
+    const d = Number(m[3])
+    return {
+      dateJalali: `${String(y).padStart(4, '0')}/${String(mo).padStart(2, '0')}/${String(d).padStart(2, '0')}`,
+      date: `${String(mo).padStart(2, '0')}/${String(d).padStart(2, '0')}`,
+    }
+  }
+  m = s.match(
+    /^(\d{1,2})\s*(فروردین|اردیبهشت|خرداد|تیر|مرداد|شهریور|مهر|آبان|آذر|دی|بهمن|اسفند)\s*(\d{4})$/,
+  )
+  if (!m) return null
+  const d = Number(m[1])
+  const mo = JALALI_MONTHS[m[2]]
+  const y = Number(m[3])
+  return {
+    dateJalali: `${String(y).padStart(4, '0')}/${String(mo).padStart(2, '0')}/${String(d).padStart(2, '0')}`,
+    date: `${String(mo).padStart(2, '0')}/${String(d).padStart(2, '0')}`,
+  }
+}
+
+function parseParsistahlilHtml(html, cid, url) {
+  const text = stripHtml(html.replace(/<script[\s\S]*?<\/script>/g, ' '))
+  let retail = null
+  let m = text.match(/معاملات\s*#?خرد[\s\S]{0,80}?مبلغ\s*([\d,]+)\s*میلیارد/) || text.match(/مبلغ\s*([\d,]+)\s*میلیارد تومان بود/)
+  if (m) retail = parseNum(m[1])
+
+  let totalTrades = null
+  m = text.match(/ارزش کل معاملات امروز بازار\s*([\d,]+)\s*میلیارد/)
+  if (m) totalTrades = parseNum(m[1])
+
+  let flow = null
+  m = text.match(/مبلغ\s*([\d,]+)\s*میلیارد تومان\s*(ورود|خروج)\s*حقیقی/)
+  if (m) {
+    flow = parseNum(m[1])
+    if (flow != null) flow = m[2] === 'خروج' ? -Math.abs(flow) : Math.abs(flow)
+  }
+
+  let dateJalaliRaw = null
+  m = text.match(/مورخ\s*(\d{1,2}\s*[\u0600-\u06FF]+\s*\d{4}|\d{4}\/\d{2}\/\d{2})/)
+  if (m) dateJalaliRaw = m[1].trim()
+  const parsed = parseJalaliDate(dateJalaliRaw)
+  if (retail == null && flow == null) return null
+  return {
+    ok: true,
+    source: 'parsistahlil.ir',
+    contentId: String(cid),
+    url,
+    dateJalaliRaw,
+    dateJalali: parsed?.dateJalali || null,
+    date: parsed?.date || null,
+    retailTradeValueBillionToman: retail,
+    totalTradeValueBillionToman: totalTrades,
+    retailMoneyFlowDailyBillionToman: flow,
+  }
+}
+
 async function scrapeParsistahlil() {
   const home = await fetchText(PARSIS_HOME)
   const ids = [...home.matchAll(/\/contents\/(\d+)-%DA%AF%D8%B2%D8%A7%D8%B1%D8%B4-%D9%88%D8%B6%D8%B9%DB%8C%D8%AA-%D8%A8%D8%A7%D8%B2%D8%A7%D8%B1/g)].map(
@@ -245,48 +322,99 @@ async function scrapeParsistahlil() {
     '%DA%AF%D8%B2%D8%A7%D8%B1%D8%B4-%D9%88%D8%B6%D8%B9%DB%8C%D8%AA-%D8%A8%D8%A7%D8%B2%D8%A7%D8%B1-%D8%A7%D8%B1%D8%B2%D8%B4-%D9%85%D8%B9%D8%A7%D9%85%D9%84%D8%A7%D8%AA-%D8%AE%D8%B1%D8%AF-%D9%88-%D9%88%D8%B1%D9%88%D8%AF-%D9%88-%D8%AE%D8%B1%D9%88%D8%AC-%D9%BE%D9%88%D9%84-%D8%AD%D9%82%DB%8C%D9%82%DB%8C'
 
   let lastErr = 'no report link'
-  for (const cid of uniq.slice(0, 6)) {
+  const days = []
+  const seedIds = uniq.map(Number).filter((n) => Number.isFinite(n))
+  const newest = seedIds.length ? Math.max(...seedIds) : 1180
+  const probe = new Set(seedIds)
+  for (let i = newest; i > newest - 10 && i > 0; i--) probe.add(i)
+  const ordered = [...probe].sort((a, b) => b - a).slice(0, 12)
+
+  for (const cidNum of ordered) {
+    const cid = String(cidNum)
     const url = `https://parsistahlil.ir/contents/${cid}-${slug}`
     try {
       const html = await fetchText(url)
-      const text = stripHtml(html.replace(/<script[\s\S]*?<\/script>/g, ' '))
-      let retail = null
-      let m = text.match(/معاملات\s*#?خرد[\s\S]{0,80}?مبلغ\s*([\d,]+)\s*میلیارد/) || text.match(/مبلغ\s*([\d,]+)\s*میلیارد تومان بود/)
-      if (m) retail = parseNum(m[1])
-
-      let totalTrades = null
-      m = text.match(/ارزش کل معاملات امروز بازار\s*([\d,]+)\s*میلیارد/)
-      if (m) totalTrades = parseNum(m[1])
-
-      let flow = null
-      m = text.match(/مبلغ\s*([\d,]+)\s*میلیارد تومان\s*(ورود|خروج)\s*حقیقی/)
-      if (m) {
-        flow = parseNum(m[1])
-        if (flow != null) flow = m[2] === 'خروج' ? -Math.abs(flow) : Math.abs(flow)
-      }
-
-      let dateJalali = null
-      m = text.match(/مورخ\s*(\d{1,2}\s*[\u0600-\u06FF]+\s*\d{4}|\d{4}\/\d{2}\/\d{2})/)
-      if (m) dateJalali = m[1].trim()
-
-      if (retail != null || flow != null) {
-        return {
-          ok: true,
-          source: 'parsistahlil.ir',
-          contentId: cid,
-          url,
-          dateJalali,
-          retailTradeValueBillionToman: retail,
-          totalTradeValueBillionToman: totalTrades,
-          retailMoneyFlowDailyBillionToman: flow,
-        }
-      }
-      lastErr = `content ${cid} no numbers`
+      const row = parseParsistahlilHtml(html, cid, url)
+      if (row) days.push(row)
+      else lastErr = `content ${cid} no numbers`
     } catch (e) {
       lastErr = String(e)
     }
   }
-  return { ok: false, error: lastErr }
+  if (!days.length) return { ok: false, error: lastErr, days: [] }
+  days.sort((a, b) => String(b.dateJalali || '').localeCompare(String(a.dateJalali || '')))
+  const latest = days[0]
+  return {
+    ok: true,
+    source: 'parsistahlil.ir',
+    contentId: latest.contentId,
+    url: latest.url,
+    dateJalali: latest.dateJalaliRaw || latest.dateJalali,
+    retailTradeValueBillionToman: latest.retailTradeValueBillionToman,
+    totalTradeValueBillionToman: latest.totalTradeValueBillionToman,
+    retailMoneyFlowDailyBillionToman: latest.retailMoneyFlowDailyBillionToman,
+    days,
+  }
+}
+
+function recomputeMoneyFlowYtd(store) {
+  const baseline = Number(store.baselineYtdBillionToman ?? -25271)
+  const through = String(store.baselineThroughJalali || '1405/04/29')
+  let extra = 0
+  let asOf = through
+  let asLabel = through.slice(5)
+  for (const row of store.series || []) {
+    const dj = String(row.dateJalali || '')
+    if (!dj || dj <= through) continue
+    extra += Number(row.value) || 0
+    asOf = dj
+    asLabel = row.date || dj.slice(5)
+  }
+  return {
+    ...store,
+    ytdBillionToman: Math.round(baseline + extra),
+    asOfJalali: asOf,
+    asOfLabel: asLabel,
+    updatedAt: new Date().toISOString(),
+    source: 'parsistahlil.ir',
+  }
+}
+
+function mergeMoneyFlowStore(store, days) {
+  const through = String(store.baselineThroughJalali || '1405/04/29')
+  const series = [...(store.series || [])]
+  const byDate = new Map(series.filter((r) => r.dateJalali).map((r) => [String(r.dateJalali), r]))
+  const added = []
+  const ordered = [...(days || [])]
+    .filter((d) => d.dateJalali && d.retailMoneyFlowDailyBillionToman != null)
+    .sort((a, b) => String(a.dateJalali).localeCompare(String(b.dateJalali)))
+
+  for (const day of ordered) {
+    const dj = String(day.dateJalali)
+    if (dj <= through) continue
+    const value = Math.round(Number(day.retailMoneyFlowDailyBillionToman))
+    if (!Number.isFinite(value)) continue
+    const point = {
+      date: day.date || dj.slice(5),
+      dateJalali: dj,
+      value,
+      contentId: String(day.contentId || ''),
+    }
+    if (byDate.has(dj)) {
+      const prev = byDate.get(dj)
+      if (Number(prev.value) !== value) {
+        Object.assign(prev, point)
+        added.push(`update:${dj}`)
+      }
+      continue
+    }
+    series.push(point)
+    byDate.set(dj, point)
+    added.push(dj)
+  }
+  series.sort((a, b) => String(a.dateJalali).localeCompare(String(b.dateJalali)))
+  const next = recomputeMoneyFlowYtd({ ...store, series })
+  return { store: next, added }
 }
 
 export async function onRequestGet(context) {
@@ -296,10 +424,19 @@ export async function onRequestGet(context) {
   let intraday = []
   let parsistahlil = { ok: false }
   let sourcearena = { ok: false }
+  let moneyFlowStore = {
+    baselineYtdBillionToman: -25271,
+    baselineThroughJalali: '1405/04/29',
+    ytdBillionToman: -25271,
+    asOfJalali: '1405/04/29',
+    series: [],
+  }
 
   const token =
     context?.env?.SOURCEARENA_TOKEN ||
     'bba6d330a87bac533f18cc245d3baeaa'
+
+  const origin = new URL(context.request.url).origin
 
   const tasks = await Promise.allSettled([
     fetchJson(TGJU_AJAX),
@@ -307,6 +444,7 @@ export async function onRequestGet(context) {
     fetchText(SHAKH_INDEX),
     scrapeParsistahlil(),
     scrapeSourceArena(token),
+    fetchJson(`${origin}/data/money_flow_ytd.json`).catch(() => null),
   ])
 
   if (tasks[0].status === 'fulfilled') {
@@ -339,6 +477,15 @@ export async function onRequestGet(context) {
     sourcearena = { ok: false, error: String(tasks[4].reason) }
     errors.push(`sourcearena: ${tasks[4].reason}`)
   }
+
+  if (tasks[5].status === 'fulfilled' && tasks[5].value) {
+    moneyFlowStore = tasks[5].value
+  } else if (tasks[5].status === 'rejected') {
+    errors.push(`money_flow_ytd: ${tasks[5].reason}`)
+  }
+
+  const merged = mergeMoneyFlowStore(moneyFlowStore, parsistahlil.days || [])
+  moneyFlowStore = merged.store
 
   const usd = quotes.price_dollar_rl?.value ?? null
   const tedpix = indices.tedpix || (quotes.bourse
@@ -387,6 +534,15 @@ export async function onRequestGet(context) {
       impacts: sourcearena.impacts ?? null,
       impactsFromSourceArena: Boolean(sourcearena.impactsFromSourceArena),
       parsistahlil,
+      retailMoneyFlowYtd: moneyFlowStore.ytdBillionToman,
+      retailMoneyFlowYtdSource: 'parsistahlil-cumulative',
+      moneyFlowAsOfJalali: moneyFlowStore.asOfJalali,
+      moneyFlowSeries: (moneyFlowStore.series || []).map((r) => ({
+        date: r.date,
+        dateJalali: r.dateJalali,
+        value: r.value,
+      })),
+      moneyFlowAdded: merged.added,
       usdRate: usd,
       errors,
       blocked,

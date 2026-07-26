@@ -271,6 +271,10 @@ async function fetchScrapedMarket(): Promise<{
     retailMoneyFlowDailyBillionToman?: number
     retailTradeValueBillionToman?: number
     retailTradeValueHmt?: number
+    retailMoneyFlowYtd?: number
+    retailMoneyFlowYtdSource?: string
+    moneyFlowSeries?: { date: string; dateJalali?: string; value: number }[]
+    moneyFlowAsOfJalali?: string
     impacts?: DashboardData['impacts'] | null
     impactsFromTsetmc?: boolean
     impactsFromSourceArena?: boolean
@@ -297,6 +301,11 @@ async function fetchScrapedMarket(): Promise<{
       tsetmc?: { ok?: boolean }
       ime?: { ok?: boolean }
       infra?: Record<string, string>
+      moneyFlowYtd?: {
+        ytdBillionToman?: number
+        asOfJalali?: string
+        series?: { date: string; dateJalali?: string; value: number }[]
+      }
       overviewLive?: {
         ok?: boolean
         totalMarketValueHmt?: number
@@ -308,6 +317,10 @@ async function fetchScrapedMarket(): Promise<{
         retailMoneyFlowDailyBillionToman?: number
         retailTradeValueBillionToman?: number
         retailTradeValueHmt?: number
+        retailMoneyFlowYtd?: number
+        retailMoneyFlowYtdSource?: string
+        moneyFlowSeries?: { date: string; dateJalali?: string; value: number }[]
+        moneyFlowAsOfJalali?: string
         impacts?: DashboardData['impacts'] | null
         impactsFromTsetmc?: boolean
         impactsFromSourceArena?: boolean
@@ -324,6 +337,18 @@ async function fetchScrapedMarket(): Promise<{
       }
       candles1401?: import('./types').CandlePoint[]
     }
+    const overviewLive = json.overviewLive
+      ? {
+          ...json.overviewLive,
+          retailMoneyFlowYtd:
+            json.overviewLive.retailMoneyFlowYtd ?? json.moneyFlowYtd?.ytdBillionToman,
+          moneyFlowSeries: json.overviewLive.moneyFlowSeries?.length
+            ? json.overviewLive.moneyFlowSeries
+            : json.moneyFlowYtd?.series,
+          moneyFlowAsOfJalali:
+            json.overviewLive.moneyFlowAsOfJalali ?? json.moneyFlowYtd?.asOfJalali,
+        }
+      : json.overviewLive
     return {
       histories: json.histories || {},
       sectors: json.sectors || [],
@@ -333,7 +358,7 @@ async function fetchScrapedMarket(): Promise<{
         imeOk: Boolean(json.ime?.ok),
         infra: json.infra,
       },
-      overviewLive: json.overviewLive,
+      overviewLive,
       candles1401: json.candles1401,
     }
   } catch {
@@ -380,6 +405,10 @@ type OverviewApi = {
   totalTradeValueSource?: string
   impacts?: DashboardData['impacts'] | null
   impactsFromSourceArena?: boolean
+  retailMoneyFlowYtd?: number
+  retailMoneyFlowYtdSource?: string
+  moneyFlowAsOfJalali?: string
+  moneyFlowSeries?: { date: string; dateJalali?: string; value: number }[]
   intraday?: { points?: IntradayPoint[]; note?: string; source?: string }
   parsistahlil?: {
     ok?: boolean
@@ -516,6 +545,21 @@ function applyFreshOverview(base: DashboardData, api: OverviewApi | null, intrad
     notes.unshift(`پارسیس در API زنده خوانده نشد${pars?.error ? `: ${pars.error}` : ''}`)
   }
 
+  if (api?.retailMoneyFlowYtd != null && Number.isFinite(api.retailMoneyFlowYtd)) {
+    o.retailMoneyFlowYtd = api.retailMoneyFlowYtd
+    sources.retailMoneyFlowYtd = api.retailMoneyFlowYtdSource || 'parsistahlil-cumulative'
+    notes.unshift(
+      `YTD پول حقیقی از ابتدای ۱۴۰۴: ${api.retailMoneyFlowYtd}` +
+        (api.moneyFlowAsOfJalali ? ` (تا ${api.moneyFlowAsOfJalali})` : ''),
+    )
+  }
+  if (api?.moneyFlowSeries?.length) {
+    o.moneyFlowSeries = api.moneyFlowSeries.map((r) => ({
+      date: r.date,
+      value: r.value,
+    }))
+  }
+
   const intraday = api?.intraday?.points?.length ? api.intraday.points : intradayFallback
   if (intraday.length) {
     o.intradayIndex = intraday.map((p) => ({ time: p.time.slice(0, 5), value: p.value }))
@@ -573,7 +617,16 @@ function applyOverviewLive(
     o.retailMoneyFlowDaily = live.retailMoneyFlowDailyBillionToman
     sources.retailMoneyFlowDaily = 'parsistahlil'
   }
-  sources.retailMoneyFlowYtd = 'pdf-seed'
+  if (live.retailMoneyFlowYtd != null) {
+    o.retailMoneyFlowYtd = live.retailMoneyFlowYtd
+    sources.retailMoneyFlowYtd = live.retailMoneyFlowYtdSource || 'parsistahlil-cumulative'
+  }
+  if (live.moneyFlowSeries?.length) {
+    o.moneyFlowSeries = live.moneyFlowSeries.map((r) => ({
+      date: r.date,
+      value: Number(r.value),
+    }))
+  }
 
   const liveAny = live as {
     impactsFromSourceArena?: boolean

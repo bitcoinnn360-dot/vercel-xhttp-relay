@@ -30,7 +30,7 @@ export const seedDashboard: DashboardData = {
     usdRate: 1_877_100,
     totalTradeValueHmt: 61.0,
     retailTradeValueHmt: 21,
-    retailMoneyFlowYtd: -25_271,
+    retailMoneyFlowYtd: -15_905,
     indexHistory: [
       { date: '1401/01', value: 1_380_000 },
       { date: '1401/07', value: 1_420_000 },
@@ -87,6 +87,10 @@ export const seedDashboard: DashboardData = {
       { date: '04/10', value: -2613 },
       { date: '04/16', value: 2974 },
       { date: '04/29', value: 4339 },
+      { date: '04/30', value: 3740 },
+      { date: '04/31', value: -719 },
+      { date: '05/03', value: 152 },
+      { date: '05/04', value: 6193 },
     ],
   },
   impacts: {

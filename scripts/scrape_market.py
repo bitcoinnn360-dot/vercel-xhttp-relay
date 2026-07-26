@@ -289,12 +289,112 @@ def scrape_shakhesban_indices() -> dict:
     return out
 
 
-def scrape_parsistahlil_market_status() -> dict:
-    """Latest retail trades + real-money flow from parsistahlil.ir public report pages."""
+JALALI_MONTHS = {
+    "فروردین": 1,
+    "اردیبهشت": 2,
+    "خرداد": 3,
+    "تیر": 4,
+    "مرداد": 5,
+    "شهریور": 6,
+    "مهر": 7,
+    "آبان": 8,
+    "آذر": 9,
+    "دی": 10,
+    "بهمن": 11,
+    "اسفند": 12,
+}
+
+MONEY_FLOW_PATH = OUT_DIR / "money_flow_ytd.json"
+
+
+def parse_jalali_date(raw: str | None) -> dict | None:
+    """Parse '4 مرداد 1405' or '1405/05/04' → keys for store/chart."""
+    if not raw:
+        return None
+    s = str(raw).strip()
+    m = re.match(r"^(\d{4})/(\d{1,2})/(\d{1,2})$", s)
+    if m:
+        y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        return {
+            "dateJalali": f"{y:04d}/{mo:02d}/{d:02d}",
+            "date": f"{mo:02d}/{d:02d}",
+            "year": y,
+            "month": mo,
+            "day": d,
+        }
+    m = re.match(
+        r"^(\d{1,2})\s*(فروردین|اردیبهشت|خرداد|تیر|مرداد|شهریور|مهر|آبان|آذر|دی|بهمن|اسفند)\s*(\d{4})$",
+        s,
+    )
+    if not m:
+        return None
+    d = int(m.group(1))
+    mo = JALALI_MONTHS[m.group(2)]
+    y = int(m.group(3))
+    return {
+        "dateJalali": f"{y:04d}/{mo:02d}/{d:02d}",
+        "date": f"{mo:02d}/{d:02d}",
+        "year": y,
+        "month": mo,
+        "day": d,
+    }
+
+
+def _parse_parsistahlil_html(html: str, cid: str, url: str) -> dict | None:
+    text = re.sub(r"<script[\s\S]*?</script>", " ", html)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"\s+", " ", text)
+
+    retail = None
+    m = re.search(r"معاملات\s*#?خرد.*?مبلغ\s*([\d,]+)\s*میلیارد", text) or re.search(
+        r"مبلغ\s*([\d,]+)\s*میلیارد تومان بود", text
+    )
+    if m:
+        retail = num(m.group(1))
+
+    total_trades = None
+    m = re.search(r"ارزش کل معاملات امروز بازار\s*([\d,]+)\s*میلیارد", text)
+    if m:
+        total_trades = num(m.group(1))
+
+    flow = None
+    m = re.search(r"مبلغ\s*([\d,]+)\s*میلیارد تومان\s*(ورود|خروج)\s*حقیقی", text)
+    if m:
+        flow = num(m.group(1))
+        if flow is not None:
+            flow = -abs(flow) if m.group(2) == "خروج" else abs(flow)
+
+    date_j = None
+    m = re.search(
+        r"مورخ\s*(\d{1,2}\s*(?:فروردین|اردیبهشت|خرداد|تیر|مرداد|شهریور|مهر|آبان|آذر|دی|بهمن|اسفند)\s*\d{4}|\d{4}/\d{2}/\d{2})",
+        text,
+    )
+    if m:
+        date_j = m.group(1).strip()
+    parsed = parse_jalali_date(date_j)
+
+    if retail is None and flow is None:
+        return None
+    return {
+        "ok": True,
+        "source": "parsistahlil.ir",
+        "contentId": str(cid),
+        "url": url,
+        "dateJalaliRaw": date_j,
+        "dateJalali": (parsed or {}).get("dateJalali"),
+        "date": (parsed or {}).get("date"),
+        "retailTradeValueBillionToman": retail,
+        "totalTradeValueBillionToman": total_trades,
+        "retailMoneyFlowDailyBillionToman": flow,
+    }
+
+
+def scrape_parsistahlil_recent(limit: int = 10) -> dict:
+    """Fetch several recent market-status reports (newest first)."""
     try:
         home = fetch("https://parsistahlil.ir/", timeout=40).decode("utf-8", errors="replace")
     except Exception as exc:  # noqa: BLE001
-        return {"ok": False, "error": str(exc)}
+        return {"ok": False, "error": str(exc), "days": []}
 
     links = sorted(
         set(
@@ -306,69 +406,141 @@ def scrape_parsistahlil_market_status() -> dict:
         key=lambda x: int(x),
         reverse=True,
     )
-    if not links:
-        # fallback: any market-status content id
-        links = sorted(set(re.findall(r"/contents/(\d+)-[^\"'\\s]*خرد[^\"'\\s]*", home.replace("\\/", "/"))), key=lambda x: int(x), reverse=True)
+    # Homepage often lists only the newest report — also walk nearby content ids.
+    seed_ids = [int(x) for x in links] if links else [1180]
+    probe: set[int] = set(seed_ids)
+    newest = max(seed_ids)
+    for i in range(newest, max(newest - max(limit, 8), 0), -1):
+        probe.add(i)
+    ordered_ids = sorted(probe, reverse=True)[: max(limit, 8)]
 
     slug = urllib.parse.quote("گزارش-وضعیت-بازار-ارزش-معاملات-خرد-و-ورود-و-خروج-پول-حقیقی")
+    days: list[dict] = []
     last_err = "no report link"
-    for cid in links[:6]:
+    for cid_i in ordered_ids:
+        cid = str(cid_i)
         url = f"https://parsistahlil.ir/contents/{cid}-{slug}"
         try:
             html = fetch(url, timeout=40).decode("utf-8", errors="replace")
         except Exception as exc:  # noqa: BLE001
             last_err = str(exc)
             continue
-        text = re.sub(r"<script[\s\S]*?</script>", " ", html)
-        text = re.sub(r"<[^>]+>", " ", text)
-        text = re.sub(r"\s+", " ", text)
-
-        retail = None
-        m = re.search(
-            r"معاملات\s*#?خرد.*?مبلغ\s*([\d,]+)\s*میلیارد",
-            text,
-        ) or re.search(r"مبلغ\s*([\d,]+)\s*میلیارد تومان بود", text)
-        if m:
-            retail = num(m.group(1))
-
-        total_trades = None
-        m = re.search(r"ارزش کل معاملات امروز بازار\s*([\d,]+)\s*میلیارد", text)
-        if m:
-            total_trades = num(m.group(1))
-
-        flow = None
-        m = re.search(r"مبلغ\s*([\d,]+)\s*میلیارد تومان\s*(ورود|خروج)\s*حقیقی", text)
-        if m:
-            flow = num(m.group(1))
-            if m.group(2) == "خروج" and flow is not None:
-                flow = -abs(flow)
-            elif flow is not None:
-                flow = abs(flow)
+        row = _parse_parsistahlil_html(html, cid, url)
+        if row:
+            days.append(row)
         else:
-            m = re.search(r"(ورود|خروج)\s*حقیقی از بازار داشته ایم.*?مبلغ\s*([\d,]+)", text)
-            # reverse order variants already covered
+            last_err = f"content {cid} parsed but no numbers"
 
-        date_j = None
-        m = re.search(
-            r"مورخ\s*(\d{1,2}\s*(?:فروردین|اردیبهشت|خرداد|تیر|مرداد|شهریور|مهر|آبان|آذر|دی|بهمن|اسفند)\s*\d{4}|\d{4}/\d{2}/\d{2})",
-            text,
-        )
-        if m:
-            date_j = m.group(1).strip()
+    if not days:
+        return {"ok": False, "error": last_err, "days": []}
 
-        if retail is not None or flow is not None:
-            return {
-                "ok": True,
-                "source": "parsistahlil.ir",
-                "contentId": cid,
-                "url": url,
-                "dateJalali": date_j,
-                "retailTradeValueBillionToman": retail,
-                "totalTradeValueBillionToman": total_trades,
-                "retailMoneyFlowDailyBillionToman": flow,
-            }
-        last_err = f"content {cid} parsed but no numbers"
-    return {"ok": False, "error": last_err}
+    # newest-first for "latest" fields
+    days.sort(key=lambda d: (str(d.get("dateJalali") or ""), int(d.get("contentId") or 0)), reverse=True)
+    latest = days[0]
+    return {
+        "ok": True,
+        "source": "parsistahlil.ir",
+        "contentId": latest.get("contentId"),
+        "url": latest.get("url"),
+        "dateJalali": latest.get("dateJalaliRaw") or latest.get("dateJalali"),
+        "retailTradeValueBillionToman": latest.get("retailTradeValueBillionToman"),
+        "totalTradeValueBillionToman": latest.get("totalTradeValueBillionToman"),
+        "retailMoneyFlowDailyBillionToman": latest.get("retailMoneyFlowDailyBillionToman"),
+        "days": days,
+    }
+
+
+def scrape_parsistahlil_market_status() -> dict:
+    return scrape_parsistahlil_recent(limit=10)
+
+
+def load_money_flow_store() -> dict:
+    if MONEY_FLOW_PATH.exists():
+        try:
+            return json.loads(MONEY_FLOW_PATH.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            pass
+    return {
+        "baselineYtdBillionToman": -25271,
+        "baselineThroughJalali": "1405/04/29",
+        "ytdBillionToman": -25271,
+        "asOfJalali": "1405/04/29",
+        "series": [],
+    }
+
+
+def recompute_money_flow_ytd(store: dict) -> dict:
+    baseline = float(store.get("baselineYtdBillionToman") or -25271)
+    through = str(store.get("baselineThroughJalali") or "1405/04/29")
+    series = list(store.get("series") or [])
+    extra = 0.0
+    as_of = through
+    as_label = through[5:] if len(through) >= 8 else through
+    for row in series:
+        dj = str(row.get("dateJalali") or "")
+        if not dj or dj <= through:
+            continue
+        try:
+            extra += float(row.get("value") or 0)
+        except (TypeError, ValueError):
+            continue
+        as_of = dj
+        as_label = str(row.get("date") or dj[5:])
+    store["ytdBillionToman"] = int(round(baseline + extra))
+    store["asOfJalali"] = as_of
+    store["asOfLabel"] = as_label
+    store["updatedAt"] = datetime.now(timezone.utc).isoformat()
+    store["source"] = "parsistahlil.ir"
+    return store
+
+
+def apply_parsistahlil_days_to_store(store: dict, days: list[dict]) -> tuple[dict, list[str]]:
+    """Append new post-baseline daily flows from parsistahlil; recompute YTD."""
+    through = str(store.get("baselineThroughJalali") or "1405/04/29")
+    series = list(store.get("series") or [])
+    by_date = {str(r.get("dateJalali")): r for r in series if r.get("dateJalali")}
+    added: list[str] = []
+
+    # oldest → newest so chart order stays chronological when appending
+    ordered = sorted(
+        [d for d in days if d.get("dateJalali") and d.get("retailMoneyFlowDailyBillionToman") is not None],
+        key=lambda d: str(d.get("dateJalali")),
+    )
+    for day in ordered:
+        dj = str(day["dateJalali"])
+        if dj <= through:
+            continue
+        flow = day.get("retailMoneyFlowDailyBillionToman")
+        try:
+            flow_n = float(flow)
+        except (TypeError, ValueError):
+            continue
+        point = {
+            "date": day.get("date") or dj[5:],
+            "dateJalali": dj,
+            "value": int(round(flow_n)),
+            "contentId": str(day.get("contentId") or ""),
+        }
+        if dj in by_date:
+            # update value if changed (same day republish)
+            prev = by_date[dj]
+            if int(prev.get("value") or 0) != point["value"]:
+                prev.update(point)
+                added.append(f"update:{dj}")
+            continue
+        series.append(point)
+        by_date[dj] = point
+        added.append(dj)
+
+    series.sort(key=lambda r: str(r.get("dateJalali") or ""))
+    store["series"] = series
+    store = recompute_money_flow_ytd(store)
+    return store, added
+
+
+def save_money_flow_store(store: dict) -> None:
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    MONEY_FLOW_PATH.write_text(json.dumps(store, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def parse_sourcearena_billion_rial(raw) -> float | None:
@@ -526,6 +698,7 @@ def build_overview_live(
     tgju_tedpix: dict | None,
     pars: dict,
     glance: dict | None,
+    money_flow: dict | None = None,
 ) -> dict:
     stocks = [s for s in stocks_all if s.get("marketFa") == "سهام"]
     bourse = [s for s in stocks if "فرابورس" not in (s.get("flow") or "")]
@@ -610,11 +783,25 @@ def build_overview_live(
     else:
         blocked.append("parsistahlil")
         notes.append(f"پارسیس‌تحلیل خوانده نشد: {pars.get('error')}")
-    notes.append("خالص ورود/خروج از ابتدای ۱۴۰۴ از گزارش PDF نگه داشته شده.")
+    mf = money_flow or {}
+    ytd = mf.get("ytdBillionToman")
+    series = [
+        {"date": r.get("date"), "dateJalali": r.get("dateJalali"), "value": r.get("value")}
+        for r in (mf.get("series") or [])
+        if r.get("date") is not None and r.get("value") is not None
+    ]
+    if ytd is not None:
+        notes.append(
+            f"خالص پول حقیقی از ابتدای ۱۴۰۴ = {ytd} میلیارد تومان"
+            f" (پایه تا {mf.get('baselineThroughJalali')}: {mf.get('baselineYtdBillionToman')}؛"
+            f" بعد از آن از پارسیس تا {mf.get('asOfJalali')})."
+        )
+    else:
+        notes.append("خالص پول حقیقی YTD هنوز ذخیره نشده.")
 
     impacts = glance.get("impacts") if glance.get("impactsFromSourceArena") else None
     if impacts:
-        notes.append("تاثیر در شاخص از SourceArena (ind_namad_bourse).")
+        notes.append("تاثیر در شاخص از SourceArena (ind_namad_bourse / farabourse).")
     else:
         notes.append("تاثیر مثبت/منفی در صورت نبود SourceArena از seed گزارش می‌ماند.")
 
@@ -641,7 +828,10 @@ def build_overview_live(
         "retailTradeValueBillionToman": retail_trades_bt,
         "retailTradeValueHmt": round(retail_trades_bt / 1000.0, 2) if retail_trades_bt else None,
         "retailMoneyFlowDailyBillionToman": retail_flow,
-        "retailMoneyFlowYtdFromPdf": True,
+        "retailMoneyFlowYtd": ytd,
+        "retailMoneyFlowYtdSource": "parsistahlil-cumulative",
+        "moneyFlowSeries": series,
+        "moneyFlowAsOfJalali": mf.get("asOfJalali"),
         "impacts": impacts,
         "impactsFromTsetmc": False,
         "impactsFromSourceArena": bool(impacts),
@@ -768,7 +958,36 @@ def main() -> int:
 
     print("parsistahlil market status…")
     pars = scrape_parsistahlil_market_status()
-    print("pars", {k: pars.get(k) for k in ("ok", "retailTradeValueBillionToman", "retailMoneyFlowDailyBillionToman", "totalTradeValueBillionToman", "dateJalali", "error")})
+    print(
+        "pars",
+        {
+            k: pars.get(k)
+            for k in (
+                "ok",
+                "retailTradeValueBillionToman",
+                "retailMoneyFlowDailyBillionToman",
+                "totalTradeValueBillionToman",
+                "dateJalali",
+                "error",
+            )
+        },
+        "days",
+        len(pars.get("days") or []),
+    )
+
+    print("money-flow YTD store…")
+    money_flow = load_money_flow_store()
+    money_flow, added_days = apply_parsistahlil_days_to_store(money_flow, pars.get("days") or [])
+    save_money_flow_store(money_flow)
+    print(
+        "moneyFlow",
+        {
+            "ytd": money_flow.get("ytdBillionToman"),
+            "asOf": money_flow.get("asOfJalali"),
+            "added": added_days,
+            "seriesLen": len(money_flow.get("series") or []),
+        },
+    )
 
     print("TGJU intraday…")
     intraday = scrape_tgju_intraday("bourse")
@@ -791,7 +1010,7 @@ def main() -> int:
     )
 
     tsetmc = scrape_tsetmc()  # optional probe only
-    overview_live = build_overview_live(board, usd, indices, tedpix, pars, glance)
+    overview_live = build_overview_live(board, usd, indices, tedpix, pars, glance, money_flow)
     overview_live["intraday"] = {
         "source": "tgju-today-table",
         "note": "مسیر روزانه TGJU (رزولوشن چنددقیقه‌ای).",
@@ -812,7 +1031,7 @@ def main() -> int:
         "infra": {
             "tgju": "TEDPIX + USD live",
             "shakhesban": "equal-weight + IFB indices + board (top trades)",
-            "parsistahlil": "retail trades + daily real-money flow from public report pages (.ir)",
+            "parsistahlil": "retail trades + daily flow; YTD cumulative in money_flow_ytd.json",
             "sourcearena": "بازار بورس+فرابورس در یک نگاه → مجموع ارزش بازار",
             "tradersarena": "UI؛ دادهٔ در یک نگاه از API سورس‌آرنا",
             "tsetmc": "از این مسیر استفاده نمی‌شود (جایگزین: SourceArena)",
@@ -830,6 +1049,7 @@ def main() -> int:
         "tsetmc": tsetmc,
         "ime": ime,
         "parsistahlil": pars,
+        "moneyFlowYtd": money_flow,
     }
 
     scraped = {
@@ -845,6 +1065,9 @@ def main() -> int:
                 "totalTradeValueSource",
                 "retailTradeValueBillionToman",
                 "retailMoneyFlowDailyBillionToman",
+                "retailMoneyFlowYtd",
+                "retailMoneyFlowYtdSource",
+                "moneyFlowAsOfJalali",
                 "marketValueSource",
                 "bourseMarketValueHmt",
                 "ifbMarketValueHmt",
@@ -858,6 +1081,11 @@ def main() -> int:
         "tsetmc": tsetmc,
         "ime": ime,
         "parsistahlil": pars,
+        "moneyFlowYtd": {
+            "ytdBillionToman": money_flow.get("ytdBillionToman"),
+            "asOfJalali": money_flow.get("asOfJalali"),
+            "seriesLen": len(money_flow.get("series") or []),
+        },
     }
 
     (OUT_DIR / "market.json").write_text(json.dumps(market, ensure_ascii=False, indent=2), encoding="utf-8")

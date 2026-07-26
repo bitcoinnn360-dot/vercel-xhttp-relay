@@ -46,15 +46,16 @@ bool enable_mitigation = input.bool(true, "Enable Failed-Swing Mitigation", grou
 bool enable_classic_breaker = input.bool(false, "Enable Classic Breaker (liq swept)", group=GRP_SIG)
 bool require_mss = input.bool(true, "Require MSS / CHoCH", group=GRP_SIG)
 bool mit_enter_on_pullback = input.bool(true, "Mitigation: Enter on Pullback", group=GRP_SIG)
-bool require_fractal_leave = input.bool(true, "Require Fractal HH/LL + Leave SSL/BSL", group=GRP_SIG, tooltip="بعد از بریکر، در فرکتال پایین‌تر سقف/کف جدید بزند و نقدینگی تازه جا بگذارد؛ تارگت سمت مخالف")
+bool require_fractal_leave = input.bool(false, "Require Fractal HH/LL + Leave SSL/BSL", group=GRP_SIG, tooltip="پیش‌فرض OFF — با ON تقریباً هیچ سیگنالی نمی‌آید. بعد از بریکر فرکتال+ترک نقدینگی می‌خواهد.")
 bool brk_enter_on_pullback = input.bool(true, "Classic Breaker: Enter on Pullback", group=GRP_SIG)
 float sl_buffer_ticks = input.float(5, "SL Buffer (ticks)", minval=0, group=GRP_SIG)
 int signal_cooldown = input.int(10, "Cooldown Between Signals (bars)", minval=0, group=GRP_SIG)
 bool show_tp_ssl_bsl = input.bool(true, "Prefer TP = Opposing Liquidity (BSL/SSL)", group=GRP_SIG)
 bool show_tp_fvg = input.bool(true, "Else TP = Untouched Opposing FVG", group=GRP_SIG)
+float min_tp_rr = input.float(1.5, "Min RR for Liq/FVG TP (else RR fallback)", minval=0.5, step=0.1, group=GRP_SIG, tooltip="اگر BSL/SSL خیلی نزدیک باشد رد می‌شود و به تارگت دورتر یا RR می‌رود")
 
 bool require_rejection = input.bool(true, "Require Rejection Confirm on Pullback", group=GRP_REJ, tooltip="شدو ≥ 50% رنج + کندل تأیید فراتر از high/low ریجکت")
-float rej_wick_pct = input.float(50.0, "Rejection Wick % of Candle", minval=30, maxval=90, step=5, group=GRP_REJ)
+float rej_wick_pct = input.float(60.0, "Rejection Wick % of Candle", minval=30, maxval=90, step=5, group=GRP_REJ)
 bool rej_close_in_half = input.bool(true, "Close in Favorable Half of Candle", group=GRP_REJ)
 bool show_rej_markers = input.bool(true, "Show Rejection / Liq-Run Markers", group=GRP_REJ)
 
@@ -522,18 +523,22 @@ float wick_need = rej_wick_pct / 100.0
 [last_ssl, last_ssl_swept, last_ssl_swept_bar, last_ssl_start] = find_last_ssl()
 
 pick_tp(bool is_long, float entry, float sl, float liq_tp, float fvg_tp) =>
+    float risk = math.abs(entry - sl)
+    float min_dist = risk * min_tp_rr
     float tp = na
     if show_tp_ssl_bsl and not na(liq_tp)
-        bool ok = is_long ? liq_tp > entry : liq_tp < entry
+        float dist = math.abs(liq_tp - entry)
+        bool ok = (is_long ? liq_tp > entry : liq_tp < entry) and dist >= min_dist
         if ok
             tp := liq_tp
     if na(tp) and show_tp_fvg and not na(fvg_tp)
-        bool ok = is_long ? fvg_tp > entry : fvg_tp < entry
+        float dist = math.abs(fvg_tp - entry)
+        bool ok = (is_long ? fvg_tp > entry : fvg_tp < entry) and dist >= min_dist
         if ok
             tp := fvg_tp
     if na(tp)
-        float risk = math.abs(entry - sl)
-        tp := is_long ? entry + risk * rr_fallback : entry - risk * rr_fallback
+        float rr = math.max(rr_fallback, min_tp_rr)
+        tp := is_long ? entry + risk * rr : entry - risk * rr
     tp
 
 opposing_liq_tp(bool is_long) =>
@@ -648,6 +653,8 @@ if pend_mit_short and not na(pend_mit_sl) and high > pend_mit_sl
     pend_mit_short := false
     pend_mit_fractal_ready := false
     pend_mit_left_liq := false
+    pend_mit_arm_high := na
+    pend_mit_arm_low := na
     pend_rej_long := false
     pend_rej_short := false
     pend_rej_high := na
@@ -657,6 +664,8 @@ if pend_mit_long and not na(pend_mit_sl) and low < pend_mit_sl
     pend_mit_long := false
     pend_mit_fractal_ready := false
     pend_mit_left_liq := false
+    pend_mit_arm_high := na
+    pend_mit_arm_low := na
     pend_rej_long := false
     pend_rej_short := false
     pend_rej_high := na
@@ -707,7 +716,8 @@ if enable_mitigation and array.size(ob_array) > 0
         int ob_i = find_ob_index_for_swing(true, fh1_bar)
         if not na(ob_i)
             OrderBlock ob = array.get(ob_array, ob_i)
-            bool break_event = ob.is_breaker and (ob.just_broke or fail_hh_new)
+            // Arm whenever breaker+failed-swing coexist (not only the one-bar race of just_broke/fail_hh_new)
+            bool break_event = ob.is_breaker and (ob.just_broke or fail_hh_new or not pend_mit_short)
             if break_event
                 bool mss_ok = not require_mss or mss_bear or close < ob.bottom
                 bool trend_ok = not require_structure or struct_bull
@@ -747,7 +757,7 @@ if enable_mitigation and array.size(ob_array) > 0
         int ob_i = find_ob_index_for_swing(false, fl1_bar)
         if not na(ob_i)
             OrderBlock ob = array.get(ob_array, ob_i)
-            bool break_event = ob.is_breaker and (ob.just_broke or fail_ll_new)
+            bool break_event = ob.is_breaker and (ob.just_broke or fail_ll_new or not pend_mit_long)
             if break_event
                 bool mss_ok = not require_mss or mss_bull or close > ob.top
                 bool trend_ok = not require_structure or struct_bear

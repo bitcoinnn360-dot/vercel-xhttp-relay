@@ -1,6 +1,6 @@
 import { Activity, RefreshCw } from 'lucide-react'
 import type { DashboardData } from '../../data/types'
-import { timeFa } from '../../lib/format'
+import { jalaliTodayTehran, timeFa } from '../../lib/format'
 
 const NAV = [
   { id: 'overview', label: 'نمای بازار' },
@@ -51,6 +51,7 @@ export function Sidebar({ active }: { active: string }) {
 }
 
 export function TopBar({ data, refreshing, onRefresh }: Omit<Props, 'active'>) {
+  const dateLabel = jalaliTodayTehran() || data.overview.dateJalali
   return (
     <div className="gf-head">
       <div>
@@ -58,7 +59,7 @@ export function TopBar({ data, refreshing, onRefresh }: Omit<Props, 'active'>) {
           داشبورد گزارش روزانه بازار
         </h1>
         <p className="text-xs text-[var(--color-muted)]">
-          شرکت سرمایه‌گذاری توسعه معادن و فلزات · {data.overview.dateJalali}
+          شرکت سرمایه‌گذاری توسعه معادن و فلزات · {dateLabel}
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">

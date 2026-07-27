@@ -1,0 +1,37 @@
+{
+  "dateJalali": "1405/05/05",
+  "history": [
+    {
+      "time": "11:30",
+      "positive": 494,
+      "negative": 270,
+      "flat": 1,
+      "orderBuy": 126.6,
+      "orderSell": 245.4,
+      "retailFlow": 652.4,
+      "perCapitaBuy": 455.96,
+      "perCapitaSell": 256.17
+    }
+  ],
+  "current": {
+    "asOf": "2026-07-27T11:30:47.892308+03:30",
+    "time": "11:30",
+    "dateJalali": "1405/05/05",
+    "source": "shakhesban-board",
+    "breadth": {
+      "positive": 494,
+      "negative": 270,
+      "flat": 1,
+      "total": 765
+    },
+    "orderBuyBillionToman": 126.6,
+    "orderSellBillionToman": 245.4,
+    "retailMoneyFlowBillionToman": 652.4,
+    "retailBuyBillionToman": 1776.0,
+    "retailSellBillionToman": 1123.6,
+    "perCapitaBuyMillionToman": 455.96,
+    "perCapitaSellMillionToman": 256.17,
+    "note": "معادل نمودارهای لحظه‌ای TradersArena از تجمیع تابلو (صف خرید/فروش + حقیقی)"
+  },
+  "updatedAt": "2026-07-27T08:00:47.892708+00:00"
+}

@@ -1,0 +1,95 @@
+{
+  "boursePos": [
+    {
+      "symbol": "شپنا",
+      "impact": 6743.3
+    },
+    {
+      "symbol": "شبندر",
+      "impact": 4973.5
+    },
+    {
+      "symbol": "وپاسار",
+      "impact": 4233.2
+    },
+    {
+      "symbol": "بوعلی",
+      "impact": 3825.0
+    },
+    {
+      "symbol": "شستا",
+      "impact": 3574.4
+    }
+  ],
+  "bourseNeg": [
+    {
+      "symbol": "وبملت",
+      "impact": -3635.9
+    },
+    {
+      "symbol": "شپدیس",
+      "impact": -2187.1
+    },
+    {
+      "symbol": "وامید",
+      "impact": -1430.5
+    },
+    {
+      "symbol": "افق",
+      "impact": -1290.1
+    },
+    {
+      "symbol": "دعبید",
+      "impact": -1204.1
+    }
+  ],
+  "ifbPos": [
+    {
+      "symbol": "شگویا",
+      "impact": 123.6
+    },
+    {
+      "symbol": "زاگرس",
+      "impact": 107.8
+    },
+    {
+      "symbol": "فغدیر",
+      "impact": 73.8
+    },
+    {
+      "symbol": "تجلی",
+      "impact": 62.1
+    },
+    {
+      "symbol": "فصبا",
+      "impact": 54.8
+    }
+  ],
+  "ifbNeg": [
+    {
+      "symbol": "کگهر",
+      "impact": -405.9
+    },
+    {
+      "symbol": "فجهان",
+      "impact": -78.0
+    },
+    {
+      "symbol": "شرانل",
+      "impact": -58.7
+    },
+    {
+      "symbol": "مادیرا",
+      "impact": -26.6
+    },
+    {
+      "symbol": "تماوند",
+      "impact": -22.5
+    }
+  ],
+  "updatedAt": "2026-07-27T08:00:49.226507+00:00",
+  "sources": [
+    "rahavard365",
+    "shakhesban-board"
+  ]
+}

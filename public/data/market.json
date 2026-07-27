@@ -5,11 +5,12 @@
     "shakhesban": "equal-weight + IFB indices + board (top trades)",
     "parsistahlil": "retail trades + daily real-money flow from public report pages (.ir)",
     "sourcearena": "بازار بورس+فرابورس در یک نگاه → مجموع ارزش بازار",
-    "tradersarena": "UI؛ دادهٔ در یک نگاه از API سورس‌آرنا",
+    "tradersarena": "الگوی UI پالس بازار؛ داده از تجمیع تابلو",
     "tsetmc": "از این مسیر استفاده نمی‌شود (جایگزین: SourceArena)",
     "ime": "usually needs Iran IP",
     "custeel": "paid; interim uses TGJU iron-ore/steel-coil + FRED",
-    "fred": "scripts/fetch_fred.py"
+    "fred": "scripts/fetch_fred.py",
+    "rahavard365": "تاثیر مثبت/منفی بورس روی شاخص کل"
   },
   "tgju": {
     "quotes": {
@@ -16972,95 +16973,95 @@
     "impacts": {
       "boursePos": [
         {
-          "symbol": "وبملت",
-          "impact": 15163.5
-        },
-        {
           "symbol": "شپنا",
-          "impact": 6489.83
+          "impact": 6743.3
         },
         {
           "symbol": "شبندر",
-          "impact": 4804.77
+          "impact": 4973.5
         },
         {
           "symbol": "وپاسار",
-          "impact": 4048.02
+          "impact": 4233.2
+        },
+        {
+          "symbol": "بوعلی",
+          "impact": 3825.0
         },
         {
           "symbol": "شستا",
-          "impact": 3724.03
+          "impact": 3574.4
         }
       ],
       "bourseNeg": [
         {
-          "symbol": "دعبید",
-          "impact": -1193.6
+          "symbol": "وبملت",
+          "impact": -3635.9
+        },
+        {
+          "symbol": "شپدیس",
+          "impact": -2187.1
         },
         {
           "symbol": "وامید",
-          "impact": -1155.9
+          "impact": -1430.5
         },
         {
-          "symbol": "غکورش",
-          "impact": -882.5
+          "symbol": "افق",
+          "impact": -1290.1
         },
         {
-          "symbol": "تیپیکو",
-          "impact": -676.4
-        },
-        {
-          "symbol": "وپخش",
-          "impact": -404.6
+          "symbol": "دعبید",
+          "impact": -1204.1
         }
       ],
       "ifbPos": [
         {
-          "symbol": "مارون",
-          "impact": 64.95
+          "symbol": "شگویا",
+          "impact": 123.6
         },
         {
-          "symbol": "کگهر",
-          "impact": 59.3
+          "symbol": "زاگرس",
+          "impact": 107.8
         },
         {
-          "symbol": "سامان",
-          "impact": 53.54
+          "symbol": "فغدیر",
+          "impact": 73.8
         },
         {
-          "symbol": "بپاس",
-          "impact": 50.66
+          "symbol": "تجلی",
+          "impact": 62.1
         },
         {
-          "symbol": "آریا",
-          "impact": 50.48
+          "symbol": "فصبا",
+          "impact": 54.8
         }
       ],
       "ifbNeg": [
         {
-          "symbol": "غصینو",
-          "impact": -15.6
+          "symbol": "کگهر",
+          "impact": -405.9
         },
         {
-          "symbol": "کاسپین",
-          "impact": -13.4
+          "symbol": "فجهان",
+          "impact": -78.0
         },
         {
-          "symbol": "دقاضی",
-          "impact": -12.7
+          "symbol": "شرانل",
+          "impact": -58.7
         },
         {
-          "symbol": "دتوزیع",
-          "impact": -9.0
+          "symbol": "مادیرا",
+          "impact": -26.6
         },
         {
-          "symbol": "شگویا",
-          "impact": -8.8
+          "symbol": "تماوند",
+          "impact": -22.5
         }
       ]
     },
     "impactsFromTsetmc": false,
-    "impactsFromSourceArena": true,
+    "impactsFromSourceArena": false,
     "topTrades": [
       {
         "name": "وبملت",
@@ -17398,7 +17399,44 @@
           "change": 8.37
         }
       ]
-    }
+    },
+    "dateJalali": "1405/05/05",
+    "dateGregorian": "2026-07-27",
+    "impactsFromRahavard": true,
+    "impactsSource": "rahavard365+shakhesban-board",
+    "marketPulse": {
+      "asOf": "2026-07-27T11:30:47.892308+03:30",
+      "time": "11:30",
+      "dateJalali": "1405/05/05",
+      "source": "shakhesban-board",
+      "breadth": {
+        "positive": 494,
+        "negative": 270,
+        "flat": 1,
+        "total": 765
+      },
+      "orderBuyBillionToman": 126.6,
+      "orderSellBillionToman": 245.4,
+      "retailMoneyFlowBillionToman": 652.4,
+      "retailBuyBillionToman": 1776.0,
+      "retailSellBillionToman": 1123.6,
+      "perCapitaBuyMillionToman": 455.96,
+      "perCapitaSellMillionToman": 256.17,
+      "note": "معادل نمودارهای لحظه‌ای TradersArena از تجمیع تابلو (صف خرید/فروش + حقیقی)"
+    },
+    "marketPulseHistory": [
+      {
+        "time": "11:30",
+        "positive": 494,
+        "negative": 270,
+        "flat": 1,
+        "orderBuy": 126.6,
+        "orderSell": 245.4,
+        "retailFlow": 652.4,
+        "perCapitaBuy": 455.96,
+        "perCapitaSell": 256.17
+      }
+    ]
   },
   "sectors": [
     {
@@ -17884,5 +17922,91 @@
       "روزهای بعد از پارسیس‌تحلیل اضافه و به YTD جمع می‌شوند.",
       "اسکرپر/API هر روز جدید را فقط یک‌بار اعمال می‌کند."
     ]
+  },
+  "rahavard": {
+    "ok": true,
+    "source": "rahavard365",
+    "boursePos": [
+      {
+        "symbol": "شپنا",
+        "impact": 6743.3
+      },
+      {
+        "symbol": "شبندر",
+        "impact": 4973.5
+      },
+      {
+        "symbol": "وپاسار",
+        "impact": 4233.2
+      },
+      {
+        "symbol": "بوعلی",
+        "impact": 3825.0
+      },
+      {
+        "symbol": "شستا",
+        "impact": 3574.4
+      }
+    ],
+    "bourseNeg": [
+      {
+        "symbol": "وبملت",
+        "impact": -3635.9
+      },
+      {
+        "symbol": "شپدیس",
+        "impact": -2187.1
+      },
+      {
+        "symbol": "وامید",
+        "impact": -1430.5
+      },
+      {
+        "symbol": "افق",
+        "impact": -1290.1
+      },
+      {
+        "symbol": "دعبید",
+        "impact": -1204.1
+      }
+    ],
+    "asOf": "2026-07-27T10:10:00+03:30"
+  },
+  "marketPulse": {
+    "dateJalali": "1405/05/05",
+    "history": [
+      {
+        "time": "11:30",
+        "positive": 494,
+        "negative": 270,
+        "flat": 1,
+        "orderBuy": 126.6,
+        "orderSell": 245.4,
+        "retailFlow": 652.4,
+        "perCapitaBuy": 455.96,
+        "perCapitaSell": 256.17
+      }
+    ],
+    "current": {
+      "asOf": "2026-07-27T11:30:47.892308+03:30",
+      "time": "11:30",
+      "dateJalali": "1405/05/05",
+      "source": "shakhesban-board",
+      "breadth": {
+        "positive": 494,
+        "negative": 270,
+        "flat": 1,
+        "total": 765
+      },
+      "orderBuyBillionToman": 126.6,
+      "orderSellBillionToman": 245.4,
+      "retailMoneyFlowBillionToman": 652.4,
+      "retailBuyBillionToman": 1776.0,
+      "retailSellBillionToman": 1123.6,
+      "perCapitaBuyMillionToman": 455.96,
+      "perCapitaSellMillionToman": 256.17,
+      "note": "معادل نمودارهای لحظه‌ای TradersArena از تجمیع تابلو (صف خرید/فروش + حقیقی)"
+    },
+    "updatedAt": "2026-07-27T08:00:47.892708+00:00"
   }
 }

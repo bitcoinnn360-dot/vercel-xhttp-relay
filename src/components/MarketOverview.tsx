@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import type { DashboardData } from '../data/types'
 import type { HistoryPoint } from '../data/fetchers'
 import { changeClass, fmtChange, fmtInt, fmtNum, fmtPct } from '../lib/format'
-import { CandlestickChart, FlowBarChart, PriceAreaChart } from './charts/Charts'
+import { BreadthBarChart, CandlestickChart, DualLineChart, FlowBarChart, PriceAreaChart } from './charts/Charts'
 import { TopTrades } from './StocksSection'
 
 function Kpi({
@@ -59,6 +59,55 @@ export function MarketOverview({
   const candles = o.candles1401 || []
   const retailDaily = o.retailMoneyFlowDaily
   const blocked = o.blockedSources || []
+  const pulse = o.marketPulse
+  const pulseHist = o.marketPulseHistory || []
+  const hasHist = pulseHist.length > 0
+  const breadthSeries = hasHist
+    ? pulseHist.map((p) => ({
+        label: p.time,
+        positive: p.positive ?? 0,
+        negative: p.negative ?? 0,
+      }))
+    : pulse?.breadth
+      ? [
+          {
+            label: pulse.time || 'الان',
+            positive: pulse.breadth.positive,
+            negative: pulse.breadth.negative,
+          },
+        ]
+      : []
+  const flowSeries = hasHist
+    ? pulseHist.map((p) => ({ label: p.time, value: p.retailFlow ?? 0 }))
+    : pulse
+      ? [{ label: pulse.time || 'الان', value: pulse.retailMoneyFlowBillionToman ?? 0 }]
+      : []
+  const orderSeries = hasHist
+    ? pulseHist.map((p) => ({ label: p.time, buy: p.orderBuy ?? 0, sell: p.orderSell ?? 0 }))
+    : pulse
+      ? [
+          {
+            label: pulse.time || 'الان',
+            buy: pulse.orderBuyBillionToman ?? 0,
+            sell: pulse.orderSellBillionToman ?? 0,
+          },
+        ]
+      : []
+  const perCapitaSeries = hasHist
+    ? pulseHist.map((p) => ({
+        label: p.time,
+        buy: p.perCapitaBuy ?? 0,
+        sell: p.perCapitaSell ?? 0,
+      }))
+    : pulse
+      ? [
+          {
+            label: pulse.time || 'الان',
+            buy: pulse.perCapitaBuyMillionToman ?? 0,
+            sell: pulse.perCapitaSellMillionToman ?? 0,
+          },
+        ]
+      : []
 
   return (
     <section id="overview" className="scroll-mt-8 space-y-4">
@@ -215,14 +264,118 @@ export function MarketOverview({
           pos={data.impacts?.boursePos || []}
           neg={data.impacts?.bourseNeg || []}
           live={Boolean(o.impactsLive)}
+          sourceHint={o.fieldSources?.impacts}
         />
         <ImpactPanel
           title="تأثیر مثبت/منفی فرابورس"
           pos={data.impacts?.ifbPos || []}
           neg={data.impacts?.ifbNeg || []}
           live={Boolean(o.impactsLive)}
+          sourceHint={o.fieldSources?.impacts}
         />
         <TopTrades data={data} />
+      </div>
+
+      <div>
+        <h3 className="mb-1 text-sm font-bold">پالس لحظه‌ای بازار (الگوی TradersArena)</h3>
+        <p className="mb-3 text-[10px] text-[var(--color-muted)]">
+          وضعیت نمادها، ورود پول حقیقی، ارزش سفارش‌ها و سرانه خرید/فروش · تجمیع تابلو
+          {pulse?.time ? ` · آخرین نمونه ${pulse.time}` : ''}
+        </p>
+        <div className="grid gap-3 lg:grid-cols-2">
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="panel p-4">
+            <h4 className="mb-1 text-sm font-bold">نمادهای مثبت / منفی</h4>
+            <p className="mb-2 text-[10px] text-[var(--color-muted)]">
+              زیر نمودار: ارزش سفارش خرید {fmtNum(pulse?.orderBuyBillionToman ?? 0, 1)} · فروش{' '}
+              {fmtNum(pulse?.orderSellBillionToman ?? 0, 1)} میلیارد تومان
+            </p>
+            {pulse?.breadth ? (
+              <BreadthBarChart
+                positive={pulse.breadth.positive}
+                negative={pulse.breadth.negative}
+                flat={pulse.breadth.flat}
+              />
+            ) : (
+              <DualLineChart
+                data={breadthSeries}
+                aKey="positive"
+                bKey="negative"
+                aLabel="مثبت"
+                bLabel="منفی"
+                unit="نماد"
+              />
+            )}
+            {breadthSeries.length > 1 ? (
+              <div className="mt-2">
+                <DualLineChart
+                  data={breadthSeries}
+                  aKey="positive"
+                  bKey="negative"
+                  aLabel="مثبت"
+                  bLabel="منفی"
+                  height={140}
+                  unit="نماد"
+                />
+              </div>
+            ) : null}
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className="panel p-4"
+          >
+            <h4 className="mb-1 text-sm font-bold">ورود پول حقیقی لحظه‌ای</h4>
+            <p className="mb-2 text-[10px] text-[var(--color-muted)]">
+              خالص الان:{' '}
+              <span className={`num font-semibold ${changeClass(pulse?.retailMoneyFlowBillionToman ?? 0)}`}>
+                {fmtNum(pulse?.retailMoneyFlowBillionToman ?? 0, 1)}
+              </span>{' '}
+              میلیارد تومان
+            </p>
+            <FlowBarChart data={flowSeries} height={200} />
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08 }}
+            className="panel p-4"
+          >
+            <h4 className="mb-1 text-sm font-bold">ارزش سفارش‌های خرید و فروش</h4>
+            <p className="mb-2 text-[10px] text-[var(--color-muted)]">بهترین سطح صف · میلیارد تومان</p>
+            <DualLineChart
+              data={orderSeries}
+              aKey="buy"
+              bKey="sell"
+              aLabel="خرید"
+              bLabel="فروش"
+              unit="میلیارد تومان"
+            />
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="panel p-4"
+          >
+            <h4 className="mb-1 text-sm font-bold">سرانه خرید و فروش</h4>
+            <p className="mb-2 text-[10px] text-[var(--color-muted)]">
+              سرانه صف · خرید {fmtNum(pulse?.perCapitaBuyMillionToman ?? 0, 1)} · فروش{' '}
+              {fmtNum(pulse?.perCapitaSellMillionToman ?? 0, 1)} میلیون تومان
+            </p>
+            <DualLineChart
+              data={perCapitaSeries}
+              aKey="buy"
+              bKey="sell"
+              aLabel="سرانه خرید"
+              bLabel="سرانه فروش"
+              unit="میلیون تومان"
+            />
+          </motion.div>
+        </div>
       </div>
 
       {o.liveNotes?.length ? (
@@ -241,18 +394,26 @@ function ImpactPanel({
   pos,
   neg,
   live,
+  sourceHint,
 }: {
   title: string
   pos: { symbol: string; impact: number }[]
   neg: { symbol: string; impact: number }[]
   live?: boolean
+  sourceHint?: string
 }) {
+  const src =
+    sourceHint?.includes('rahavard')
+      ? 'رهاورد ۳۶۵ · تاثیر بر شاخص کل'
+      : sourceHint?.includes('shakhesban')
+        ? 'محاسبه از تابلو · قیمت پایانی'
+        : live
+          ? 'سورت تاثیر بر شاخص · زنده'
+          : 'فعلاً از گزارش PDF — در انتظار داده زنده'
   return (
     <div className="panel p-4">
       <h3 className="mb-1 text-sm font-bold">{title}</h3>
-      <p className="mb-3 text-[10px] text-[var(--color-muted)]">
-        {live ? 'سورت تاثیر بر شاخص · SourceArena' : 'فعلاً از گزارش PDF — در انتظار داده زنده'}
-      </p>
+      <p className="mb-3 text-[10px] text-[var(--color-muted)]">{src}</p>
       <div className="grid grid-cols-2 gap-3">
         <ul className="space-y-2">
           {(pos || []).slice(0, 5).map((s, i) => (

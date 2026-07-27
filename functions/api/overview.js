@@ -12,10 +12,13 @@
 const TGJU_AJAX = 'https://call2.tgju.org/ajax.json'
 const TGJU_TODAY = 'https://api.tgju.org/v1/market/indicator/today-table-data/bourse?lang=fa'
 const SHAKH_INDEX = 'https://www.shakhesban.com/markets/index'
+const SHAKH_LIST = 'https://www.shakhesban.com/stocks/list-data'
 const PARSIS_HOME = 'https://parsistahlil.ir/'
 const SOURCEARENA_API = 'https://apis.sourcearena.ir/api/'
+const RAHAVARD_API = 'https://rahavard365.com/api/v2'
 const BILLION_RIAL_PER_HEMAT = 10000
 const RIAL_PER_HEMAT = 1e13
+const RIAL_PER_BILLION_TOMAN = 1e10
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
@@ -156,69 +159,225 @@ function parseIntraday(payload) {
   return points
 }
 
-function isEquityRow(row) {
-  const market = String(row?.market || '')
-  const industry = String(row?.industry || '')
-  const name = String(row?.name || '')
-  const full = String(row?.full_name || '')
-  const code = String(row?.namad_code || '')
-  const blob = `${market} ${industry} ${name} ${full}`
-  if (!market.includes('بورس') && !market.includes('فرابورس')) return false
-  if (
-    /صندوق|مرابحه|اجاره|اختيار|اختیار|تبعی|حق تقدم|آتی/.test(blob) ||
-    name.endsWith('ح') ||
-    code.startsWith('IRF') ||
-    code.startsWith('IRR')
-  ) {
-    return false
+function jalaliToday() {
+  const fmt = new Intl.DateTimeFormat('en-US-u-ca-persian', {
+    timeZone: 'Asia/Tehran',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+  const parts = Object.fromEntries(fmt.formatToParts(new Date()).map((p) => [p.type, p.value]))
+  const y = String(parts.year).padStart(4, '0')
+  const mo = String(parts.month).padStart(2, '0')
+  const d = String(parts.day).padStart(2, '0')
+  const timeFmt = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Tehran',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  return {
+    dateJalali: `${y}/${mo}/${d}`,
+    dateGregorian: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tehran' }),
+    time: timeFmt.format(new Date()),
   }
-  return true
 }
 
-function buildImpactsAndTopTrades(allRows, bourseGlance, ifbGlance) {
-  const indexB = parseBillionRial(bourseGlance?.index)
-  const indexF = parseBillionRial(ifbGlance?.index)
-  const totalB = (parseBillionRial(bourseGlance?.market_value) || 0) * 1e9
-  const totalF = (parseBillionRial(ifbGlance?.market_value) || 0) * 1e9
-  const bourse = []
-  const ifb = []
-  const trades = []
+function parseShakhesbanTbody(tbody) {
+  const rows = []
+  const trRe = /<tr\s+data-symbol="([^"]+)">([\s\S]*?)<\/tr>/g
+  let m
+  while ((m = trRe.exec(tbody || ''))) {
+    const symbol = m[1]
+    const block = m[2]
+    const vals = {}
+    const tdRe1 = /<td[^>]*data-val="([^"]*)"[^>]*data-col="([^"]+)"/g
+    const tdRe2 = /<td[^>]*data-col="([^"]+)"[^>]*data-val="([^"]*)"/g
+    let td
+    while ((td = tdRe1.exec(block))) vals[td[2]] = td[1]
+    while ((td = tdRe2.exec(block))) vals[td[1]] = td[2]
+    if ((vals['info.market_fa'] || '') !== 'سهام') continue
+    const yesterday = parseNum(vals['info.PriceYesterday']) || 0
+    const close = parseNum(vals['info.last_price.PClosing']) || 0
+    const last = parseNum(vals['info.last_trade.PDrCotVal']) || 0
+    let closeChg = parseNum(vals['info.last_price.closing_change'])
+    let lastChg = parseNum(vals['info.last_trade.last_change'])
+    if (closeChg == null && close && yesterday) closeChg = close - yesterday
+    if (lastChg == null && last && yesterday) lastChg = last - yesterday
+    const finalChg = closeChg != null && closeChg !== 0 ? closeChg : lastChg
+    rows.push({
+      symbol,
+      flow: vals['info.flow.title'] || '',
+      marketValue: parseNum(vals['trades.arzesh_bazar']) || 0,
+      tradeValue: parseNum(vals['trades.QTotCap']) || 0,
+      close,
+      last,
+      yesterday,
+      closeChg,
+      lastChg,
+      finalChg,
+      changePctLast: parseNum(vals['info.last_trade.last_change_percentage']) || 0,
+      changePctClose: parseNum(vals['info.last_price.closing_change_percentage']) || 0,
+      buyIVol: parseNum(vals['trades.buy_and_sell.Buy_I_Volume']) || 0,
+      sellIVol: parseNum(vals['trades.buy_and_sell.Sell_I_Volume']) || 0,
+      orderBuyVol: parseNum(vals['demands.1_0']) || 0,
+      orderBuyCnt: parseNum(vals['demands.1_1']) || 0,
+      orderBuyPx: parseNum(vals['demands.1_2']) || 0,
+      orderSellPx: parseNum(vals['demands.1_3']) || 0,
+      orderSellCnt: parseNum(vals['demands.1_4']) || 0,
+      orderSellVol: parseNum(vals['demands.1_5']) || 0,
+    })
+  }
+  return rows
+}
 
-  for (const row of allRows || []) {
-    if (!isEquityRow(row)) continue
-    const name = String(row.name || '').trim()
-    const mv = parseNum(row.market_value) || 0
-    const yesterday = parseNum(row.yesterday_price) || 0
-    const change = parseNum(row.close_price_change) ?? parseNum(row.final_price_change)
-    const tradeValue = parseNum(row.trade_value) || 0
-    if (!name || !mv || !yesterday || change == null) continue
-    const market = String(row.market || '')
-    const isIfb = market.includes('فرابورس')
-    const total = isIfb ? totalF : totalB
-    const index = isIfb ? indexF : indexB
-    if (!total || !index) continue
-    const impact = index * (mv / total) * (change / yesterday)
-    const item = { symbol: name, impact: Math.round(impact * 10) / 10 }
-    ;(isIfb ? ifb : bourse).push(item)
-    if (tradeValue > 0) {
-      trades.push({ name, valueBr: Math.round((tradeValue / 1e10) * 10) / 10 })
+async function scrapeShakhesbanBoardLite(maxPages = 6) {
+  const pages = Array.from({ length: maxPages }, (_, i) => i + 1)
+  const results = await Promise.allSettled(
+    pages.map(async (page) => {
+      const qs = new URLSearchParams({
+        limit: '100',
+        page: String(page),
+        market: 'stock',
+        order_col: 'trades.arzesh_bazar',
+        order_dir: 'desc',
+        _: String(Date.now()),
+      })
+      const res = await fetch(`${SHAKH_LIST}?${qs}`, {
+        headers: {
+          Accept: 'application/json, text/javascript, */*; q=0.01',
+          'User-Agent': UA,
+          Referer: 'https://www.shakhesban.com/markets/stock',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      })
+      if (!res.ok) throw new Error(`shakhesban ${page} ${res.status}`)
+      return res.json()
+    }),
+  )
+  const rows = []
+  for (const r of results) {
+    if (r.status !== 'fulfilled') continue
+    rows.push(...parseShakhesbanTbody(r.value?.tbody || ''))
+  }
+  return rows
+}
+
+function computeBoardImpacts(stocks, indices, maxMove = 0.22) {
+  const bourse = stocks.filter((s) => !(s.flow || '').includes('فرابورس'))
+  const ifb = stocks.filter((s) => (s.flow || '').includes('فرابورس'))
+  const indexB = indices?.tedpix?.value || 0
+  const indexF = indices?.ifb?.value || 0
+  const totalB = bourse.reduce((a, s) => a + (s.marketValue || 0), 0)
+  const totalF = ifb.reduce((a, s) => a + (s.marketValue || 0), 0)
+
+  const build = (rows, index, total) => {
+    if (!index || !total) return { pos: [], neg: [] }
+    const items = []
+    for (const s of rows) {
+      const mv = s.marketValue || 0
+      const yest = s.yesterday || 0
+      let chg = s.finalChg
+      if (chg == null || chg === 0) chg = s.closeChg
+      if (chg == null || chg === 0) chg = s.lastChg
+      if (!mv || !yest || chg == null) continue
+      const move = chg / yest
+      if (Math.abs(move) > maxMove) continue
+      items.push({ symbol: s.symbol, impact: Math.round(index * (mv / total) * move * 10) / 10 })
+    }
+    return {
+      pos: items.filter((x) => x.impact > 0).sort((a, b) => b.impact - a.impact).slice(0, 5),
+      neg: items.filter((x) => x.impact < 0).sort((a, b) => a.impact - b.impact).slice(0, 5),
     }
   }
 
-  const pick = (rows, positive) =>
-    rows
-      .filter((r) => (positive ? r.impact > 0 : r.impact < 0))
-      .sort((a, b) => (positive ? b.impact - a.impact : a.impact - b.impact))
-      .slice(0, 5)
-
+  const b = build(bourse, indexB, totalB)
+  const f = build(ifb, indexF, totalF)
   return {
-    impacts: {
-      boursePos: pick(bourse, true),
-      bourseNeg: pick(bourse, false),
-      ifbPos: pick(ifb, true),
-      ifbNeg: pick(ifb, false),
-    },
-    topTrades: trades.sort((a, b) => b.valueBr - a.valueBr).slice(0, 13),
+    boursePos: b.pos,
+    bourseNeg: b.neg,
+    ifbPos: f.pos,
+    ifbNeg: f.neg,
+    source: 'shakhesban-board',
+  }
+}
+
+function buildMarketPulse(stocks) {
+  let pos = 0
+  let neg = 0
+  let flat = 0
+  let orderBuy = 0
+  let orderSell = 0
+  let retailBuy = 0
+  let retailSell = 0
+  let buyCnt = 0
+  let sellCnt = 0
+  for (const s of stocks) {
+    let p = s.changePctLast ?? s.changePctClose ?? 0
+    if (Math.abs(p) < 1) p *= 100
+    if (p > 0.05) pos += 1
+    else if (p < -0.05) neg += 1
+    else flat += 1
+    orderBuy += (s.orderBuyVol || 0) * (s.orderBuyPx || 0)
+    orderSell += (s.orderSellVol || 0) * (s.orderSellPx || 0)
+    const px = s.last || s.close || 0
+    retailBuy += (s.buyIVol || 0) * px
+    retailSell += (s.sellIVol || 0) * px
+    buyCnt += s.orderBuyCnt || 0
+    sellCnt += s.orderSellCnt || 0
+  }
+  const today = jalaliToday()
+  const perBuy = buyCnt > 0 ? retailBuy / buyCnt / RIAL_PER_BILLION_TOMAN : null
+  const perSell = sellCnt > 0 ? retailSell / sellCnt / RIAL_PER_BILLION_TOMAN : null
+  return {
+    asOf: new Date().toISOString(),
+    time: today.time,
+    dateJalali: today.dateJalali,
+    source: 'shakhesban-board',
+    breadth: { positive: pos, negative: neg, flat, total: pos + neg + flat },
+    orderBuyBillionToman: Math.round((orderBuy / RIAL_PER_BILLION_TOMAN) * 10) / 10,
+    orderSellBillionToman: Math.round((orderSell / RIAL_PER_BILLION_TOMAN) * 10) / 10,
+    retailMoneyFlowBillionToman: Math.round(((retailBuy - retailSell) / RIAL_PER_BILLION_TOMAN) * 10) / 10,
+    retailBuyBillionToman: Math.round((retailBuy / RIAL_PER_BILLION_TOMAN) * 10) / 10,
+    retailSellBillionToman: Math.round((retailSell / RIAL_PER_BILLION_TOMAN) * 10) / 10,
+    perCapitaBuyMillionToman: perBuy != null ? Math.round(perBuy * 1000 * 100) / 100 : null,
+    perCapitaSellMillionToman: perSell != null ? Math.round(perSell * 1000 * 100) / 100 : null,
+    note: 'معادل نمودارهای لحظه‌ای TradersArena از تجمیع تابلو',
+  }
+}
+
+async function scrapeRahavardImpacts() {
+  const hdrs = {
+    Accept: 'application/json, text/plain, */*',
+    'User-Agent': UA,
+    Referer: 'https://rahavard365.com/',
+    Origin: 'https://rahavard365.com',
+  }
+  const load = async (kind) => {
+    const res = await fetch(`${RAHAVARD_API}/home/${kind}-instrument-effect-d`, { headers: hdrs })
+    if (!res.ok) throw new Error(`rahavard ${kind} ${res.status}`)
+    const payload = await res.json()
+    const list = payload?.data?.list || []
+    return list
+      .map((row) => {
+        const symbol = String(row?.trade_symbol || row?.short_name || '').trim()
+        const impact = parseNum(row?.instrument_effect_value)
+        if (!symbol || impact == null) return null
+        return { symbol, impact: Math.round(impact * 10) / 10 }
+      })
+      .filter(Boolean)
+      .slice(0, 5)
+  }
+  try {
+    const [pos, neg] = await Promise.all([load('positive'), load('negative')])
+    return {
+      ok: Boolean(pos.length || neg.length),
+      source: 'rahavard365',
+      boursePos: [...pos].sort((a, b) => b.impact - a.impact).slice(0, 5),
+      bourseNeg: [...neg].sort((a, b) => a.impact - b.impact).slice(0, 5),
+    }
+  } catch (e) {
+    return { ok: false, source: 'rahavard365', error: String(e), boursePos: [], bourseNeg: [] }
   }
 }
 
@@ -226,12 +385,10 @@ async function scrapeSourceArena(token) {
   const tok = (token || '').trim()
   if (!tok) return { ok: false, error: 'SOURCEARENA_TOKEN missing' }
 
-  const [bourseRes, ifbRes, allRes, indBourseRes, indIfbRes] = await Promise.allSettled([
+  // فقط «در یک نگاه» برای ارزش بازار — all/ind را کم صدا بزن تا سقف روزانه نخورد
+  const [bourseRes, ifbRes] = await Promise.allSettled([
     fetchJsonRetry(`${SOURCEARENA_API}?token=${encodeURIComponent(tok)}&market=market_bourse`),
     fetchJsonRetry(`${SOURCEARENA_API}?token=${encodeURIComponent(tok)}&market=market_farabourse`),
-    fetchJsonRetry(`${SOURCEARENA_API}?token=${encodeURIComponent(tok)}&all&type=0`, 3),
-    fetchJsonRetry(`${SOURCEARENA_API}?token=${encodeURIComponent(tok)}&market=ind_namad_bourse`, 3),
-    fetchJsonRetry(`${SOURCEARENA_API}?token=${encodeURIComponent(tok)}&market=ind_namad_farabourse`, 3),
   ])
 
   if (bourseRes.status !== 'fulfilled' || ifbRes.status !== 'fulfilled') {
@@ -241,6 +398,9 @@ async function scrapeSourceArena(token) {
       'sourcearena failed'
     return { ok: false, error: err }
   }
+
+  if (bourseRes.value?.Error) return { ok: false, error: String(bourseRes.value.Error) }
+  if (ifbRes.value?.Error) return { ok: false, error: String(ifbRes.value.Error) }
 
   const bourse = bourseRes.value?.bourse
   const ifb = ifbRes.value?.['fara-bourse']
@@ -262,38 +422,6 @@ async function scrapeSourceArena(token) {
     tradeSource = 'sourcearena-bourse-only'
   }
 
-  function splitOfficial(rows) {
-    const list = Array.isArray(rows) ? rows : []
-    const mapped = []
-    for (const row of list.slice(0, 16)) {
-      const symbol = String(row?.name || row?.symbol || '').trim()
-      const effect = parseBillionRial(row?.effect ?? row?.impact)
-      if (!symbol || effect == null) continue
-      mapped.push({ symbol, impact: effect })
-    }
-    return {
-      pos: mapped.filter((x) => x.impact > 0).sort((a, b) => b.impact - a.impact).slice(0, 5),
-      neg: mapped.filter((x) => x.impact < 0).sort((a, b) => a.impact - b.impact).slice(0, 5),
-    }
-  }
-
-  const computed =
-    allRes.status === 'fulfilled' && Array.isArray(allRes.value)
-      ? buildImpactsAndTopTrades(allRes.value, bourse, ifb)
-      : { impacts: null, topTrades: [] }
-
-  const bOff = splitOfficial(indBourseRes.status === 'fulfilled' ? indBourseRes.value : [])
-  const fOff = splitOfficial(indIfbRes.status === 'fulfilled' ? indIfbRes.value : [])
-
-  // رسمی مثبت از ind_namad؛ منفی از محاسبه روی all (API رسمی فقط مثبت‌های بزرگ را می‌دهد)
-  const impacts = {
-    boursePos: bOff.pos.length ? bOff.pos : computed.impacts?.boursePos || [],
-    bourseNeg: bOff.neg.length ? bOff.neg : computed.impacts?.bourseNeg || [],
-    ifbPos: fOff.pos.length ? fOff.pos : computed.impacts?.ifbPos || [],
-    ifbNeg: fOff.neg.length ? fOff.neg : computed.impacts?.ifbNeg || [],
-  }
-  const hasImpacts = Object.values(impacts).some((arr) => arr.length > 0)
-
   return {
     ok: true,
     source: 'sourcearena',
@@ -303,11 +431,39 @@ async function scrapeSourceArena(token) {
     totalTradeValueHmt: totalTrade,
     totalTradeValueSource: tradeSource,
     marketValueSource: 'sourcearena-bourse+ifb',
-    impacts: hasImpacts ? impacts : null,
-    impactsFromSourceArena: hasImpacts,
-    topTrades: computed.topTrades,
-    topTradesSource: computed.topTrades.length ? 'sourcearena-all' : null,
+    impacts: null,
+    impactsFromSourceArena: false,
+    topTrades: [],
+    topTradesSource: null,
+    bourseRaw: bourse,
+    ifbRaw: ifb,
   }
+}
+
+function mergeImpacts(rahavard, board, arena) {
+  const out = { boursePos: [], bourseNeg: [], ifbPos: [], ifbNeg: [] }
+  const sources = []
+  if (rahavard?.ok) {
+    out.boursePos = rahavard.boursePos || []
+    out.bourseNeg = rahavard.bourseNeg || []
+    sources.push('rahavard365')
+  }
+  if (arena?.impacts) {
+    if (!out.boursePos.length) out.boursePos = arena.impacts.boursePos || []
+    if (!out.bourseNeg.length) out.bourseNeg = arena.impacts.bourseNeg || []
+    out.ifbPos = arena.impacts.ifbPos || []
+    out.ifbNeg = arena.impacts.ifbNeg || []
+    sources.push('sourcearena')
+  }
+  if (board) {
+    if (!out.boursePos.length) out.boursePos = board.boursePos || []
+    if (!out.bourseNeg.length) out.bourseNeg = board.bourseNeg || []
+    if (!out.ifbPos.length) out.ifbPos = board.ifbPos || []
+    if (!out.ifbNeg.length) out.ifbNeg = board.ifbNeg || []
+    sources.push('shakhesban-board')
+  }
+  const has = Object.values(out).some((arr) => arr.length > 0)
+  return { impacts: has ? out : null, source: sources.join('+') || null }
 }
 
 const JALALI_MONTHS = {
@@ -520,6 +676,10 @@ export async function onRequestGet(context) {
     scrapeParsistahlil(),
     scrapeSourceArena(token),
     fetchJson(`${origin}/data/money_flow_ytd.json`).catch(() => null),
+    scrapeRahavardImpacts(),
+    scrapeShakhesbanBoardLite(6),
+    fetchJson(`${origin}/data/market_pulse.json`).catch(() => null),
+    fetchJson(`${origin}/data/impacts_cache.json`).catch(() => null),
   ])
 
   if (tasks[0].status === 'fulfilled') {
@@ -559,6 +719,75 @@ export async function onRequestGet(context) {
     errors.push(`money_flow_ytd: ${tasks[5].reason}`)
   }
 
+  let rahavard = { ok: false }
+  if (tasks[6].status === 'fulfilled') {
+    rahavard = tasks[6].value
+    if (!rahavard.ok) errors.push(`rahavard: ${rahavard.error || 'empty'}`)
+  } else {
+    errors.push(`rahavard: ${tasks[6].reason}`)
+  }
+
+  let boardRows = []
+  if (tasks[7].status === 'fulfilled') {
+    boardRows = tasks[7].value || []
+  } else {
+    errors.push(`shakhesban-board: ${tasks[7].reason}`)
+  }
+
+  const pulseStore = tasks[8].status === 'fulfilled' ? tasks[8].value : null
+  const impactsCache = tasks[9].status === 'fulfilled' ? tasks[9].value : null
+
+  const boardImpacts = boardRows.length ? computeBoardImpacts(boardRows, indices) : null
+  const mergedImpacts = mergeImpacts(rahavard, boardImpacts, sourcearena)
+  // fill gaps from deployed cache
+  if (mergedImpacts.impacts && impactsCache) {
+    for (const k of ['boursePos', 'bourseNeg', 'ifbPos', 'ifbNeg']) {
+      if (!mergedImpacts.impacts[k]?.length && impactsCache[k]?.length) {
+        mergedImpacts.impacts[k] = impactsCache[k]
+        mergedImpacts.source = `${mergedImpacts.source || ''}+cache`.replace(/^\+/, '')
+      }
+    }
+  }
+
+  const marketPulse = boardRows.length ? buildMarketPulse(boardRows) : pulseStore?.current || null
+  let marketPulseHistory = Array.isArray(pulseStore?.history) ? pulseStore.history : []
+  if (marketPulse?.time) {
+    const point = {
+      time: marketPulse.time,
+      positive: marketPulse.breadth?.positive,
+      negative: marketPulse.breadth?.negative,
+      flat: marketPulse.breadth?.flat,
+      orderBuy: marketPulse.orderBuyBillionToman,
+      orderSell: marketPulse.orderSellBillionToman,
+      retailFlow: marketPulse.retailMoneyFlowBillionToman,
+      perCapitaBuy: marketPulse.perCapitaBuyMillionToman,
+      perCapitaSell: marketPulse.perCapitaSellMillionToman,
+    }
+    marketPulseHistory = [
+      ...marketPulseHistory.filter((h) => h?.time !== point.time),
+      point,
+    ].slice(-120)
+  }
+
+  const topTrades =
+    sourcearena.topTrades?.length
+      ? sourcearena.topTrades
+      : boardRows
+          .filter((s) => s.tradeValue > 0)
+          .sort((a, b) => b.tradeValue - a.tradeValue)
+          .slice(0, 13)
+          .map((s) => ({
+            name: s.symbol,
+            valueBr: Math.round((s.tradeValue / RIAL_PER_BILLION_TOMAN) * 10) / 10,
+          }))
+  const topTradesSource = sourcearena.topTrades?.length
+    ? sourcearena.topTradesSource
+    : boardRows.length
+      ? 'shakhesban-board'
+      : null
+
+  const today = jalaliToday()
+
   const merged = mergeMoneyFlowStore(moneyFlowStore, parsistahlil.days || [])
   moneyFlowStore = merged.store
 
@@ -581,12 +810,15 @@ export async function onRequestGet(context) {
   const blocked = [
     ...(sourcearena.ok ? [] : ['sourcearena']),
     ...(parsistahlil.ok ? [] : ['parsistahlil']),
+    ...(rahavard.ok ? [] : ['rahavard365']),
   ]
 
   return Response.json(
     {
       ok: true,
       updatedAt: new Date().toISOString(),
+      dateJalali: today.dateJalali,
+      dateGregorian: today.dateGregorian,
       quotes,
       indices: {
         tedpix,
@@ -599,6 +831,7 @@ export async function onRequestGet(context) {
         points: intraday,
       },
       sourcearena,
+      rahavard,
       bourseMarketValueHmt: sourcearena.bourseMarketValueHmt ?? null,
       ifbMarketValueHmt: sourcearena.ifbMarketValueHmt ?? null,
       totalMarketValueHmt: sourcearena.totalMarketValueHmt ?? null,
@@ -606,10 +839,14 @@ export async function onRequestGet(context) {
       marketValueSource: sourcearena.marketValueSource ?? null,
       totalTradeValueHmt: sourcearena.totalTradeValueHmt ?? null,
       totalTradeValueSource: sourcearena.totalTradeValueSource ?? null,
-      impacts: sourcearena.impacts ?? null,
-      impactsFromSourceArena: Boolean(sourcearena.impactsFromSourceArena),
-      topTrades: sourcearena.topTrades ?? [],
-      topTradesSource: sourcearena.topTradesSource ?? null,
+      impacts: mergedImpacts.impacts,
+      impactsFromSourceArena: Boolean(mergedImpacts.source?.includes('sourcearena')),
+      impactsFromRahavard: Boolean(mergedImpacts.source?.includes('rahavard')),
+      impactsSource: mergedImpacts.source,
+      topTrades,
+      topTradesSource,
+      marketPulse,
+      marketPulseHistory,
       parsistahlil,
       retailMoneyFlowYtd: moneyFlowStore.ytdBillionToman,
       retailMoneyFlowYtdSource: 'parsistahlil-cumulative',

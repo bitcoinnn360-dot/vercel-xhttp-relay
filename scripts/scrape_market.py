@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import ssl
 import time
 import urllib.error
 import urllib.parse
@@ -23,6 +24,7 @@ import urllib.request
 from datetime import datetime, timezone
 from html import unescape
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = ROOT / "public" / "data"
@@ -42,6 +44,11 @@ TEDPIX_FROM_1401 = "2022/03/21"
 # Demo/public token used in SourceArena docs — override with SOURCEARENA_TOKEN
 SOURCEARENA_TOKEN = os.environ.get("SOURCEARENA_TOKEN", "bba6d330a87bac533f18cc245d3baeaa")
 SOURCEARENA_API = "https://apis.sourcearena.ir/api/"
+RAHAVARD_API = "https://rahavard365.com/api/v2"
+BOARD_CACHE_PATH = OUT_DIR / "sourcearena_all.json"
+PULSE_PATH = OUT_DIR / "market_pulse.json"
+IMPACTS_CACHE_PATH = OUT_DIR / "impacts_cache.json"
+SSL_INSECURE = ssl._create_unverified_context()
 
 TGJU_LIVE_KEYS = [
     "bourse",
@@ -74,10 +81,78 @@ HIST_KEYS = [
 ]
 
 
-def fetch(url: str, timeout: int = 45, headers: dict | None = None) -> bytes:
+def fetch(url: str, timeout: int = 45, headers: dict | None = None, insecure: bool = False) -> bytes:
     req = urllib.request.Request(url, headers={**UA, **(headers or {})})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    ctx = SSL_INSECURE if insecure else None
+    with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
         return resp.read()
+
+
+def fetch_json_retry(
+    url: str,
+    *,
+    timeout: int = 25,
+    attempts: int = 4,
+    headers: dict | None = None,
+    insecure: bool = False,
+) -> object:
+    last: Exception | None = None
+    for i in range(attempts):
+        try:
+            raw = fetch(url, timeout=timeout, headers=headers, insecure=insecure)
+            return json.loads(raw.decode("utf-8", errors="replace"))
+        except Exception as exc:  # noqa: BLE001
+            last = exc
+            time.sleep(0.8 * (i + 1))
+    raise last or RuntimeError(f"fetch failed: {url}")
+
+
+def tehran_now() -> datetime:
+    return datetime.now(ZoneInfo("Asia/Tehran"))
+
+
+def jalali_today() -> dict:
+    """Live Jalali date in Asia/Tehran (numeric YYYY/MM/DD)."""
+    now = tehran_now()
+    # Intl-style via algorithm: use datetime + jdatetime if available, else approximate via format
+    try:
+        import jdatetime  # type: ignore
+
+        j = jdatetime.datetime.fromgregorian(datetime=now)
+        return {
+            "dateJalali": f"{j.year:04d}/{j.month:02d}/{j.day:02d}",
+            "dateGregorian": now.date().isoformat(),
+            "time": now.strftime("%H:%M"),
+        }
+    except Exception:
+        # Fallback: Persian calendar via glibc when available
+        try:
+            fa = now.strftime("%Y/%m/%d")  # may still be Gregorian
+        except Exception:
+            fa = now.date().isoformat()
+        # Manual Gregorian→Jalali
+        gy, gm, gd = now.year, now.month, now.day
+        g_d_m = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334]
+        gy2 = gy + 1 if gm > 2 else gy
+        days = 355666 + (365 * gy) + ((gy2 + 3) // 4) - ((gy2 + 99) // 100) + ((gy2 + 399) // 400) + gd + g_d_m[gm - 1]
+        jy = -1595 + (33 * (days // 12053))
+        days %= 12053
+        jy += 4 * (days // 1461)
+        days %= 1461
+        if days > 365:
+            jy += (days - 1) // 365
+            days = (days - 1) % 365
+        if days < 186:
+            jm = 1 + days // 31
+            jd = 1 + (days % 31)
+        else:
+            jm = 7 + (days - 186) // 30
+            jd = 1 + ((days - 186) % 30)
+        return {
+            "dateJalali": f"{jy:04d}/{jm:02d}/{jd:02d}",
+            "dateGregorian": now.date().isoformat(),
+            "time": now.strftime("%H:%M"),
+        }
 
 
 def num(x) -> float | None:
@@ -185,6 +260,17 @@ def parse_shakhesban_tbody(tbody: str) -> list[dict]:
             vals[td.group(2)] = unescape(td.group(1))
         for td in re.finditer(r'<td[^>]*data-col="([^"]+)"[^>]*data-val="([^"]*)"', block):
             vals[td.group(1)] = unescape(td.group(2))
+        yesterday = num(vals.get("info.PriceYesterday")) or 0.0
+        close = num(vals.get("info.last_price.PClosing")) or 0.0
+        last = num(vals.get("info.last_trade.PDrCotVal")) or 0.0
+        close_chg = num(vals.get("info.last_price.closing_change"))
+        last_chg = num(vals.get("info.last_trade.last_change"))
+        if close_chg is None and close and yesterday:
+            close_chg = close - yesterday
+        if last_chg is None and last and yesterday:
+            last_chg = last - yesterday
+        # Prefer قیمت پایانی (final) for impact; fall back to last trade.
+        final_chg = close_chg if close_chg not in (None, 0) else last_chg
         rows.append(
             {
                 "symbol": symbol,
@@ -193,18 +279,32 @@ def parse_shakhesban_tbody(tbody: str) -> list[dict]:
                 "flow": vals.get("info.flow.title") or "",
                 "marketValue": num(vals.get("trades.arzesh_bazar")) or 0.0,
                 "tradeValue": num(vals.get("trades.QTotCap")) or 0.0,
-                "close": num(vals.get("info.last_price.PClosing")) or 0.0,
-                "last": num(vals.get("info.last_trade.PDrCotVal")) or 0.0,
+                "close": close,
+                "last": last,
+                "yesterday": yesterday,
+                "closeChg": close_chg,
+                "lastChg": last_chg,
+                "finalChg": final_chg,
                 "changePctClose": num(vals.get("info.last_price.closing_change_percentage")) or 0.0,
                 "changePctLast": num(vals.get("info.last_trade.last_change_percentage")) or 0.0,
                 "buyIVol": num(vals.get("trades.buy_and_sell.Buy_I_Volume")) or 0.0,
                 "sellIVol": num(vals.get("trades.buy_and_sell.Sell_I_Volume")) or 0.0,
+                "buyNVol": num(vals.get("trades.buy_and_sell.Buy_N_Volume")) or 0.0,
+                "sellNVol": num(vals.get("trades.buy_and_sell.Sell_N_Volume")) or 0.0,
+                "orderBuyVol": num(vals.get("demands.1_0")) or 0.0,
+                "orderBuyCnt": num(vals.get("demands.1_1")) or 0.0,
+                "orderBuyPx": num(vals.get("demands.1_2")) or 0.0,
+                "orderSellPx": num(vals.get("demands.1_3")) or 0.0,
+                "orderSellCnt": num(vals.get("demands.1_4")) or 0.0,
+                "orderSellVol": num(vals.get("demands.1_5")) or 0.0,
+                "tradeCount": num(vals.get("trades.ZTotTran")) or 0.0,
             }
         )
     return rows
 
 
-def scrape_shakhesban_board(max_pages: int = 35) -> list[dict]:
+def scrape_shakhesban_board(max_pages: int = 12) -> list[dict]:
+    """Equity board via shakhesban list-data (market=stock)."""
     all_rows: list[dict] = []
     page = 1
     while page <= max_pages:
@@ -212,7 +312,8 @@ def scrape_shakhesban_board(max_pages: int = 35) -> list[dict]:
             {
                 "limit": 100,
                 "page": page,
-                "order_col": "trades.QTotCap",
+                "market": "stock",
+                "order_col": "trades.arzesh_bazar",
                 "order_dir": "desc",
                 "_": int(time.time() * 1000),
             }
@@ -234,13 +335,252 @@ def scrape_shakhesban_board(max_pages: int = 35) -> list[dict]:
             print(f"shakhesban page {page}: {exc}")
             break
         batch = parse_shakhesban_tbody(payload.get("tbody") or "")
+        # Keep equities only
+        batch = [r for r in batch if r.get("marketFa") == "سهام"]
         all_rows.extend(batch)
         print(f"shakhesban page {page}: +{len(batch)} (total {len(all_rows)})")
         if not payload.get("is_more") or not batch:
             break
         page += 1
-        time.sleep(0.12)
+        time.sleep(0.1)
     return all_rows
+
+
+def scrape_rahavard_tedpix_impacts() -> dict:
+    """Official TEDPIX influencers from Rahavard365 public home APIs."""
+    hdrs = {
+        "Accept": "application/json, text/plain, */*",
+        "Referer": "https://rahavard365.com/",
+        "Origin": "https://rahavard365.com",
+    }
+
+    def load(kind: str) -> tuple[list[dict], str | None]:
+        url = f"{RAHAVARD_API}/home/{kind}-instrument-effect-d"
+        payload = fetch_json_retry(url, headers=hdrs, insecure=True, attempts=5)
+        data = payload.get("data") if isinstance(payload, dict) else None
+        rows = (data or {}).get("list") if isinstance(data, dict) else []
+        as_of = (data or {}).get("date_time") if isinstance(data, dict) else None
+        out: list[dict] = []
+        for row in rows or []:
+            if not isinstance(row, dict):
+                continue
+            symbol = str(row.get("trade_symbol") or row.get("short_name") or "").strip()
+            effect = num(row.get("instrument_effect_value"))
+            if not symbol or effect is None:
+                continue
+            out.append({"symbol": symbol, "impact": round(float(effect), 1)})
+        return out[:5], as_of
+
+    try:
+        pos, as_of_pos = load("positive")
+        neg, as_of_neg = load("negative")
+        neg = sorted(neg, key=lambda r: r["impact"])[:5]
+        pos = sorted(pos, key=lambda r: -r["impact"])[:5]
+        return {
+            "ok": bool(pos or neg),
+            "source": "rahavard365",
+            "boursePos": pos,
+            "bourseNeg": neg,
+            "asOf": as_of_neg or as_of_pos,
+        }
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "source": "rahavard365", "error": str(exc), "boursePos": [], "bourseNeg": []}
+
+
+def compute_impacts_from_board(stocks: list[dict], indices: dict, max_move: float = 0.22) -> dict:
+    """Index impact ≈ index × (mv/total) × (final_change/yesterday)."""
+    equities = [s for s in stocks if s.get("marketFa") == "سهام"]
+    bourse = [s for s in equities if "فرابورس" not in (s.get("flow") or "")]
+    ifb = [s for s in equities if "فرابورس" in (s.get("flow") or "")]
+    index_b = num((indices.get("tedpix") or {}).get("value")) or 0.0
+    index_f = num((indices.get("ifb") or {}).get("value")) or 0.0
+    total_b = sum(s.get("marketValue") or 0 for s in bourse) or 0.0
+    total_f = sum(s.get("marketValue") or 0 for s in ifb) or 0.0
+
+    def build(rows: list[dict], index: float, total: float) -> tuple[list[dict], list[dict]]:
+        items: list[dict] = []
+        if not index or not total:
+            return [], []
+        for s in rows:
+            mv = float(s.get("marketValue") or 0)
+            yest = float(s.get("yesterday") or 0)
+            chg = s.get("finalChg")
+            if chg is None:
+                chg = s.get("closeChg")
+            if chg in (None, 0):
+                chg = s.get("lastChg")
+            if not mv or not yest or chg is None:
+                continue
+            move = float(chg) / yest
+            if abs(move) > max_move:
+                continue
+            impact = index * (mv / total) * move
+            items.append({"symbol": s["symbol"], "impact": round(impact, 1)})
+        pos = sorted([x for x in items if x["impact"] > 0], key=lambda x: -x["impact"])[:5]
+        neg = sorted([x for x in items if x["impact"] < 0], key=lambda x: x["impact"])[:5]
+        return pos, neg
+
+    b_pos, b_neg = build(bourse, index_b, total_b)
+    f_pos, f_neg = build(ifb, index_f, total_f)
+    return {
+        "boursePos": b_pos,
+        "bourseNeg": b_neg,
+        "ifbPos": f_pos,
+        "ifbNeg": f_neg,
+        "source": "shakhesban-board",
+    }
+
+
+def build_market_pulse(stocks: list[dict]) -> dict:
+    """TradersArena-style market pulse aggregates from equity board."""
+    equities = [s for s in stocks if s.get("marketFa") == "سهام"]
+    pos = neg = flat = 0
+    order_buy = order_sell = 0.0
+    retail_buy = retail_sell = 0.0
+    buy_cnt = sell_cnt = 0.0
+    for s in equities:
+        pct = s.get("changePctLast")
+        if pct is None:
+            pct = s.get("changePctClose")
+        p = float(pct or 0)
+        # shakhesban sometimes stores ratio
+        if abs(p) < 1:
+            p *= 100.0
+        if p > 0.05:
+            pos += 1
+        elif p < -0.05:
+            neg += 1
+        else:
+            flat += 1
+        order_buy += float(s.get("orderBuyVol") or 0) * float(s.get("orderBuyPx") or 0)
+        order_sell += float(s.get("orderSellVol") or 0) * float(s.get("orderSellPx") or 0)
+        px = float(s.get("last") or s.get("close") or 0)
+        retail_buy += float(s.get("buyIVol") or 0) * px
+        retail_sell += float(s.get("sellIVol") or 0) * px
+        buy_cnt += float(s.get("orderBuyCnt") or 0)
+        sell_cnt += float(s.get("orderSellCnt") or 0)
+
+    now = tehran_now()
+    flow_bt = (retail_buy - retail_sell) / RIAL_PER_BILLION_TOMAN
+    per_buy = (retail_buy / buy_cnt / RIAL_PER_BILLION_TOMAN) if buy_cnt > 0 else None
+    per_sell = (retail_sell / sell_cnt / RIAL_PER_BILLION_TOMAN) if sell_cnt > 0 else None
+    # order-book best-level per-capita proxy (میلیون تومان)
+    per_buy_m = (per_buy * 1000) if per_buy is not None else None
+    per_sell_m = (per_sell * 1000) if per_sell is not None else None
+
+    return {
+        "asOf": now.isoformat(),
+        "time": now.strftime("%H:%M"),
+        "dateJalali": jalali_today()["dateJalali"],
+        "source": "shakhesban-board",
+        "breadth": {"positive": pos, "negative": neg, "flat": flat, "total": pos + neg + flat},
+        "orderBuyBillionToman": round(order_buy / RIAL_PER_BILLION_TOMAN, 1),
+        "orderSellBillionToman": round(order_sell / RIAL_PER_BILLION_TOMAN, 1),
+        "retailMoneyFlowBillionToman": round(flow_bt, 1),
+        "retailBuyBillionToman": round(retail_buy / RIAL_PER_BILLION_TOMAN, 1),
+        "retailSellBillionToman": round(retail_sell / RIAL_PER_BILLION_TOMAN, 1),
+        "perCapitaBuyMillionToman": round(per_buy_m, 2) if per_buy_m is not None else None,
+        "perCapitaSellMillionToman": round(per_sell_m, 2) if per_sell_m is not None else None,
+        "note": "معادل نمودارهای لحظه‌ای TradersArena از تجمیع تابلو (صف خرید/فروش + حقیقی)",
+    }
+
+
+def load_pulse_store() -> dict:
+    if PULSE_PATH.exists():
+        try:
+            return json.loads(PULSE_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {"dateJalali": None, "history": []}
+
+
+def save_pulse_store(store: dict) -> None:
+    PULSE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PULSE_PATH.write_text(json.dumps(store, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def append_pulse_history(pulse: dict) -> dict:
+    store = load_pulse_store()
+    today = pulse.get("dateJalali")
+    if store.get("dateJalali") != today:
+        store = {"dateJalali": today, "history": []}
+    hist = list(store.get("history") or [])
+    point = {
+        "time": pulse.get("time"),
+        "positive": (pulse.get("breadth") or {}).get("positive"),
+        "negative": (pulse.get("breadth") or {}).get("negative"),
+        "flat": (pulse.get("breadth") or {}).get("flat"),
+        "orderBuy": pulse.get("orderBuyBillionToman"),
+        "orderSell": pulse.get("orderSellBillionToman"),
+        "retailFlow": pulse.get("retailMoneyFlowBillionToman"),
+        "perCapitaBuy": pulse.get("perCapitaBuyMillionToman"),
+        "perCapitaSell": pulse.get("perCapitaSellMillionToman"),
+    }
+    # replace same minute if exists
+    hist = [h for h in hist if h.get("time") != point["time"]]
+    hist.append(point)
+    hist = hist[-120:]
+    store = {"dateJalali": today, "history": hist, "current": pulse, "updatedAt": datetime.now(timezone.utc).isoformat()}
+    save_pulse_store(store)
+    return store
+
+
+def merge_impacts(
+    rahavard: dict | None,
+    board: dict | None,
+    arena: dict | None,
+) -> tuple[dict | None, str | None]:
+    """TSE from Rahavard; IFB from board/SourceArena (final-price based)."""
+    out = {"boursePos": [], "bourseNeg": [], "ifbPos": [], "ifbNeg": []}
+    sources: list[str] = []
+
+    if rahavard and rahavard.get("ok"):
+        out["boursePos"] = list(rahavard.get("boursePos") or [])
+        out["bourseNeg"] = list(rahavard.get("bourseNeg") or [])
+        sources.append("rahavard365")
+
+    arena_imp = (arena or {}).get("impacts") if (arena or {}).get("ok") else None
+    if arena_imp:
+        if not out["boursePos"]:
+            out["boursePos"] = list(arena_imp.get("boursePos") or [])
+        if not out["bourseNeg"]:
+            out["bourseNeg"] = list(arena_imp.get("bourseNeg") or [])
+        out["ifbPos"] = list(arena_imp.get("ifbPos") or [])
+        out["ifbNeg"] = list(arena_imp.get("ifbNeg") or [])
+        sources.append("sourcearena")
+
+    if board:
+        if not out["boursePos"]:
+            out["boursePos"] = list(board.get("boursePos") or [])
+        if not out["bourseNeg"]:
+            out["bourseNeg"] = list(board.get("bourseNeg") or [])
+        if not out["ifbPos"]:
+            out["ifbPos"] = list(board.get("ifbPos") or [])
+        if not out["ifbNeg"]:
+            out["ifbNeg"] = list(board.get("ifbNeg") or [])
+        sources.append("shakhesban-board")
+
+    # Prefer cache for empty IFB buckets
+    if IMPACTS_CACHE_PATH.exists() and (not out["ifbPos"] or not out["ifbNeg"] or not out["bourseNeg"]):
+        try:
+            cached = json.loads(IMPACTS_CACHE_PATH.read_text(encoding="utf-8"))
+            for k in out:
+                if not out[k] and cached.get(k):
+                    out[k] = cached[k]
+            sources.append("cache")
+        except Exception:
+            pass
+
+    has = any(out[k] for k in out)
+    if has:
+        try:
+            IMPACTS_CACHE_PATH.write_text(
+                json.dumps({**out, "updatedAt": datetime.now(timezone.utc).isoformat(), "sources": sources}, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        except Exception:
+            pass
+    return (out if has else None), ("+".join(sources) if sources else None)
 
 
 def scrape_shakhesban_indices() -> dict:
@@ -598,6 +938,11 @@ def scrape_sourcearena_glance(token: str | None = None) -> dict:
     except Exception as exc:  # noqa: BLE001
         return {**out, "error": str(exc)}
 
+    if isinstance(bourse_raw, dict) and bourse_raw.get("Error"):
+        return {**out, "error": str(bourse_raw.get("Error"))}
+    if isinstance(ifb_raw, dict) and ifb_raw.get("Error"):
+        return {**out, "error": str(ifb_raw.get("Error"))}
+
     bourse = bourse_raw.get("bourse") if isinstance(bourse_raw, dict) else None
     ifb = ifb_raw.get("fara-bourse") if isinstance(ifb_raw, dict) else None
     if not isinstance(bourse, dict) or not isinstance(ifb, dict):
@@ -669,12 +1014,24 @@ def scrape_sourcearena_glance(token: str | None = None) -> dict:
                 "ifbNeg": [],
             }, []
         if not isinstance(all_rows, list):
-            return {
-                "boursePos": [],
-                "bourseNeg": [],
-                "ifbPos": [],
-                "ifbNeg": [],
-            }, []
+            # try disk cache when rate-limited / unexpected
+            if BOARD_CACHE_PATH.exists():
+                try:
+                    all_rows = json.loads(BOARD_CACHE_PATH.read_text(encoding="utf-8"))
+                except Exception:
+                    all_rows = None
+            if not isinstance(all_rows, list):
+                return {
+                    "boursePos": [],
+                    "bourseNeg": [],
+                    "ifbPos": [],
+                    "ifbNeg": [],
+                }, []
+        else:
+            try:
+                BOARD_CACHE_PATH.write_text(json.dumps(all_rows, ensure_ascii=False), encoding="utf-8")
+            except Exception:
+                pass
 
         index_b = parse_sourcearena_billion_rial(bourse.get("index")) or 0.0
         index_f = parse_sourcearena_billion_rial(ifb.get("index")) or 0.0
@@ -689,9 +1046,10 @@ def scrape_sourcearena_glance(token: str | None = None) -> dict:
             name = str(row.get("name") or "").strip()
             mv = num(row.get("market_value")) or 0.0
             yesterday = num(row.get("yesterday_price")) or 0.0
-            change = num(row.get("close_price_change"))
+            # قیمت پایانی (final) — نه آخرین معامله — مبنای تاثیر رسمی
+            change = num(row.get("final_price_change"))
             if change is None:
-                change = num(row.get("final_price_change"))
+                change = num(row.get("close_price_change"))
             trade_value = num(row.get("trade_value")) or 0.0
             if not name or not mv or not yesterday or change is None:
                 continue
@@ -732,11 +1090,12 @@ def scrape_sourcearena_glance(token: str | None = None) -> dict:
 
     b_pos, b_neg = split_pos_neg(b_off)
     f_pos, f_neg = split_pos_neg(f_off)
+    # مثبت رسمی؛ منفی همیشه از محاسبه final_price (API رسمی معمولاً فقط مثبت می‌دهد)
     impacts_ui = {
         "boursePos": b_pos or computed_impacts["boursePos"],
-        "bourseNeg": b_neg or computed_impacts["bourseNeg"],
+        "bourseNeg": computed_impacts["bourseNeg"] or b_neg,
         "ifbPos": f_pos or computed_impacts["ifbPos"],
-        "ifbNeg": f_neg or computed_impacts["ifbNeg"],
+        "ifbNeg": computed_impacts["ifbNeg"] or f_neg,
     }
     has_impacts = any(impacts_ui[k] for k in impacts_ui)
 
@@ -785,6 +1144,8 @@ def build_overview_live(
     pars: dict,
     glance: dict | None,
     money_flow: dict | None = None,
+    impacts_bundle: dict | None = None,
+    pulse_store: dict | None = None,
 ) -> dict:
     stocks = [s for s in stocks_all if s.get("marketFa") == "سهام"]
     bourse = [s for s in stocks if "فرابورس" not in (s.get("flow") or "")]
@@ -792,6 +1153,7 @@ def build_overview_live(
 
     sum_mv = sum(s["marketValue"] for s in stocks)
     sum_trade = sum(s["tradeValue"] for s in stocks)
+    today = jalali_today()
 
     # Top trades: prefer SourceArena all (سهام واقعی)؛ وگرنه تابلو شاخص‌بان
     if glance.get("ok") and glance.get("topTrades"):
@@ -890,15 +1252,21 @@ def build_overview_live(
     else:
         notes.append("خالص پول حقیقی YTD هنوز ذخیره نشده.")
 
-    impacts = glance.get("impacts") if glance.get("impactsFromSourceArena") else None
+    impacts = (impacts_bundle or {}).get("impacts")
+    impacts_source = (impacts_bundle or {}).get("source")
     if impacts:
-        notes.append("تاثیر در شاخص از SourceArena (ind_namad_bourse / farabourse).")
+        notes.append(f"تاثیر در شاخص از {impacts_source or 'live'}.")
     else:
-        notes.append("تاثیر مثبت/منفی در صورت نبود SourceArena از seed گزارش می‌ماند.")
+        notes.append("تاثیر مثبت/منفی در صورت نبود منبع زنده از seed گزارش می‌ماند.")
+
+    pulse = (pulse_store or {}).get("current")
+    pulse_hist = (pulse_store or {}).get("history") or []
 
     return {
         "ok": True,
         "asOf": datetime.now(timezone.utc).isoformat(),
+        "dateJalali": today["dateJalali"],
+        "dateGregorian": today["dateGregorian"],
         "indices": {
             "tedpix": ted or None,
             "equalWeight": eq or None,
@@ -925,9 +1293,13 @@ def build_overview_live(
         "moneyFlowAsOfJalali": mf.get("asOfJalali"),
         "impacts": impacts,
         "impactsFromTsetmc": False,
-        "impactsFromSourceArena": bool(impacts),
+        "impactsFromSourceArena": bool(impacts) and "sourcearena" in (impacts_source or ""),
+        "impactsFromRahavard": bool(impacts) and "rahavard" in (impacts_source or ""),
+        "impactsSource": impacts_source,
         "topTrades": top_trades_out,
         "topTradesSource": top_trades_source,
+        "marketPulse": pulse,
+        "marketPulseHistory": pulse_hist,
         "sourcearena": {"ok": bool(glance.get("ok")), "error": glance.get("error")},
         "parsistahlil": pars,
         "blocked": blocked,
@@ -1087,6 +1459,43 @@ def main() -> int:
     print("shakhesban board…")
     board = scrape_shakhesban_board()
 
+    print("Rahavard365 TEDPIX impacts…")
+    rahavard = scrape_rahavard_tedpix_impacts()
+    print(
+        "rahavard",
+        {
+            "ok": rahavard.get("ok"),
+            "pos": [x["symbol"] for x in (rahavard.get("boursePos") or [])],
+            "neg": [x["symbol"] for x in (rahavard.get("bourseNeg") or [])],
+            "error": rahavard.get("error"),
+        },
+    )
+
+    print("board impacts (IFB/TSE fallback)…")
+    board_impacts = compute_impacts_from_board(board, indices)
+    print(
+        "boardImpacts",
+        {
+            "ifbNeg": [x["symbol"] for x in (board_impacts.get("ifbNeg") or [])],
+            "ifbPos": [x["symbol"] for x in (board_impacts.get("ifbPos") or [])],
+            "bourseNeg": [x["symbol"] for x in (board_impacts.get("bourseNeg") or [])],
+        },
+    )
+
+    print("market pulse (TradersArena-style)…")
+    pulse = build_market_pulse(board)
+    pulse_store = append_pulse_history(pulse)
+    print(
+        "pulse",
+        {
+            "breadth": pulse.get("breadth"),
+            "orderBuy": pulse.get("orderBuyBillionToman"),
+            "orderSell": pulse.get("orderSellBillionToman"),
+            "flow": pulse.get("retailMoneyFlowBillionToman"),
+            "hist": len(pulse_store.get("history") or []),
+        },
+    )
+
     print("SourceArena glance (bourse + farabourse)…")
     glance = scrape_sourcearena_glance()
     print(
@@ -1100,8 +1509,22 @@ def main() -> int:
         },
     )
 
+    impacts, impacts_source = merge_impacts(rahavard, board_impacts, glance)
+    impacts_bundle = {"impacts": impacts, "source": impacts_source}
+    print("impactsSource", impacts_source, "bourseNeg", [x["symbol"] for x in ((impacts or {}).get("bourseNeg") or [])])
+
     tsetmc = scrape_tsetmc()  # optional probe only
-    overview_live = build_overview_live(board, usd, indices, tedpix, pars, glance, money_flow)
+    overview_live = build_overview_live(
+        board,
+        usd,
+        indices,
+        tedpix,
+        pars,
+        glance,
+        money_flow,
+        impacts_bundle=impacts_bundle,
+        pulse_store=pulse_store,
+    )
     overview_live["intraday"] = {
         "source": "tgju-today-table",
         "note": "مسیر روزانه TGJU (رزولوشن چنددقیقه‌ای).",
@@ -1111,7 +1534,8 @@ def main() -> int:
         f"MV={overview_live['totalMarketValueHmt']} همت ({overview_live['marketValueSource']}) | "
         f"USD={overview_live['totalMarketValueUsdM']} m$ | "
         f"trade={overview_live['totalTradeValueHmt']} همت ({overview_live['totalTradeValueSource']}) | "
-        f"retailFlow={overview_live['retailMoneyFlowDailyBillionToman']}"
+        f"retailFlow={overview_live['retailMoneyFlowDailyBillionToman']} | "
+        f"date={overview_live.get('dateJalali')}"
     )
 
     ime = scrape_ime()
@@ -1121,11 +1545,12 @@ def main() -> int:
         "updatedAt": datetime.now(timezone.utc).isoformat(),
         "infra": {
             "tgju": "TEDPIX + USD live",
-            "shakhesban": "equal-weight + IFB indices + board (top trades)",
+            "shakhesban": "equal-weight + IFB indices + board (top trades / pulse / IFB impacts)",
             "parsistahlil": "retail trades + daily flow; YTD cumulative in money_flow_ytd.json",
             "sourcearena": "بازار بورس+فرابورس در یک نگاه → مجموع ارزش بازار",
-            "tradersarena": "UI؛ دادهٔ در یک نگاه از API سورس‌آرنا",
-            "tsetmc": "از این مسیر استفاده نمی‌شود (جایگزین: SourceArena)",
+            "rahavard365": "تاثیر مثبت/منفی بورس روی شاخص کل",
+            "tradersarena": "الگوی UI پالس بازار؛ داده از تجمیع تابلو",
+            "tsetmc": "از این مسیر استفاده نمی‌شود (جایگزین: SourceArena/Rahavard)",
             "ime": "usually needs Iran IP",
             "custeel": "paid; interim uses TGJU iron-ore/steel-coil + FRED",
             "fred": "scripts/fetch_fred.py",
@@ -1137,6 +1562,8 @@ def main() -> int:
         "overviewLive": overview_live,
         "sectors": sectors,
         "sourcearena": glance,
+        "rahavard": rahavard,
+        "marketPulse": pulse_store,
         "tsetmc": tsetmc,
         "ime": ime,
         "parsistahlil": pars,

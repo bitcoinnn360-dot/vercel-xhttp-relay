@@ -50,3 +50,19 @@ export function timeFa(iso: string): string {
     return iso
   }
 }
+
+/** Live Jalali calendar date in Asia/Tehran as YYYY/MM/DD (Latin digits). */
+export function jalaliTodayTehran(): string {
+  try {
+    const fmt = new Intl.DateTimeFormat('en-US-u-ca-persian', {
+      timeZone: 'Asia/Tehran',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    })
+    const parts = Object.fromEntries(fmt.formatToParts(new Date()).map((p) => [p.type, p.value]))
+    return `${String(parts.year).padStart(4, '0')}/${String(parts.month).padStart(2, '0')}/${String(parts.day).padStart(2, '0')}`
+  } catch {
+    return ''
+  }
+}

@@ -51,6 +51,36 @@ export interface MarketOverview {
   fieldSources?: Record<string, string>
   blockedSources?: string[]
   impactsLive?: boolean
+  marketPulse?: MarketPulseSnapshot | null
+  marketPulseHistory?: MarketPulsePoint[]
+}
+
+export interface MarketPulsePoint {
+  time: string
+  positive?: number
+  negative?: number
+  flat?: number
+  orderBuy?: number
+  orderSell?: number
+  retailFlow?: number
+  perCapitaBuy?: number
+  perCapitaSell?: number
+}
+
+export interface MarketPulseSnapshot {
+  asOf?: string
+  time?: string
+  dateJalali?: string
+  source?: string
+  breadth?: { positive: number; negative: number; flat: number; total: number }
+  orderBuyBillionToman?: number
+  orderSellBillionToman?: number
+  retailMoneyFlowBillionToman?: number
+  retailBuyBillionToman?: number
+  retailSellBillionToman?: number
+  perCapitaBuyMillionToman?: number | null
+  perCapitaSellMillionToman?: number | null
+  note?: string
 }
 
 export interface ImpactStock {

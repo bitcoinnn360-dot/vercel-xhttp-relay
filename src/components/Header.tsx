@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { Activity, RefreshCw } from 'lucide-react'
 import type { DashboardData } from '../data/types'
-import { timeFa } from '../lib/format'
+import { jalaliTodayTehran, timeFa } from '../lib/format'
 
 const SECTIONS = [
   { id: 'overview', label: 'نمای بازار' },
@@ -41,7 +41,7 @@ export function Header({ data, refreshing, onRefresh, active }: Props) {
               توسعه معادن و فلزات
             </div>
             <div className="text-xs text-[var(--color-muted)]">
-              داشبورد گزارش روزانه بازار · {data.overview.dateJalali}
+              داشبورد گزارش روزانه بازار · {jalaliTodayTehran() || data.overview.dateJalali}
             </div>
           </div>
         </div>

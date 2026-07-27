@@ -122,6 +122,94 @@ export function FlowBarChart({
   )
 }
 
+export function DualLineChart({
+  data,
+  aKey,
+  bKey,
+  aLabel,
+  bLabel,
+  aColor = '#15803d',
+  bColor = '#b91c1c',
+  height = 220,
+  unit = '',
+}: {
+  data: Record<string, string | number>[]
+  aKey: string
+  bKey: string
+  aLabel: string
+  bLabel: string
+  aColor?: string
+  bColor?: string
+  height?: number
+  unit?: string
+}) {
+  if (!data.length) {
+    return (
+      <div style={{ height }} className="flex items-center justify-center text-xs text-[var(--color-muted)]">
+        در انتظار داده لحظه‌ای…
+      </div>
+    )
+  }
+  return (
+    <div style={{ height }} className="w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
+          <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} minTickGap={20} />
+          <YAxis
+            tick={{ fontSize: 10, fill: '#64748b' }}
+            axisLine={false}
+            tickLine={false}
+            width={48}
+            tickFormatter={(v: number) => (Math.abs(v) >= 1000 ? fmtInt(v) : fmtNum(v, 1))}
+          />
+          <Tooltip
+            contentStyle={tip}
+            formatter={(v, name) => [fmtNum(Number(v), 2) + (unit ? ` ${unit}` : ''), String(name)]}
+          />
+          <Line type="monotone" dataKey={aKey} name={aLabel} stroke={aColor} strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey={bKey} name={bLabel} stroke={bColor} strokeWidth={2} dot={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+export function BreadthBarChart({
+  positive,
+  negative,
+  flat,
+  height = 160,
+}: {
+  positive: number
+  negative: number
+  flat: number
+  height?: number
+}) {
+  const data = [
+    { label: 'مثبت', value: positive, color: '#15803d' },
+    { label: 'منفی', value: negative, color: '#b91c1c' },
+    { label: 'بدون تغییر', value: flat, color: '#94a3b8' },
+  ]
+  return (
+    <div style={{ height }} className="w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data}>
+          <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
+          <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} width={36} />
+          <Tooltip contentStyle={tip} formatter={(v) => [fmtInt(Number(v)), 'نماد']} />
+          <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+            {data.map((d) => (
+              <Cell key={d.label} fill={d.color} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
 /** Weekly OHLC aggregation so ~4y of daily candles stays readable */
 function toWeeklyCandles(rows: CandlePoint[]): CandlePoint[] {
   if (rows.length <= 420) return rows

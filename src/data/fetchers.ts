@@ -278,6 +278,11 @@ async function fetchScrapedMarket(): Promise<{
     impacts?: DashboardData['impacts'] | null
     impactsFromTsetmc?: boolean
     impactsFromSourceArena?: boolean
+    impactsFromRahavard?: boolean
+    impactsSource?: string
+    dateJalali?: string
+    marketPulse?: DashboardData['overview']['marketPulse']
+    marketPulseHistory?: DashboardData['overview']['marketPulseHistory']
     topTrades?: DashboardData['topTrades']
     topTradesSource?: string
     indices?: {
@@ -288,6 +293,10 @@ async function fetchScrapedMarket(): Promise<{
     notes?: string[]
     blocked?: string[]
     asOf?: string
+  }
+  marketPulse?: {
+    current?: DashboardData['overview']['marketPulse']
+    history?: DashboardData['overview']['marketPulseHistory']
   }
   candles1401?: import('./types').CandlePoint[]
 } | null> {
@@ -336,6 +345,10 @@ async function fetchScrapedMarket(): Promise<{
         asOf?: string
       }
       candles1401?: import('./types').CandlePoint[]
+      marketPulse?: {
+        current?: DashboardData['overview']['marketPulse']
+        history?: DashboardData['overview']['marketPulseHistory']
+      }
     }
     const overviewLive = json.overviewLive
       ? {
@@ -359,6 +372,7 @@ async function fetchScrapedMarket(): Promise<{
         infra: json.infra,
       },
       overviewLive,
+      marketPulse: json.marketPulse,
       candles1401: json.candles1401,
     }
   } catch {
@@ -390,6 +404,8 @@ async function fetchTgjuIntraday(): Promise<IntradayPoint[]> {
 type OverviewApi = {
   ok?: boolean
   updatedAt?: string
+  dateJalali?: string
+  dateGregorian?: string
   indices?: {
     tedpix?: { name?: string; value?: number; change?: number; changePct?: number; source?: string }
     equalWeight?: { name?: string; value?: number; change?: number; changePct?: number; source?: string }
@@ -405,8 +421,12 @@ type OverviewApi = {
   totalTradeValueSource?: string
   impacts?: DashboardData['impacts'] | null
   impactsFromSourceArena?: boolean
+  impactsFromRahavard?: boolean
+  impactsSource?: string
   topTrades?: DashboardData['topTrades']
   topTradesSource?: string
+  marketPulse?: DashboardData['overview']['marketPulse']
+  marketPulseHistory?: DashboardData['overview']['marketPulseHistory']
   retailMoneyFlowYtd?: number
   retailMoneyFlowYtdSource?: string
   moneyFlowAsOfJalali?: string
@@ -525,7 +545,25 @@ function applyFreshOverview(base: DashboardData, api: OverviewApi | null, intrad
   if (api?.impactsFromSourceArena && api.impacts) {
     // applied on base via caller — store flag on overview
     o.impactsLive = true
-    sources.impacts = 'sourcearena'
+    sources.impacts = api.impactsSource || 'sourcearena'
+  }
+  if (api?.impactsFromRahavard && api.impacts) {
+    o.impactsLive = true
+    sources.impacts = api.impactsSource || 'rahavard365'
+  }
+  if (api?.dateJalali) {
+    o.dateJalali = api.dateJalali
+    sources.dateJalali = 'tehran-live'
+  }
+  if (api?.dateGregorian) {
+    o.dateGregorian = api.dateGregorian
+  }
+  if (api?.marketPulse) {
+    o.marketPulse = api.marketPulse
+    sources.marketPulse = api.marketPulse.source || 'shakhesban-board'
+  }
+  if (api?.marketPulseHistory?.length) {
+    o.marketPulseHistory = api.marketPulseHistory
   }
   if (api?.topTrades?.length) {
     // applied on base via caller
@@ -636,18 +674,31 @@ function applyOverviewLive(
 
   const liveAny = live as {
     impactsFromSourceArena?: boolean
+    impactsFromRahavard?: boolean
     impactsFromTsetmc?: boolean
+    impactsSource?: string
     impacts?: unknown
+    dateJalali?: string
+    marketPulse?: DashboardData['overview']['marketPulse']
+    marketPulseHistory?: DashboardData['overview']['marketPulseHistory']
   }
   const normalized = normalizeImpacts(liveAny.impacts)
-  if ((liveAny.impactsFromSourceArena || liveAny.impactsFromTsetmc) && normalized) {
+  if (
+    normalized &&
+    (liveAny.impactsFromSourceArena || liveAny.impactsFromRahavard || liveAny.impactsFromTsetmc || liveAny.impactsSource)
+  ) {
     base.impacts = normalized
     o.impactsLive = true
-    sources.impacts = liveAny.impactsFromSourceArena ? 'sourcearena' : 'tsetmc'
+    sources.impacts =
+      liveAny.impactsSource ||
+      (liveAny.impactsFromRahavard ? 'rahavard365' : liveAny.impactsFromSourceArena ? 'sourcearena' : 'tsetmc')
   } else {
     o.impactsLive = false
     sources.impacts = 'pdf-seed'
   }
+  if (liveAny.dateJalali) o.dateJalali = liveAny.dateJalali
+  if (liveAny.marketPulse) o.marketPulse = liveAny.marketPulse
+  if (liveAny.marketPulseHistory?.length) o.marketPulseHistory = liveAny.marketPulseHistory
 
   if (live.topTrades?.length) {
     base.topTrades = live.topTrades
@@ -684,12 +735,12 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   const overviewLiveOk = applyOverviewLive(base, scraped?.overviewLive, scraped?.candles1401)
   const freshOk = applyFreshOverview(base, overviewApi, intradayFallback)
   const apiImpacts = normalizeImpacts(overviewApi?.impacts)
-  if (overviewApi?.impactsFromSourceArena && apiImpacts) {
+  if (apiImpacts && (overviewApi?.impactsFromSourceArena || overviewApi?.impactsFromRahavard || overviewApi?.impactsSource)) {
     base.impacts = apiImpacts
     base.overview.impactsLive = true
     base.overview.fieldSources = {
       ...(base.overview.fieldSources || {}),
-      impacts: 'sourcearena-live',
+      impacts: overviewApi?.impactsSource || (overviewApi?.impactsFromRahavard ? 'rahavard365' : 'sourcearena-live'),
     }
   }
   if (overviewApi?.topTrades?.length) {
@@ -698,6 +749,23 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
       ...(base.overview.fieldSources || {}),
       topTrades: overviewApi.topTradesSource || 'sourcearena-all',
     }
+  }
+  if (overviewApi?.dateJalali) {
+    base.overview.dateJalali = overviewApi.dateJalali
+  }
+  if (overviewApi?.marketPulse) {
+    base.overview.marketPulse = overviewApi.marketPulse
+  }
+  if (overviewApi?.marketPulseHistory?.length) {
+    base.overview.marketPulseHistory = overviewApi.marketPulseHistory
+  }
+  // also from scraped market.json when API thin
+  const scrapedPulse = scraped?.marketPulse
+  if (!base.overview.marketPulse && scrapedPulse?.current) {
+    base.overview.marketPulse = scrapedPulse.current
+  }
+  if (!base.overview.marketPulseHistory?.length && scrapedPulse?.history?.length) {
+    base.overview.marketPulseHistory = scrapedPulse.history
   }
 
   const histories: Record<string, HistoryPoint[]> = { ...(scraped?.histories || {}) }

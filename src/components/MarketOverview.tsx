@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import type { DashboardData } from '../data/types'
 import type { HistoryPoint } from '../data/fetchers'
 import { changeClass, fmtChange, fmtInt, fmtNum, fmtPct } from '../lib/format'
+import { densifyFlowSeries, PULSE_HIST_END } from '../data/fetchers'
 import { BreadthBarChart, CandlestickChart, DualLineChart, FlowBarChart, TripleLineChart, PriceAreaChart } from './charts/Charts'
 import { TopTrades } from './StocksSection'
 
@@ -77,51 +78,46 @@ export function MarketOverview({
           },
         ]
       : []
-  const flowSeries = hasHist
+  const flowKeys = ['stocks', 'equityFunds', 'fixedIncome', 'basicMetals', 'metalOres', 'goldFunds'] as const
+  const flowSeriesRaw = hasHist
     ? pulseHist.map((p) => ({
         label: p.time,
-        stocks: p.flowStocks ?? 0,
-        equityFunds: p.flowEquityFunds ?? 0,
-        fixedIncome: p.flowFixedIncome ?? 0,
-        basicMetals: p.flowBasicMetals ?? 0,
-        metalOres: p.flowMetalOres ?? 0,
-        goldFunds: p.flowGoldFunds ?? 0,
+        stocks: p.flowStocks,
+        equityFunds: p.flowEquityFunds,
+        fixedIncome: p.flowFixedIncome,
+        basicMetals: p.flowBasicMetals,
+        metalOres: p.flowMetalOres,
+        goldFunds: p.flowGoldFunds,
       }))
-    : pulse
-      ? [
-          {
-            label: pulse.time || 'الان',
-            stocks: pulse.flowStocksBillionToman ?? 0,
-            equityFunds: pulse.flowEquityFundsBillionToman ?? 0,
-            fixedIncome: pulse.flowFixedIncomeBillionToman ?? 0,
-            basicMetals: pulse.flowBasicMetalsBillionToman ?? 0,
-            metalOres: pulse.flowMetalOresBillionToman ?? 0,
-            goldFunds: pulse.flowGoldFundsBillionToman ?? 0,
-          },
-        ]
-      : []
-  // drop points that predate the multi-series shape (all zeros while current is non-zero)
-  const flowHasSignal =
-    pulse &&
-    ((pulse.flowStocksBillionToman ?? 0) !== 0 ||
-      (pulse.flowEquityFundsBillionToman ?? 0) !== 0 ||
-      (pulse.flowFixedIncomeBillionToman ?? 0) !== 0 ||
-      (pulse.flowBasicMetalsBillionToman ?? 0) !== 0 ||
-      (pulse.flowMetalOresBillionToman ?? 0) !== 0 ||
-      (pulse.flowGoldFundsBillionToman ?? 0) !== 0)
-  const flowSeriesClean = flowHasSignal
-    ? flowSeries.filter(
-        (p) =>
-          p.stocks !== 0 ||
-          p.equityFunds !== 0 ||
-          p.fixedIncome !== 0 ||
-          p.basicMetals !== 0 ||
-          p.metalOres !== 0 ||
-          p.goldFunds !== 0 ||
-          p.label === (pulse.time || 'الان'),
-      )
-    : flowSeries
-
+    : []
+  // merge current snapshot onto the series so new industry fields appear immediately
+  if (pulse) {
+    const curLabel = pulse.time && pulse.time > '12:30' ? '12:30' : pulse.time || 'الان'
+    const curPoint = {
+      label: curLabel,
+      stocks: pulse.flowStocksBillionToman,
+      equityFunds: pulse.flowEquityFundsBillionToman,
+      fixedIncome: pulse.flowFixedIncomeBillionToman,
+      basicMetals: pulse.flowBasicMetalsBillionToman,
+      metalOres: pulse.flowMetalOresBillionToman,
+      goldFunds: pulse.flowGoldFundsBillionToman,
+    }
+    const idx = flowSeriesRaw.findIndex((p) => p.label === curLabel)
+    if (idx >= 0) flowSeriesRaw[idx] = { ...flowSeriesRaw[idx], ...curPoint }
+    else flowSeriesRaw.push(curPoint)
+  }
+  const wall = String(pulse?.time || '')
+  const flatEnd =
+    wall > PULSE_HIST_END || flowSeriesRaw.length <= 1
+      ? PULSE_HIST_END
+      : wall > String(flowSeriesRaw[flowSeriesRaw.length - 1]?.label || '')
+        ? wall
+        : undefined
+  const flowSeriesClean = densifyFlowSeries(
+    flowSeriesRaw as Record<string, string | number | null | undefined>[],
+    [...flowKeys],
+    flatEnd,
+  )
   return (
     <section id="overview" className="scroll-mt-8 space-y-4">
       <div>

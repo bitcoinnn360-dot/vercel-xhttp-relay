@@ -453,8 +453,18 @@ async function fetchOverviewApi(): Promise<OverviewApi | null> {
   }
 }
 
-const PULSE_SESSION_KEY = 'midco-pulse-history-v3'
+const PULSE_SESSION_KEY = 'midco-pulse-history-v4'
 export const PULSE_REFRESH_MS = 30 * 1000
+export const PULSE_HIST_START = '08:45'
+export const PULSE_HIST_END = '12:30'
+
+function clampPulseHistoryTime(hhmm: string | undefined | null): string | null {
+  const t = String(hhmm || '')
+  if (!/^\d{2}:\d{2}$/.test(t)) return null
+  if (t < PULSE_HIST_START) return null
+  if (t > PULSE_HIST_END) return PULSE_HIST_END
+  return t
+}
 
 type PulseApi = {
   ok?: boolean
@@ -495,12 +505,42 @@ function mergePulsePoints(
   for (const list of lists) {
     for (const p of list || []) {
       if (!p?.time) continue
-      const t = String(p.time)
-      if (t < '08:45' || t > '15:00') continue
-      byTime.set(t, { ...byTime.get(t), ...p })
+      const t = clampPulseHistoryTime(String(p.time))
+      if (!t) continue
+      byTime.set(t, { ...byTime.get(t), ...p, time: t })
     }
   }
   return [...byTime.values()].sort((a, b) => String(a.time).localeCompare(String(b.time))).slice(-480)
+}
+
+/** Forward-fill series values. Optional endLabel draws a flat tail to that time. */
+export function densifyFlowSeries(
+  points: Record<string, string | number | null | undefined>[],
+  keys: string[],
+  endLabel?: string,
+): Record<string, string | number>[] {
+  if (!points.length) return []
+  const sorted = [...points].sort((a, b) => String(a.label).localeCompare(String(b.label)))
+  const last: Record<string, number> = {}
+  const out: Record<string, string | number>[] = []
+  for (const p of sorted) {
+    const next: Record<string, string | number> = { label: String(p.label) }
+    for (const k of keys) {
+      const raw = p[k]
+      if (raw != null && raw !== '' && Number.isFinite(Number(raw))) last[k] = Number(raw)
+      next[k] = last[k] ?? 0
+    }
+    out.push(next)
+  }
+  if (endLabel) {
+    const lastPoint = out[out.length - 1]
+    if (lastPoint && String(lastPoint.label) < endLabel) {
+      const tail: Record<string, string | number> = { label: endLabel }
+      for (const k of keys) tail[k] = lastPoint[k] ?? 0
+      out.push(tail)
+    }
+  }
+  return out
 }
 
 export async function fetchPulseApi(): Promise<{

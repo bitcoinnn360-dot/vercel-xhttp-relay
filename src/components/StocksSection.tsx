@@ -105,7 +105,7 @@ export function TopTrades({ data }: { data: DashboardData }) {
     <div className="panel p-4">
       <h3 className="mb-1 text-sm font-bold">بیشترین ارزش معاملات</h3>
       <p className="mb-3 text-[10px] text-[var(--color-muted)]">
-        ۱۲ نماد برتر · سهام و صندوق سهامی · میلیارد تومان
+        ۱۲ نماد برتر · سهام و صندوق سهامی · میلیارد تومان · TradersArena / رهاورد
       </p>
       <ul className="space-y-2.5">
         {rows.map((t) => (

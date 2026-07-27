@@ -13,7 +13,14 @@ const TA_MARKET = 'https://tradersarena.ir/data/market'
 const TA_INDUSTRIES = 'https://tradersarena.ir/data/industries'
 const RIAL_PER_BILLION_TOMAN = 1e10
 const RIAL_PER_MILLION_TOMAN = 1e7
-const PULSE_CACHE_URL = 'https://pulse-cache.internal/market-pulse-v3'
+const PULSE_CACHE_URL = 'https://pulse-cache.internal/market-pulse-v4'
+const PULSE_CACHE_URL_LEGACY = [
+  'https://pulse-cache.internal/market-pulse-v3',
+  'https://pulse-cache.internal/market-pulse-v2',
+]
+/** Cash-market session window (Tehran). After close, ticks update the end slot. */
+const PULSE_HIST_START = '08:45'
+const PULSE_HIST_END = '12:30'
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
 
@@ -99,10 +106,19 @@ export function parseIndustryFlows(rows) {
   return out
 }
 
+function clampPulseHistoryTime(hhmm) {
+  const t = String(hhmm || '')
+  if (!/^\d{2}:\d{2}$/.test(t)) return null
+  if (t < PULSE_HIST_START) return null
+  if (t > PULSE_HIST_END) return PULSE_HIST_END
+  return t
+}
+
 export function pulsePointFromSnapshot(pulse) {
   if (!pulse) return null
+  const time = clampPulseHistoryTime(pulse.time) || pulse.time
   return {
-    time: pulse.time,
+    time,
     positive: pulse.breadth?.positive,
     negative: pulse.breadth?.negative,
     flat: pulse.breadth?.flat,
@@ -206,20 +222,28 @@ export async function fetchTradersArenaPulse() {
 }
 
 export async function loadPulseStore(cache, fallback = null) {
-  try {
-    if (cache) {
-      const hit = await cache.match(PULSE_CACHE_URL)
-      if (hit) {
-        const json = await hit.json()
-        if (json && typeof json === 'object') return json
-      }
+  const empty = { dateJalali: null, history: [], current: null }
+  const tryMatch = async (url) => {
+    try {
+      if (!cache) return null
+      const hit = await cache.match(url)
+      if (!hit) return null
+      const json = await hit.json()
+      return json && typeof json === 'object' ? json : null
+    } catch {
+      return null
     }
-  } catch {
-    /* ignore cache errors */
   }
-  return fallback && typeof fallback === 'object'
-    ? fallback
-    : { dateJalali: null, history: [], current: null }
+  const primary = await tryMatch(PULSE_CACHE_URL)
+  if (primary?.history?.length) return primary
+  for (const url of PULSE_CACHE_URL_LEGACY) {
+    const legacy = await tryMatch(url)
+    if (legacy?.history?.length) {
+      return { ...legacy, migratedFrom: url }
+    }
+  }
+  if (primary) return primary
+  return fallback && typeof fallback === 'object' ? fallback : empty
 }
 
 export async function savePulseStore(cache, store) {
@@ -247,14 +271,18 @@ export function mergePulseHistory(store, pulse, { maxPoints = 480 } = {}) {
       : { dateJalali: today, history: [], current: null }
   const point = pulsePointFromSnapshot(pulse)
   let history = Array.isArray(base.history) ? [...base.history] : []
-  if (point?.time) {
-    history = history.filter((h) => h?.time !== point.time)
+  const t = clampPulseHistoryTime(point?.time)
+  if (point && t) {
+    point.time = t
+    // replace same minute (incl. after-hours updates to end slot)
+    history = history.filter((h) => h?.time !== t)
     history.push(point)
     history = history
       .filter((h) => {
-        const t = String(h?.time || '')
-        return t >= '08:45' && t <= '15:00'
+        const ht = String(h?.time || '')
+        return ht >= PULSE_HIST_START && ht <= PULSE_HIST_END
       })
+      .sort((a, b) => String(a.time).localeCompare(String(b.time)))
       .slice(-maxPoints)
   }
   return {

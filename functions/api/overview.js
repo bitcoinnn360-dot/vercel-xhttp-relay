@@ -22,10 +22,32 @@ const TGJU_TODAY = 'https://api.tgju.org/v1/market/indicator/today-table-data/bo
 const SHAKH_INDEX = 'https://www.shakhesban.com/markets/index'
 const SHAKH_LIST = 'https://www.shakhesban.com/stocks/list-data'
 const TA_HEATMAP_STOCK_FUNDS = 'https://tradersarena.ir/data/heatmap/stock-funds'
+const TA_MARKET_VALUES = 'https://tradersarena.ir/data/market-values'
 const PARSIS_HOME = 'https://parsistahlil.ir/'
 const SOURCEARENA_API = 'https://apis.sourcearena.ir/api/'
 const RAHAVARD_API = 'https://rahavard365.com/api/v2'
 const TOP_TRADES_LIMIT = 12
+const EQUITY_FUND_RAHAVARD_CANDIDATES = 28
+/** Liquid equity ETFs often missing/zero on shakhesban QTotCap — always try Rahavard. */
+const PRIORITY_EQUITY_FUNDS = [
+  'اهرم',
+  'شتاب',
+  'آگاس',
+  'موج',
+  'جهش',
+  'توان',
+  'نارنج',
+  'بیدار',
+  'پالایش',
+  'دارایکم',
+  'اطلس',
+  'سرو',
+  'کاریس',
+  'تمشک',
+  'همای',
+  'آساس',
+  'پتروآگاه',
+]
 const BILLION_RIAL_PER_HEMAT = 10000
 const RIAL_PER_HEMAT = 1e13
 const RIAL_PER_BILLION_TOMAN = 1e10
@@ -348,21 +370,117 @@ function buildTopTradesFromBoard(rows, fundSet, limit = TOP_TRADES_LIMIT) {
     }))
 }
 
-/** Dedicated scrape ordered by trade value: سهام + صندوق (filtered later). */
-async function scrapeTopTradeCandidates() {
-  const [stocks, funds] = await Promise.all([
-    scrapeShakhesbanPages({ maxPages: 3, orderCol: 'trades.QTotCap', market: 'stock' }),
-    scrapeShakhesbanPages({ maxPages: 3, orderCol: 'trades.QTotCap', market: 'fund' }),
-  ])
-  const bySym = new Map()
-  for (const row of [...stocks, ...funds]) {
-    if (!row?.symbol) continue
-    const prev = bySym.get(row.symbol)
-    if (!prev || (row.tradeValue || 0) > (prev.tradeValue || 0)) bySym.set(row.symbol, row)
-  }
-  return [...bySym.values()]
+/** TradersArena market-values: reliable stock trade value (`t`, rial). */
+async function fetchTaMarketValueRows() {
+  const res = await fetch(TA_MARKET_VALUES, {
+    headers: {
+      Accept: 'application/json, text/plain, */*',
+      'User-Agent': UA,
+      Referer: 'https://tradersarena.ir/',
+    },
+  })
+  if (!res.ok) throw new Error(`ta market-values ${res.status}`)
+  const rows = await res.json()
+  if (!Array.isArray(rows)) return []
+  return rows
+    .map((r) => {
+      const name = String(r?.s || '').trim()
+      const tradeValue = Number(r?.t)
+      if (!name || !Number.isFinite(tradeValue) || tradeValue <= 0) return null
+      return {
+        name,
+        valueBr: Math.round((tradeValue / RIAL_PER_BILLION_TOMAN) * 10) / 10,
+        kind: 'stock',
+      }
+    })
+    .filter(Boolean)
 }
 
+async function fetchRahavardTradeValueBr(symbol) {
+  const q = encodeURIComponent(symbol)
+  const searchRes = await fetch(`${RAHAVARD_API}/search?keyword=${q}`, {
+    headers: {
+      Accept: 'application/json',
+      'User-Agent': UA,
+      Referer: 'https://rahavard365.com/',
+    },
+  })
+  if (!searchRes.ok) throw new Error(`rahavard search ${searchRes.status}`)
+  const search = await searchRes.json()
+  const hit = (search?.data || []).find(
+    (x) => String(x?.trade_symbol || '') === symbol && (x?.type === 'صندوق' || x?.type === 'سهام'),
+  )
+  if (!hit?.entity_id) return null
+  const assetRes = await fetch(`${RAHAVARD_API}/asset/${hit.entity_id}`, {
+    headers: {
+      Accept: 'application/json',
+      'User-Agent': UA,
+      Referer: 'https://rahavard365.com/',
+    },
+  })
+  if (!assetRes.ok) throw new Error(`rahavard asset ${assetRes.status}`)
+  const asset = await assetRes.json()
+  const value = parseNum(asset?.data?.last_trade?.value)
+  if (value == null || value <= 0) return null
+  return Math.round((value / RIAL_PER_BILLION_TOMAN) * 10) / 10
+}
+
+/**
+ * Top 12 = سهام (TradersArena market-values.t) ∪ صندوق سهامی (Rahavard last_trade.value).
+ * Shakhesban QTotCap is often wrong after close / for some names (e.g. فصبا).
+ */
+async function buildLiveTopTrades(fundSet) {
+  const [stockRows, fundBoard] = await Promise.all([
+    fetchTaMarketValueRows(),
+    scrapeShakhesbanPages({ maxPages: 2, orderCol: 'trades.QTotCap', market: 'fund' }).catch(() => []),
+  ])
+
+  const fundCands = (fundBoard || [])
+    .filter((r) => isEquityFundRow(r, fundSet) && (r.tradeValue || 0) > 0)
+    .sort((a, b) => (b.tradeValue || 0) - (a.tradeValue || 0))
+    .slice(0, EQUITY_FUND_RAHAVARD_CANDIDATES)
+
+  const seen = new Set(fundCands.map((r) => r.symbol))
+  for (const sym of PRIORITY_EQUITY_FUNDS) {
+    if (seen.has(sym)) continue
+    if (fundSet?.size && !fundSet.has(normalizeSymbolKey(sym)) && sym !== 'دارایکم') continue
+    fundCands.push({ symbol: sym, marketFa: 'صندوق', tradeValue: 1 })
+    seen.add(sym)
+  }
+
+  const fundSettled = await Promise.allSettled(
+    fundCands.map(async (row) => {
+      const valueBr = await fetchRahavardTradeValueBr(row.symbol)
+      if (valueBr == null) return null
+      return { name: row.symbol, valueBr, kind: 'equity-fund' }
+    }),
+  )
+  const fundRows = fundSettled
+    .filter((r) => r.status === 'fulfilled' && r.value)
+    .map((r) => r.value)
+
+  const merged = [...stockRows, ...fundRows]
+    .filter((r) => (r.valueBr || 0) > 0)
+    .sort((a, b) => b.valueBr - a.valueBr)
+
+  // de-dupe by name (prefer higher value)
+  const byName = new Map()
+  for (const row of merged) {
+    const prev = byName.get(row.name)
+    if (!prev || row.valueBr > prev.valueBr) byName.set(row.name, row)
+  }
+  const top = [...byName.values()].sort((a, b) => b.valueBr - a.valueBr).slice(0, TOP_TRADES_LIMIT)
+  return {
+    topTrades: top.map(({ name, valueBr }) => ({ name, valueBr })),
+    topTradesSource: fundRows.length
+      ? 'tradersarena-market-values+rahavard-equity-funds'
+      : stockRows.length
+        ? 'tradersarena-market-values'
+        : null,
+  }
+}
+
+/** Dedicated scrape ordered by trade value: سهام + صندوق (filtered later). */
 function computeBoardImpacts(stocks, indices, maxMove = 0.22) {
   const equities = stocks.filter((s) => !s.marketFa || s.marketFa === 'سهام')
   const bourse = equities.filter((s) => !(s.flow || '').includes('فرابورس'))
@@ -963,7 +1081,8 @@ export async function onRequestGet(context) {
     fetchTradersArenaPulse(),
     fetchJson(`${origin}/data/market.json`).catch(() => null),
     fetchEquityFundSymbolSet(),
-    scrapeTopTradeCandidates(),
+    // placeholder slot kept for Promise index stability — live top trades built below
+    Promise.resolve(null),
   ])
 
   if (tasks[0].status === 'fulfilled') {
@@ -1038,11 +1157,18 @@ export async function onRequestGet(context) {
     errors.push(`equity-funds: ${tasks[12].reason}`)
   }
 
-  let topTradeRows = []
-  if (tasks[13].status === 'fulfilled') {
-    topTradeRows = tasks[13].value || []
-  } else {
-    errors.push(`top-trades-board: ${tasks[13].reason}`)
+  let topTrades = []
+  let topTradesSource = null
+  try {
+    const liveTop = await buildLiveTopTrades(equityFundSet)
+    topTrades = liveTop.topTrades || []
+    topTradesSource = liveTop.topTradesSource
+  } catch (e) {
+    errors.push(`top-trades: ${e}`)
+    // last-resort: board equities only (may be stale/wrong — better than empty)
+    const fallbackRows = boardRows.filter((s) => (!s.marketFa || s.marketFa === 'سهام') && s.tradeValue > 0)
+    topTrades = buildTopTradesFromBoard(fallbackRows, equityFundSet, TOP_TRADES_LIMIT)
+    topTradesSource = topTrades.length ? 'shakhesban-board-fallback' : null
   }
 
   const boardImpacts = boardRows.length ? computeBoardImpacts(boardRows, indices) : null
@@ -1075,13 +1201,7 @@ export async function onRequestGet(context) {
   }
   const marketPulseHistory = Array.isArray(pulseStore?.history) ? pulseStore.history : []
 
-  const tradeUniverse = topTradeRows.length ? topTradeRows : boardRows
-  const topTrades = buildTopTradesFromBoard(tradeUniverse, equityFundSet, TOP_TRADES_LIMIT)
-  const topTradesSource = topTrades.length
-    ? topTradeRows.length
-      ? 'shakhesban+ta-equity-funds'
-      : 'shakhesban-board-stocks+equity-funds'
-    : null
+  // topTrades already resolved above via TradersArena market-values + Rahavard equity funds
 
   const merged = mergeMoneyFlowStore(moneyFlowStore, parsistahlil.days || [])
   moneyFlowStore = merged.store

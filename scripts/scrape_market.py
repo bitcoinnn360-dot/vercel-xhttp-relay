@@ -419,6 +419,130 @@ def scrape_top_trade_candidates() -> list[dict]:
     return list(by_sym.values())
 
 
+def fetch_ta_market_value_trades() -> list[dict]:
+    """Reliable stock trade values from TradersArena /data/market-values (`t` = rial)."""
+    try:
+        raw = fetch(
+            "https://tradersarena.ir/data/market-values",
+            timeout=45,
+            headers={
+                "Accept": "application/json, text/plain, */*",
+                "Referer": "https://tradersarena.ir/",
+            },
+        )
+        rows = json.loads(raw.decode("utf-8", errors="replace") if isinstance(raw, (bytes, bytearray)) else raw)
+    except Exception as exc:  # noqa: BLE001
+        print(f"ta market-values: {exc}")
+        return []
+    out: list[dict] = []
+    if not isinstance(rows, list):
+        return out
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        name = str(row.get("s") or "").strip()
+        try:
+            tv = float(row.get("t") or 0)
+        except (TypeError, ValueError):
+            continue
+        if not name or tv <= 0:
+            continue
+        out.append({"name": name, "valueBr": round(tv / RIAL_PER_BILLION_TOMAN, 1), "kind": "stock"})
+    return out
+
+
+def fetch_rahavard_trade_value_br(symbol: str) -> float | None:
+    try:
+        search = json.loads(
+            fetch(
+                f"https://rahavard365.com/api/v2/search?keyword={urllib.parse.quote(symbol)}",
+                timeout=20,
+                headers={"Accept": "application/json", "Referer": "https://rahavard365.com/"},
+            ).decode("utf-8", errors="replace")
+        )
+    except Exception:
+        return None
+    hit = next(
+        (
+            x
+            for x in (search.get("data") or [])
+            if isinstance(x, dict) and x.get("trade_symbol") == symbol and x.get("type") in ("صندوق", "سهام")
+        ),
+        None,
+    )
+    if not hit or not hit.get("entity_id"):
+        return None
+    try:
+        asset = json.loads(
+            fetch(
+                f"https://rahavard365.com/api/v2/asset/{hit['entity_id']}",
+                timeout=20,
+                headers={"Accept": "application/json", "Referer": "https://rahavard365.com/"},
+            ).decode("utf-8", errors="replace")
+        )
+    except Exception:
+        return None
+    value = num(((asset.get("data") or {}).get("last_trade") or {}).get("value"))
+    if value is None or value <= 0:
+        return None
+    return round(value / RIAL_PER_BILLION_TOMAN, 1)
+
+
+def build_live_top_trades(fund_set: set[str], limit: int = 12) -> tuple[list[dict], str | None]:
+    stocks = fetch_ta_market_value_trades()
+    fund_board = scrape_shakhesban_market_pages("fund", max_pages=2)
+    cands = [
+        r
+        for r in fund_board
+        if is_equity_fund_row(r, fund_set) and float(r.get("tradeValue") or 0) > 0
+    ]
+    cands.sort(key=lambda r: float(r.get("tradeValue") or 0), reverse=True)
+    cands = cands[:28]
+    seen = {str(r.get("symbol") or "") for r in cands}
+    priority = [
+        "اهرم",
+        "شتاب",
+        "آگاس",
+        "موج",
+        "جهش",
+        "توان",
+        "نارنج",
+        "بیدار",
+        "پالایش",
+        "دارایکم",
+        "اطلس",
+        "سرو",
+        "کاریس",
+        "تمشک",
+        "همای",
+        "آساس",
+        "پتروآگاه",
+    ]
+    for sym in priority:
+        if sym in seen:
+            continue
+        key = _normalize_symbol_key(sym)
+        if fund_set and key not in fund_set and sym != "دارایکم":
+            continue
+        cands.append({"symbol": sym, "marketFa": "صندوق", "tradeValue": 1.0})
+        seen.add(sym)
+    fund_rows: list[dict] = []
+    for row in cands:
+        v = fetch_rahavard_trade_value_br(str(row.get("symbol") or ""))
+        if v is None:
+            continue
+        fund_rows.append({"name": row["symbol"], "valueBr": v, "kind": "equity-fund"})
+    merged = {r["name"]: r for r in [*stocks, *fund_rows]}
+    top = sorted(merged.values(), key=lambda r: r["valueBr"], reverse=True)[:limit]
+    out = [{"name": r["name"], "valueBr": r["valueBr"]} for r in top]
+    source = (
+        "tradersarena-market-values+rahavard-equity-funds"
+        if fund_rows
+        else ("tradersarena-market-values" if stocks else None)
+    )
+    return out, source
+
+
 def scrape_shakhesban_board(max_pages: int = 15) -> list[dict]:
     """Full board via shakhesban list-data (سهام+صندوق+اوراق; no market=stock)."""
     all_rows: list[dict] = []
@@ -726,8 +850,16 @@ def append_pulse_history(pulse: dict) -> dict:
     if store.get("dateJalali") != today:
         store = {"dateJalali": today, "history": []}
     hist = list(store.get("history") or [])
+    raw_time = str(pulse.get("time") or "")
+    # After cash-market close, keep refreshing the end slot (flat live line).
+    if raw_time and raw_time > "12:30":
+        slot = "12:30"
+    elif raw_time and raw_time < "08:45":
+        slot = None
+    else:
+        slot = raw_time or None
     point = {
-        "time": pulse.get("time"),
+        "time": slot,
         "positive": (pulse.get("breadth") or {}).get("positive"),
         "negative": (pulse.get("breadth") or {}).get("negative"),
         "flat": (pulse.get("breadth") or {}).get("flat"),
@@ -743,11 +875,11 @@ def append_pulse_history(pulse: dict) -> dict:
         "perCapitaBuy": pulse.get("perCapitaBuyMillionToman"),
         "perCapitaSell": pulse.get("perCapitaSellMillionToman"),
     }
-    # replace same minute if exists
-    hist = [h for h in hist if h.get("time") != point["time"]]
-    hist.append(point)
-    hist = [h for h in hist if str(h.get("time") or "") >= "08:45" and str(h.get("time") or "") <= "15:00"]
-    hist = hist[-480:]
+    if slot:
+        hist = [h for h in hist if h.get("time") != slot]
+        hist.append(point)
+    hist = [h for h in hist if str(h.get("time") or "") >= "08:45" and str(h.get("time") or "") <= "12:30"]
+    hist = sorted(hist, key=lambda h: str(h.get("time") or ""))[-480:]
     store = {"dateJalali": today, "history": hist, "current": pulse, "updatedAt": datetime.now(timezone.utc).isoformat()}
     save_pulse_store(store)
     return store
@@ -1383,12 +1515,10 @@ def build_overview_live(
     sum_trade = sum(s["tradeValue"] for s in stocks)
     today = jalali_today()
 
-    # Top trades: ۱۲ نماد برتر سهام + صندوق سهامی (نه اوراق/طلا/درآمدثابت)
+    # Top trades: ۱۲ نماد برتر سهام + صندوق سهامی (TA market-values + Rahavard)
     fund_set = fetch_equity_fund_symbol_set()
-    trade_rows = scrape_top_trade_candidates() or stocks_all
-    top_trades_out = build_top_trades(trade_rows, fund_set, limit=12)
-    top_trades_source = "shakhesban+ta-equity-funds" if top_trades_out else None
-    if glance.get("ok") and glance.get("topTrades") and not top_trades_out:
+    top_trades_out, top_trades_source = build_live_top_trades(fund_set, limit=12)
+    if not top_trades_out and glance.get("ok") and glance.get("topTrades"):
         top_trades_out = list(glance.get("topTrades") or [])[:12]
         top_trades_source = glance.get("topTradesSource") or "sourcearena-all"
 

@@ -430,40 +430,42 @@ async function fetchRahavardTradeValueBr(symbol) {
  * Shakhesban QTotCap is often wrong after close / for some names (e.g. فصبا).
  */
 async function buildLiveTopTrades(fundSet) {
-  const [stockRows, fundBoard] = await Promise.all([
-    fetchTaMarketValueRows(),
-    scrapeShakhesbanPages({ maxPages: 2, orderCol: 'trades.QTotCap', market: 'fund' }).catch(() => []),
-  ])
+  const stockRows = await fetchTaMarketValueRows()
 
-  const fundCands = (fundBoard || [])
-    .filter((r) => isEquityFundRow(r, fundSet) && (r.tradeValue || 0) > 0)
-    .sort((a, b) => (b.tradeValue || 0) - (a.tradeValue || 0))
-    .slice(0, EQUITY_FUND_RAHAVARD_CANDIDATES)
-
-  const seen = new Set(fundCands.map((r) => r.symbol))
+  // Prefer a small liquid ETF set — full board+Rahavard fan-out often times out on CF.
+  const fundSymbols = []
+  const seen = new Set()
   for (const sym of PRIORITY_EQUITY_FUNDS) {
-    if (seen.has(sym)) continue
-    if (fundSet?.size && !fundSet.has(normalizeSymbolKey(sym)) && sym !== 'دارایکم') continue
-    fundCands.push({ symbol: sym, marketFa: 'صندوق', tradeValue: 1 })
-    seen.add(sym)
+    const key = normalizeSymbolKey(sym)
+    if (seen.has(key)) continue
+    if (fundSet?.size && !fundSet.has(key) && sym !== 'دارایکم' && key !== normalizeSymbolKey('دارا یکم')) {
+      continue
+    }
+    fundSymbols.push(sym)
+    seen.add(key)
   }
 
-  const fundSettled = await Promise.allSettled(
-    fundCands.map(async (row) => {
-      const valueBr = await fetchRahavardTradeValueBr(row.symbol)
-      if (valueBr == null) return null
-      return { name: row.symbol, valueBr, kind: 'equity-fund' }
-    }),
-  )
-  const fundRows = fundSettled
-    .filter((r) => r.status === 'fulfilled' && r.value)
-    .map((r) => r.value)
+  const fundRows = []
+  // modest concurrency to avoid Rahavard resets / worker subrequest storms
+  const chunkSize = 4
+  for (let i = 0; i < fundSymbols.length; i += chunkSize) {
+    const chunk = fundSymbols.slice(i, i + chunkSize)
+    const settled = await Promise.allSettled(
+      chunk.map(async (symbol) => {
+        const valueBr = await fetchRahavardTradeValueBr(symbol)
+        if (valueBr == null) return null
+        return { name: symbol, valueBr, kind: 'equity-fund' }
+      }),
+    )
+    for (const r of settled) {
+      if (r.status === 'fulfilled' && r.value) fundRows.push(r.value)
+    }
+  }
 
   const merged = [...stockRows, ...fundRows]
     .filter((r) => (r.valueBr || 0) > 0)
     .sort((a, b) => b.valueBr - a.valueBr)
 
-  // de-dupe by name (prefer higher value)
   const byName = new Map()
   for (const row of merged) {
     const prev = byName.get(row.name)
@@ -477,6 +479,7 @@ async function buildLiveTopTrades(fundSet) {
       : stockRows.length
         ? 'tradersarena-market-values'
         : null,
+    equityFundsEnriched: fundRows.length,
   }
 }
 
@@ -1163,6 +1166,9 @@ export async function onRequestGet(context) {
     const liveTop = await buildLiveTopTrades(equityFundSet)
     topTrades = liveTop.topTrades || []
     topTradesSource = liveTop.topTradesSource
+    if (liveTop.equityFundsEnriched === 0 && equityFundSet.size) {
+      errors.push('top-trades-equity-funds: rahavard enrich empty')
+    }
   } catch (e) {
     errors.push(`top-trades: ${e}`)
     // last-resort: board equities only (may be stale/wrong — better than empty)

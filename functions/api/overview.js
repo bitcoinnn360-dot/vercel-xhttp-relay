@@ -466,14 +466,21 @@ async function loadSaGlanceCache(cache) {
   }
 }
 
-async function saveSaGlanceCache(cache, glance) {
+async function saveSaGlanceCache(cache, glance, dateJalali) {
   if (!cache || !glance?.ok) return
   try {
     await cache.put(
       SA_GLANCE_CACHE_URL,
-      new Response(JSON.stringify({ ...glance, cachedAt: new Date().toISOString() }), {
-        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=86400' },
-      }),
+      new Response(
+        JSON.stringify({
+          ...glance,
+          dateJalali: dateJalali || null,
+          cachedAt: new Date().toISOString(),
+        }),
+        {
+          headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=86400' },
+        },
+      ),
     )
   } catch {
     /* ignore */
@@ -500,11 +507,44 @@ function computeBoardMarketStats(stocks) {
   }
 }
 
+function isFreshMvSnapshot(snap, todayGregorian, todayJalali) {
+  if (!snap || snap.totalMarketValueHmt == null) return false
+  const asOf = snap.asOf || snap.cachedAt || snap.updatedAt
+  if (asOf) {
+    try {
+      const g = new Date(asOf).toLocaleDateString('en-CA', { timeZone: 'Asia/Tehran' })
+      return g === todayGregorian
+    } catch {
+      /* fall through */
+    }
+  }
+  return Boolean(snap.dateJalali && snap.dateJalali === todayJalali)
+}
+
+function applyIndexMove(hmt, changePct) {
+  if (hmt == null || !Number.isFinite(Number(hmt))) return null
+  const pct = Number(changePct)
+  if (!Number.isFinite(pct)) return Math.round(Number(hmt) * 10) / 10
+  return Math.round(Number(hmt) * (1 + pct / 100) * 10) / 10
+}
+
 /**
  * Resolve MV + trade value with fallbacks:
- * SourceArena → CF cache of last SA → TradersArena trade → board → static market.json
+ * SourceArena → today's CF cache → last SA/static adjusted by today's index move → board
+ * Trade: prefer live TradersArena over stale snapshots
  */
-function resolveMarketStats({ sourcearena, boardStats, tradersPulse, saCache, staticLive, usd }) {
+function resolveMarketStats({
+  sourcearena,
+  boardStats,
+  tradersPulse,
+  saCache,
+  staticLive,
+  usd,
+  todayJalali,
+  todayGregorian,
+  tedpixChangePct,
+  ifbChangePct,
+}) {
   let bourseMarketValueHmt = null
   let ifbMarketValueHmt = null
   let totalMarketValueHmt = null
@@ -521,29 +561,39 @@ function resolveMarketStats({ sourcearena, boardStats, tradersPulse, saCache, st
       totalTradeValueHmt = sourcearena.totalTradeValueHmt
       totalTradeValueSource = sourcearena.totalTradeValueSource || 'sourcearena'
     }
-  } else if (saCache?.ok && saCache.totalMarketValueHmt != null) {
-    bourseMarketValueHmt = saCache.bourseMarketValueHmt
-    ifbMarketValueHmt = saCache.ifbMarketValueHmt
-    totalMarketValueHmt = saCache.totalMarketValueHmt
-    marketValueSource = `${saCache.marketValueSource || 'sourcearena'}+cache`
-    if (saCache.totalTradeValueHmt != null) {
-      totalTradeValueHmt = saCache.totalTradeValueHmt
-      totalTradeValueSource = `${saCache.totalTradeValueSource || 'sourcearena'}+cache`
+  } else {
+    const baselines = [saCache, staticLive].filter((b) => b && b.totalMarketValueHmt != null)
+    const sameDay = baselines.find((b) => isFreshMvSnapshot(b, todayGregorian, todayJalali))
+    const baseline = sameDay || baselines[0] || null
+
+    if (baseline) {
+      const fromToday = isFreshMvSnapshot(baseline, todayGregorian, todayJalali)
+      if (fromToday) {
+        bourseMarketValueHmt = baseline.bourseMarketValueHmt ?? null
+        ifbMarketValueHmt = baseline.ifbMarketValueHmt ?? null
+        totalMarketValueHmt = baseline.totalMarketValueHmt
+        marketValueSource = `${baseline.marketValueSource || 'sourcearena'}+cache`
+      } else {
+        // Snapshot is from a prior session — move with today's index % so KPI isn't frozen
+        bourseMarketValueHmt = applyIndexMove(baseline.bourseMarketValueHmt, tedpixChangePct)
+        ifbMarketValueHmt = applyIndexMove(baseline.ifbMarketValueHmt, ifbChangePct)
+        if (bourseMarketValueHmt != null && ifbMarketValueHmt != null) {
+          totalMarketValueHmt = Math.round((bourseMarketValueHmt + ifbMarketValueHmt) * 10) / 10
+        } else {
+          totalMarketValueHmt = applyIndexMove(baseline.totalMarketValueHmt, tedpixChangePct)
+        }
+        marketValueSource = `${baseline.marketValueSource || 'sourcearena'}+index-adjusted`
+      }
+      if (baseline.totalTradeValueHmt != null) {
+        totalTradeValueHmt = baseline.totalTradeValueHmt
+        totalTradeValueSource = `${baseline.totalTradeValueSource || 'sourcearena'}+${fromToday ? 'cache' : 'stale'}`
+      }
+    } else if (boardStats?.ok) {
+      bourseMarketValueHmt = boardStats.bourseMarketValueHmt
+      ifbMarketValueHmt = boardStats.ifbMarketValueHmt
+      totalMarketValueHmt = boardStats.totalMarketValueHmt
+      marketValueSource = boardStats.marketValueSource
     }
-  } else if (staticLive?.totalMarketValueHmt != null) {
-    bourseMarketValueHmt = staticLive.bourseMarketValueHmt ?? null
-    ifbMarketValueHmt = staticLive.ifbMarketValueHmt ?? null
-    totalMarketValueHmt = staticLive.totalMarketValueHmt
-    marketValueSource = `${staticLive.marketValueSource || 'static'}+deployed`
-    if (staticLive.totalTradeValueHmt != null) {
-      totalTradeValueHmt = staticLive.totalTradeValueHmt
-      totalTradeValueSource = `${staticLive.totalTradeValueSource || 'static'}+deployed`
-    }
-  } else if (boardStats?.ok) {
-    bourseMarketValueHmt = boardStats.bourseMarketValueHmt
-    ifbMarketValueHmt = boardStats.ifbMarketValueHmt
-    totalMarketValueHmt = boardStats.totalMarketValueHmt
-    marketValueSource = boardStats.marketValueSource
   }
 
   // Live trade value from TradersArena (same poll as pulse) when SA trade missing
@@ -558,7 +608,7 @@ function resolveMarketStats({ sourcearena, boardStats, tradersPulse, saCache, st
   // Prefer fresher TA trade over stale SA cache / deployed snapshot for "today"
   if (
     tradersPulse?.totalTradeValueHmt != null &&
-    (totalTradeValueSource || '').match(/cache|deployed|static/)
+    (totalTradeValueSource || '').match(/cache|deployed|static|stale/)
   ) {
     totalTradeValueHmt = tradersPulse.totalTradeValueHmt
     totalTradeValueSource = 'tradersarena'
@@ -902,7 +952,8 @@ export async function onRequestGet(context) {
   }
 
   const cache = typeof caches !== 'undefined' ? caches.default : null
-  if (sourcearena?.ok) await saveSaGlanceCache(cache, sourcearena)
+  const today = jalaliToday()
+  if (sourcearena?.ok) await saveSaGlanceCache(cache, sourcearena, today.dateJalali)
   const saCache = sourcearena?.ok ? null : await loadSaGlanceCache(cache)
   const boardStats = computeBoardMarketStats(boardRows)
 
@@ -934,8 +985,6 @@ export async function onRequestGet(context) {
       ? 'shakhesban-board-equities'
       : null
 
-  const today = jalaliToday()
-
   const merged = mergeMoneyFlowStore(moneyFlowStore, parsistahlil.days || [])
   moneyFlowStore = merged.store
 
@@ -957,6 +1006,10 @@ export async function onRequestGet(context) {
     saCache,
     staticLive,
     usd,
+    todayJalali: today.dateJalali,
+    todayGregorian: today.dateGregorian,
+    tedpixChangePct: tedpix?.changePct,
+    ifbChangePct: indices?.ifb?.changePct,
   })
 
   const blocked = [

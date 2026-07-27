@@ -108,32 +108,6 @@ export function MarketOverview({
             p.label === (pulse.time || 'الان'),
         )
       : flowSeries
-  const orderSeries = hasHist
-    ? pulseHist.map((p) => ({ label: p.time, buy: p.orderBuy ?? 0, sell: p.orderSell ?? 0 }))
-    : pulse
-      ? [
-          {
-            label: pulse.time || 'الان',
-            buy: pulse.orderBuyBillionToman ?? 0,
-            sell: pulse.orderSellBillionToman ?? 0,
-          },
-        ]
-      : []
-  const perCapitaSeries = hasHist
-    ? pulseHist.map((p) => ({
-        label: p.time,
-        buy: p.perCapitaBuy ?? 0,
-        sell: p.perCapitaSell ?? 0,
-      }))
-    : pulse
-      ? [
-          {
-            label: pulse.time || 'الان',
-            buy: pulse.perCapitaBuyMillionToman ?? 0,
-            sell: pulse.perCapitaSellMillionToman ?? 0,
-          },
-        ]
-      : []
 
   return (
     <section id="overview" className="scroll-mt-8 space-y-4">
@@ -177,15 +151,17 @@ export function MarketOverview({
           unit="همت"
           delay={0.1}
           hint={
-            (src.marketValue || '').includes('sourcearena')
-              ? 'بورس + فرابورس · SourceArena'
-              : (src.marketValue || '').includes('shakhesban')
-                ? 'تابلو شاخص‌بان (پشتیبان)'
-                : (src.marketValue || '').includes('cache') || (src.marketValue || '').includes('deployed')
-                  ? 'آخرین مقدار معتبر (کش)'
-                  : blocked.includes('sourcearena')
-                    ? 'موقت: پشتیبان'
-                    : src.marketValue || '—'
+            (src.marketValue || '').includes('index-adjusted')
+              ? 'آخرین رسمی × تغییر شاخص امروز'
+              : (src.marketValue || '').includes('sourcearena')
+                ? 'بورس + فرابورس · SourceArena'
+                : (src.marketValue || '').includes('shakhesban')
+                  ? 'تابلو شاخص‌بان (پشتیبان)'
+                  : (src.marketValue || '').includes('cache') || (src.marketValue || '').includes('deployed')
+                    ? 'آخرین مقدار معتبر (کش)'
+                    : blocked.includes('sourcearena')
+                      ? 'موقت: پشتیبان'
+                      : src.marketValue || '—'
           }
         />
       </div>
@@ -313,7 +289,7 @@ export function MarketOverview({
       <div>
         <h3 className="mb-1 text-sm font-bold">پالس لحظه‌ای بازار (الگوی TradersArena)</h3>
         <p className="mb-3 text-[10px] text-[var(--color-muted)]">
-          وضعیت نمادها، ورود پول حقیقی، ارزش سفارش‌ها و سرانه خرید/فروش · منبع TradersArena
+          وضعیت نمادها و ورود پول حقیقی · منبع TradersArena
           {pulse?.time ? ` · آخرین نمونه ${pulse.time}` : ''}
           {pulseHist.length > 1 ? ` · ${pulseHist.length} نقطه از ۹:۰۰` : ''}
         </p>
@@ -395,48 +371,6 @@ export function MarketOverview({
               ]}
               height={200}
               unit="میلیارد تومان"
-            />
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.08 }}
-            className="panel p-4"
-          >
-            <h4 className="mb-1 text-sm font-bold">ارزش سفارش‌های خرید و فروش</h4>
-            <p className="mb-2 text-[10px] text-[var(--color-muted)]">
-              مجموع ۵ خط اول تابلو · خرید {fmtNum(pulse?.orderBuyBillionToman ?? 0, 1)} · فروش{' '}
-              {fmtNum(pulse?.orderSellBillionToman ?? 0, 1)} میلیارد تومان
-            </p>
-            <DualLineChart
-              data={orderSeries}
-              aKey="buy"
-              bKey="sell"
-              aLabel="خرید"
-              bLabel="فروش"
-              unit="میلیارد تومان"
-            />
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="panel p-4"
-          >
-            <h4 className="mb-1 text-sm font-bold">سرانه خرید و فروش</h4>
-            <p className="mb-2 text-[10px] text-[var(--color-muted)]">
-              سرانه حقیقی · خرید {fmtNum(pulse?.perCapitaBuyMillionToman ?? 0, 1)} · فروش{' '}
-              {fmtNum(pulse?.perCapitaSellMillionToman ?? 0, 1)} میلیون تومان
-            </p>
-            <DualLineChart
-              data={perCapitaSeries}
-              aKey="buy"
-              bKey="sell"
-              aLabel="سرانه خرید"
-              bLabel="سرانه فروش"
-              unit="میلیون تومان"
             />
           </motion.div>
         </div>

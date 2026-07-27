@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Sidebar, TopBar } from './components/layout/Shell'
+import { MobileNav, Sidebar, TopBar } from './components/layout/Shell'
 import { SourceBar } from './components/SourceBar'
 import { MarketOverview } from './components/MarketOverview'
 import { ChartsHub, FredMacroSection } from './components/ChartsHub'
@@ -40,7 +40,8 @@ export default function App() {
   return (
     <div className="app-shell">
       <Sidebar active={active} />
-      <div>
+      <div className="min-w-0">
+        <MobileNav active={active} />
         <main className="main-wrap">
           <TopBar data={data} refreshing={refreshing || loading} onRefresh={() => void refresh()} />
           {error && (

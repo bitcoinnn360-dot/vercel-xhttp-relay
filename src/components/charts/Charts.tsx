@@ -158,9 +158,13 @@ export function ImpactDivergingChart({
   }
 
   const maxAbs = Math.max(...data.map((d) => Math.abs(d.impact)), 1)
+  // Unique gradient ids per instance (two impact panels on one page)
+  const uid = `impact-${Math.abs(data.reduce((s, d) => s + d.impact * 10, 0)).toString(36)}-${data.length}`
+  const posId = `${uid}-pos`
+  const negId = `${uid}-neg`
 
   return (
-    <div style={{ height }} className="w-full">
+    <div className="chart-ltr" style={{ height, width: '100%' }}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           layout="vertical"
@@ -169,11 +173,11 @@ export function ImpactDivergingChart({
           barCategoryGap="18%"
         >
           <defs>
-            <linearGradient id="impactPos" x1="0" y1="0" x2="1" y2="0">
+            <linearGradient id={posId} x1="0" y1="0" x2="1" y2="0">
               <stop offset="0%" stopColor="#86efac" />
               <stop offset="100%" stopColor="#15803d" />
             </linearGradient>
-            <linearGradient id="impactNeg" x1="1" y1="0" x2="0" y2="0">
+            <linearGradient id={negId} x1="1" y1="0" x2="0" y2="0">
               <stop offset="0%" stopColor="#fca5a5" />
               <stop offset="100%" stopColor="#b91c1c" />
             </linearGradient>
@@ -203,7 +207,7 @@ export function ImpactDivergingChart({
           />
           <Bar dataKey="impact" radius={[4, 4, 4, 4]} isAnimationActive={false}>
             {data.map((d) => (
-              <Cell key={d.symbol} fill={d.impact >= 0 ? 'url(#impactPos)' : 'url(#impactNeg)'} />
+              <Cell key={d.symbol} fill={d.impact >= 0 ? `url(#${posId})` : `url(#${negId})`} />
             ))}
             <LabelList
               dataKey="impact"
@@ -283,7 +287,7 @@ export function TopTradesBarChart({
   })
 
   return (
-    <div style={{ height }} className="w-full">
+    <div className="chart-ltr" style={{ height, width: '100%' }}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           layout="vertical"

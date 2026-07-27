@@ -21,15 +21,28 @@ interface Props {
   active: string
 }
 
+function BrandMark({ size = 24 }: { size?: number }) {
+  return (
+    <svg
+      viewBox="0 0 64 64"
+      width={size}
+      height={size}
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M14 42 L32 14 L50 42 Z" stroke="currentColor" strokeWidth="3.5" fill="none" />
+      <circle cx="32" cy="38" r="5" fill="currentColor" />
+    </svg>
+  )
+}
+
 export function Sidebar({ active }: { active: string }) {
   return (
     <aside className="side-nav">
       <div className="side-brand">
         <div className="grid h-9 w-9 place-items-center rounded-lg bg-white/10 text-[#7dd3fc]">
-          <svg viewBox="0 0 64 64" className="h-6 w-6" fill="none">
-            <path d="M14 42 L32 14 L50 42 Z" stroke="currentColor" strokeWidth="3.5" />
-            <circle cx="32" cy="38" r="5" fill="currentColor" />
-          </svg>
+          <BrandMark size={24} />
         </div>
         <div>
           <div className="text-sm font-extrabold text-white leading-tight">معادن و فلزات</div>
@@ -47,6 +60,30 @@ export function Sidebar({ active }: { active: string }) {
         بروزرسانی خودکار هر ۳ دقیقه
       </div>
     </aside>
+  )
+}
+
+/** Compact sticky nav for viewports where the sidebar is hidden. */
+export function MobileNav({ active }: { active: string }) {
+  return (
+    <nav className="mobile-nav" aria-label="بخش‌های داشبورد">
+      <div className="mobile-nav-brand">
+        <div className="grid h-8 w-8 place-items-center rounded-md bg-white/10 text-[#7dd3fc]">
+          <BrandMark size={20} />
+        </div>
+        <div>
+          <div className="text-sm font-extrabold text-white leading-tight">معادن و فلزات</div>
+          <div className="text-[0.65rem] text-slate-300">Market Terminal</div>
+        </div>
+      </div>
+      <div className="mobile-nav-links">
+        {NAV.map((n) => (
+          <a key={n.id} href={`#${n.id}`} data-active={active === n.id}>
+            {n.label}
+          </a>
+        ))}
+      </div>
+    </nav>
   )
 }
 

@@ -491,6 +491,8 @@ def scrape_tradersarena_pulse() -> dict | None:
         "flowStocksBillionToman": bt((data.get("st") or [None] * 6)[5]),
         "flowEquityFundsBillionToman": bt((data.get("sf") or [None] * 6)[5]),
         "flowFixedIncomeBillionToman": bt((data.get("nsf") or [None] * 6)[5]),
+        "totalTradeValueHmt": round(float(m[1]) / RIAL_PER_HEMAT, 2) if len(m) > 1 and m[1] is not None else None,
+        "totalTradeValueBillionToman": bt(m[1] if len(m) > 1 else None),
         "retailBuyBillionToman": bt(m[7] if len(m) > 7 else None),
         "retailSellBillionToman": bt(m[10] if len(m) > 10 else None),
         "perCapitaBuyMillionToman": mt(m[2] if len(m) > 2 else None),
@@ -1283,6 +1285,9 @@ def build_overview_live(
         usd_m = round(total_mv * RIAL_PER_HEMAT / usd_rial / 1e6, 0)
 
     ifb_board_trade = round(sum(s["tradeValue"] for s in ifb) / RIAL_PER_HEMAT, 2)
+    ta_trade = None
+    if isinstance(pulse_store, dict):
+        ta_trade = (pulse_store.get("current") or {}).get("totalTradeValueHmt")
     if glance.get("ok") and glance.get("totalTradeValueHmt") is not None:
         total_trade_hmt = glance["totalTradeValueHmt"]
         total_trade_source = glance.get("totalTradeValueSource") or "sourcearena"
@@ -1291,6 +1296,9 @@ def build_overview_live(
             b_tr = (glance.get("bourse") or {}).get("tradeValueHmt") or total_trade_hmt
             total_trade_hmt = round(float(b_tr) + ifb_board_trade, 2)
             total_trade_source = "sourcearena-bourse+shakhesban-ifb"
+    elif ta_trade is not None:
+        total_trade_hmt = ta_trade
+        total_trade_source = "tradersarena"
     else:
         total_trade_hmt = board_trade
         total_trade_source = "shakhesban-board-interim"

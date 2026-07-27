@@ -179,9 +179,13 @@ export function MarketOverview({
           hint={
             (src.marketValue || '').includes('sourcearena')
               ? 'بورس + فرابورس · SourceArena'
-              : blocked.includes('sourcearena')
-                ? 'موقت: تابلو شاخص‌بان'
-                : src.marketValue || '—'
+              : (src.marketValue || '').includes('shakhesban')
+                ? 'تابلو شاخص‌بان (پشتیبان)'
+                : (src.marketValue || '').includes('cache') || (src.marketValue || '').includes('deployed')
+                  ? 'آخرین مقدار معتبر (کش)'
+                  : blocked.includes('sourcearena')
+                    ? 'موقت: پشتیبان'
+                    : src.marketValue || '—'
           }
         />
       </div>
@@ -201,9 +205,13 @@ export function MarketOverview({
           hint={
             (src.totalTrade || '').includes('sourcearena')
               ? 'SourceArena · در یک نگاه'
-              : src.totalTrade === 'parsistahlil'
-                ? 'پارسیس (کل بازار گزارش)'
-                : src.totalTrade || '—'
+              : (src.totalTrade || '').includes('tradersarena')
+                ? 'TradersArena · ارزش معاملات بازار'
+                : (src.totalTrade || '').includes('shakhesban')
+                  ? 'تابلو شاخص‌بان'
+                  : src.totalTrade === 'parsistahlil'
+                    ? 'پارسیس (کل بازار گزارش)'
+                    : src.totalTrade || '—'
           }
         />
         <Kpi
@@ -354,20 +362,23 @@ export function MarketOverview({
             className="panel p-4"
           >
             <h4 className="mb-1 text-sm font-bold">ورود پول حقیقی لحظه‌ای</h4>
-            <div className="mb-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-[var(--color-muted)]">
-              <span>
+            <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[10px] text-[var(--color-muted)]">
+              <span className="inline-flex items-center gap-1.5">
+                <i className="inline-block h-[2px] w-4 rounded-full bg-[#15803d]" aria-hidden />
                 سهام و حق‌تقدم:{' '}
                 <span className={`num font-semibold ${changeClass(pulse?.flowStocksBillionToman ?? 0)}`}>
                   {fmtNum(pulse?.flowStocksBillionToman ?? 0, 1)}
                 </span>
               </span>
-              <span>
+              <span className="inline-flex items-center gap-1.5">
+                <i className="inline-block h-[2px] w-4 rounded-full bg-[#1a5f9e]" aria-hidden />
                 ص.سهامی:{' '}
                 <span className={`num font-semibold ${changeClass(pulse?.flowEquityFundsBillionToman ?? 0)}`}>
                   {fmtNum(pulse?.flowEquityFundsBillionToman ?? 0, 1)}
                 </span>
               </span>
-              <span>
+              <span className="inline-flex items-center gap-1.5">
+                <i className="inline-block h-[2px] w-4 rounded-full bg-[#b45309]" aria-hidden />
                 ص.درآمدثابت:{' '}
                 <span className={`num font-semibold ${changeClass(pulse?.flowFixedIncomeBillionToman ?? 0)}`}>
                   {fmtNum(pulse?.flowFixedIncomeBillionToman ?? 0, 1)}

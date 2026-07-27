@@ -452,6 +452,134 @@ async function scrapeSourceArena(token) {
   }
 }
 
+const SA_GLANCE_CACHE_URL = 'https://pulse-cache.internal/sourcearena-glance-v1'
+
+async function loadSaGlanceCache(cache) {
+  try {
+    if (!cache) return null
+    const hit = await cache.match(SA_GLANCE_CACHE_URL)
+    if (!hit) return null
+    const json = await hit.json()
+    return json && typeof json === 'object' ? json : null
+  } catch {
+    return null
+  }
+}
+
+async function saveSaGlanceCache(cache, glance) {
+  if (!cache || !glance?.ok) return
+  try {
+    await cache.put(
+      SA_GLANCE_CACHE_URL,
+      new Response(JSON.stringify({ ...glance, cachedAt: new Date().toISOString() }), {
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=86400' },
+      }),
+    )
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Board-derived MV/TV when SourceArena is rate-limited. */
+function computeBoardMarketStats(stocks) {
+  const equities = (stocks || []).filter((s) => !s.marketFa || s.marketFa === 'سهام')
+  const bourse = equities.filter((s) => !(s.flow || '').includes('فرابورس'))
+  const ifb = equities.filter((s) => (s.flow || '').includes('فرابورس'))
+  const bMv = bourse.reduce((a, s) => a + (s.marketValue || 0), 0)
+  const fMv = ifb.reduce((a, s) => a + (s.marketValue || 0), 0)
+  const tradeAll = (stocks || []).reduce((a, s) => a + (s.tradeValue || 0), 0)
+  if (bMv <= 0 && fMv <= 0) return null
+  return {
+    ok: true,
+    bourseMarketValueHmt: Math.round((bMv / RIAL_PER_HEMAT) * 10) / 10,
+    ifbMarketValueHmt: Math.round((fMv / RIAL_PER_HEMAT) * 10) / 10,
+    totalMarketValueHmt: Math.round(((bMv + fMv) / RIAL_PER_HEMAT) * 10) / 10,
+    totalTradeValueHmt: Math.round((tradeAll / RIAL_PER_HEMAT) * 100) / 100,
+    marketValueSource: 'shakhesban-board',
+    totalTradeValueSource: 'shakhesban-board',
+  }
+}
+
+/**
+ * Resolve MV + trade value with fallbacks:
+ * SourceArena → CF cache of last SA → TradersArena trade → board → static market.json
+ */
+function resolveMarketStats({ sourcearena, boardStats, tradersPulse, saCache, staticLive, usd }) {
+  let bourseMarketValueHmt = null
+  let ifbMarketValueHmt = null
+  let totalMarketValueHmt = null
+  let totalTradeValueHmt = null
+  let marketValueSource = null
+  let totalTradeValueSource = null
+
+  if (sourcearena?.ok && sourcearena.totalMarketValueHmt != null) {
+    bourseMarketValueHmt = sourcearena.bourseMarketValueHmt
+    ifbMarketValueHmt = sourcearena.ifbMarketValueHmt
+    totalMarketValueHmt = sourcearena.totalMarketValueHmt
+    marketValueSource = sourcearena.marketValueSource || 'sourcearena-bourse+ifb'
+    if (sourcearena.totalTradeValueHmt != null) {
+      totalTradeValueHmt = sourcearena.totalTradeValueHmt
+      totalTradeValueSource = sourcearena.totalTradeValueSource || 'sourcearena'
+    }
+  } else if (saCache?.ok && saCache.totalMarketValueHmt != null) {
+    bourseMarketValueHmt = saCache.bourseMarketValueHmt
+    ifbMarketValueHmt = saCache.ifbMarketValueHmt
+    totalMarketValueHmt = saCache.totalMarketValueHmt
+    marketValueSource = `${saCache.marketValueSource || 'sourcearena'}+cache`
+    if (saCache.totalTradeValueHmt != null) {
+      totalTradeValueHmt = saCache.totalTradeValueHmt
+      totalTradeValueSource = `${saCache.totalTradeValueSource || 'sourcearena'}+cache`
+    }
+  } else if (staticLive?.totalMarketValueHmt != null) {
+    bourseMarketValueHmt = staticLive.bourseMarketValueHmt ?? null
+    ifbMarketValueHmt = staticLive.ifbMarketValueHmt ?? null
+    totalMarketValueHmt = staticLive.totalMarketValueHmt
+    marketValueSource = `${staticLive.marketValueSource || 'static'}+deployed`
+    if (staticLive.totalTradeValueHmt != null) {
+      totalTradeValueHmt = staticLive.totalTradeValueHmt
+      totalTradeValueSource = `${staticLive.totalTradeValueSource || 'static'}+deployed`
+    }
+  } else if (boardStats?.ok) {
+    bourseMarketValueHmt = boardStats.bourseMarketValueHmt
+    ifbMarketValueHmt = boardStats.ifbMarketValueHmt
+    totalMarketValueHmt = boardStats.totalMarketValueHmt
+    marketValueSource = boardStats.marketValueSource
+  }
+
+  // Live trade value from TradersArena (same poll as pulse) when SA trade missing
+  if (totalTradeValueHmt == null && tradersPulse?.totalTradeValueHmt != null) {
+    totalTradeValueHmt = tradersPulse.totalTradeValueHmt
+    totalTradeValueSource = 'tradersarena'
+  } else if (totalTradeValueHmt == null && boardStats?.totalTradeValueHmt != null) {
+    totalTradeValueHmt = boardStats.totalTradeValueHmt
+    totalTradeValueSource = boardStats.totalTradeValueSource
+  }
+
+  // Prefer fresher TA trade over stale SA cache for "today"
+  if (
+    tradersPulse?.totalTradeValueHmt != null &&
+    (totalTradeValueSource || '').includes('cache')
+  ) {
+    totalTradeValueHmt = tradersPulse.totalTradeValueHmt
+    totalTradeValueSource = 'tradersarena'
+  }
+
+  let totalMarketValueUsdM = null
+  if (totalMarketValueHmt != null && usd > 0) {
+    totalMarketValueUsdM = Math.round((totalMarketValueHmt * RIAL_PER_HEMAT) / usd / 1e6)
+  }
+
+  return {
+    bourseMarketValueHmt,
+    ifbMarketValueHmt,
+    totalMarketValueHmt,
+    totalTradeValueHmt,
+    totalMarketValueUsdM,
+    marketValueSource,
+    totalTradeValueSource,
+  }
+}
+
 function mergeImpacts(rahavard, board, arena) {
   const out = { boursePos: [], bourseNeg: [], ifbPos: [], ifbNeg: [] }
   const sources = []
@@ -693,6 +821,7 @@ export async function onRequestGet(context) {
     fetchJson(`${origin}/data/market_pulse.json`).catch(() => null),
     fetchJson(`${origin}/data/impacts_cache.json`).catch(() => null),
     fetchTradersArenaPulse(),
+    fetchJson(`${origin}/data/market.json`).catch(() => null),
   ])
 
   if (tasks[0].status === 'fulfilled') {
@@ -757,6 +886,9 @@ export async function onRequestGet(context) {
     errors.push(`tradersarena: ${tasks[10].reason}`)
   }
 
+  const marketJson = tasks[11].status === 'fulfilled' ? tasks[11].value : null
+  const staticLive = marketJson?.overviewLive || null
+
   const boardImpacts = boardRows.length ? computeBoardImpacts(boardRows, indices) : null
   const mergedImpacts = mergeImpacts(rahavard, boardImpacts, sourcearena)
   // fill gaps from deployed cache
@@ -770,6 +902,10 @@ export async function onRequestGet(context) {
   }
 
   const cache = typeof caches !== 'undefined' ? caches.default : null
+  if (sourcearena?.ok) await saveSaGlanceCache(cache, sourcearena)
+  const saCache = sourcearena?.ok ? null : await loadSaGlanceCache(cache)
+  const boardStats = computeBoardMarketStats(boardRows)
+
   let pulseStore = await loadPulseStore(cache, pulseStoreStatic)
   const marketPulse =
     tradersPulse ||
@@ -815,10 +951,14 @@ export async function onRequestGet(context) {
       }
     : null)
 
-  let totalMarketValueUsdM = null
-  if (sourcearena.ok && sourcearena.totalMarketValueHmt != null && usd > 0) {
-    totalMarketValueUsdM = Math.round((sourcearena.totalMarketValueHmt * RIAL_PER_HEMAT) / usd / 1e6)
-  }
+  const marketStats = resolveMarketStats({
+    sourcearena,
+    boardStats,
+    tradersPulse: marketPulse,
+    saCache,
+    staticLive,
+    usd,
+  })
 
   const blocked = [
     ...(sourcearena.ok ? [] : ['sourcearena']),
@@ -845,13 +985,13 @@ export async function onRequestGet(context) {
       },
       sourcearena,
       rahavard,
-      bourseMarketValueHmt: sourcearena.bourseMarketValueHmt ?? null,
-      ifbMarketValueHmt: sourcearena.ifbMarketValueHmt ?? null,
-      totalMarketValueHmt: sourcearena.totalMarketValueHmt ?? null,
-      totalMarketValueUsdM,
-      marketValueSource: sourcearena.marketValueSource ?? null,
-      totalTradeValueHmt: sourcearena.totalTradeValueHmt ?? null,
-      totalTradeValueSource: sourcearena.totalTradeValueSource ?? null,
+      bourseMarketValueHmt: marketStats.bourseMarketValueHmt,
+      ifbMarketValueHmt: marketStats.ifbMarketValueHmt,
+      totalMarketValueHmt: marketStats.totalMarketValueHmt,
+      totalMarketValueUsdM: marketStats.totalMarketValueUsdM,
+      marketValueSource: marketStats.marketValueSource,
+      totalTradeValueHmt: marketStats.totalTradeValueHmt,
+      totalTradeValueSource: marketStats.totalTradeValueSource,
       impacts: mergedImpacts.impacts,
       impactsFromSourceArena: Boolean(mergedImpacts.source?.includes('sourcearena')),
       impactsFromRahavard: Boolean(mergedImpacts.source?.includes('rahavard')),

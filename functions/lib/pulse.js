@@ -127,6 +127,12 @@ export function parseTradersArenaMarket(data) {
     flowStocksBillionToman: flowStocks,
     flowEquityFundsBillionToman: flowEquityFunds,
     flowFixedIncomeBillionToman: flowFixedIncome,
+    // m[1] = ارزش معاملات کل بازار (ریال) → همت
+    totalTradeValueHmt:
+      m[1] != null && Number.isFinite(Number(m[1]))
+        ? Math.round((Number(m[1]) / 1e13) * 100) / 100
+        : null,
+    totalTradeValueBillionToman: bt(m[1]),
     retailBuyBillionToman: bt(m[7]),
     retailSellBillionToman: bt(m[10]),
     perCapitaBuyMillionToman: mt(m[2]),

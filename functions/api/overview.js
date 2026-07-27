@@ -555,10 +555,10 @@ function resolveMarketStats({ sourcearena, boardStats, tradersPulse, saCache, st
     totalTradeValueSource = boardStats.totalTradeValueSource
   }
 
-  // Prefer fresher TA trade over stale SA cache for "today"
+  // Prefer fresher TA trade over stale SA cache / deployed snapshot for "today"
   if (
     tradersPulse?.totalTradeValueHmt != null &&
-    (totalTradeValueSource || '').includes('cache')
+    (totalTradeValueSource || '').match(/cache|deployed|static/)
   ) {
     totalTradeValueHmt = tradersPulse.totalTradeValueHmt
     totalTradeValueSource = 'tradersarena'

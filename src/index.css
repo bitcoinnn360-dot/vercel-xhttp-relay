@@ -188,4 +188,20 @@
     border-bottom: 1px solid var(--color-line);
     margin-bottom: 1rem;
   }
+
+  /* Recharts default tooltip items ignore contentStyle.color — force white text */
+  .recharts-default-tooltip {
+    color: #fff !important;
+  }
+  .recharts-default-tooltip,
+  .recharts-default-tooltip * {
+    color: #fff !important;
+  }
+  .recharts-tooltip-item,
+  .recharts-tooltip-item-name,
+  .recharts-tooltip-item-value,
+  .recharts-tooltip-item-separator,
+  .recharts-tooltip-label {
+    color: #fff !important;
+  }
 }

@@ -23,6 +23,14 @@ const tip = {
   fontSize: 11,
   fontFamily: 'Vazirmatn, sans-serif',
 }
+const tipItem = { color: '#fff' }
+const tipLabel = { color: '#fff' }
+const tipProps = {
+  contentStyle: tip,
+  itemStyle: tipItem,
+  labelStyle: tipLabel,
+  wrapperStyle: { outline: 'none' },
+}
 
 export function Sparkline({
   data,
@@ -88,7 +96,7 @@ export function PriceAreaChart({
             width={56}
             tickFormatter={(v: number) => (Math.abs(v) >= 1000 ? fmtInt(v) : fmtNum(v, 1))}
           />
-          <Tooltip contentStyle={tip} formatter={(v) => [fmtNum(Number(v), 2), valueLabel]} />
+          <Tooltip {...tipProps} formatter={(v) => [fmtNum(Number(v), 2), valueLabel]} />
           <Area type="monotone" dataKey="value" stroke={color} strokeWidth={2} fill={`url(#${gid})`} />
         </AreaChart>
       </ResponsiveContainer>
@@ -110,7 +118,7 @@ export function FlowBarChart({
           <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
           <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
           <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} width={48} />
-          <Tooltip contentStyle={tip} formatter={(v) => [fmtInt(Number(v)), 'میلیارد تومان']} />
+          <Tooltip {...tipProps} formatter={(v) => [fmtInt(Number(v)), 'میلیارد تومان']} />
           <Bar dataKey="value" radius={[3, 3, 0, 0]}>
             {data.map((d) => (
               <Cell key={d.label} fill={d.value >= 0 ? '#15803d' : '#b91c1c'} />
@@ -164,11 +172,64 @@ export function DualLineChart({
             tickFormatter={(v: number) => (Math.abs(v) >= 1000 ? fmtInt(v) : fmtNum(v, 1))}
           />
           <Tooltip
-            contentStyle={tip}
+            {...tipProps}
             formatter={(v, name) => [fmtNum(Number(v), 2) + (unit ? ` ${unit}` : ''), String(name)]}
           />
           <Line type="monotone" dataKey={aKey} name={aLabel} stroke={aColor} strokeWidth={2} dot={false} />
           <Line type="monotone" dataKey={bKey} name={bLabel} stroke={bColor} strokeWidth={2} dot={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+export function TripleLineChart({
+  data,
+  series,
+  height = 220,
+  unit = '',
+}: {
+  data: Record<string, string | number>[]
+  series: { key: string; label: string; color: string }[]
+  height?: number
+  unit?: string
+}) {
+  if (!data.length) {
+    return (
+      <div style={{ height }} className="flex items-center justify-center text-xs text-[var(--color-muted)]">
+        در انتظار داده لحظه‌ای…
+      </div>
+    )
+  }
+  return (
+    <div style={{ height }} className="w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
+          <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} minTickGap={20} />
+          <YAxis
+            tick={{ fontSize: 10, fill: '#64748b' }}
+            axisLine={false}
+            tickLine={false}
+            width={52}
+            tickFormatter={(v: number) => (Math.abs(v) >= 1000 ? fmtInt(v) : fmtNum(v, 1))}
+          />
+          <Tooltip
+            {...tipProps}
+            formatter={(v, name) => [fmtNum(Number(v), 1) + (unit ? ` ${unit}` : ''), String(name)]}
+          />
+          {series.map((s) => (
+            <Line
+              key={s.key}
+              type="monotone"
+              dataKey={s.key}
+              name={s.label}
+              stroke={s.color}
+              strokeWidth={2}
+              dot={false}
+              isAnimationActive={false}
+            />
+          ))}
         </LineChart>
       </ResponsiveContainer>
     </div>
@@ -198,7 +259,7 @@ export function BreadthBarChart({
           <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
           <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
           <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} width={36} />
-          <Tooltip contentStyle={tip} formatter={(v) => [fmtInt(Number(v)), 'نماد']} />
+          <Tooltip {...tipProps} formatter={(v) => [fmtInt(Number(v)), 'نماد']} />
           <Bar dataKey="value" radius={[4, 4, 0, 0]}>
             {data.map((d) => (
               <Cell key={d.label} fill={d.color} />

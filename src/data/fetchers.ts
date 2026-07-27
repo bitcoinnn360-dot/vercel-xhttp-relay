@@ -453,7 +453,7 @@ async function fetchOverviewApi(): Promise<OverviewApi | null> {
   }
 }
 
-const PULSE_SESSION_KEY = 'midco-pulse-history-v1'
+const PULSE_SESSION_KEY = 'midco-pulse-history-v2'
 export const PULSE_REFRESH_MS = 30 * 1000
 
 type PulseApi = {

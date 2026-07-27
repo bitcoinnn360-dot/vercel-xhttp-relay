@@ -487,12 +487,16 @@ def scrape_tradersarena_pulse() -> dict | None:
         "orderBuyQueueBillionToman": bt(o[3] if len(o) > 3 else None),
         "orderSellQueueBillionToman": bt(o[2] if len(o) > 2 else None),
         "retailMoneyFlowBillionToman": bt(m[5] if len(m) > 5 else None),
+        # st/sf/nsf[5] = ورود پول سهام+حق‌تقدم / ص.سهامی / ص.درآمدثابت
+        "flowStocksBillionToman": bt((data.get("st") or [None] * 6)[5]),
+        "flowEquityFundsBillionToman": bt((data.get("sf") or [None] * 6)[5]),
+        "flowFixedIncomeBillionToman": bt((data.get("nsf") or [None] * 6)[5]),
         "retailBuyBillionToman": bt(m[7] if len(m) > 7 else None),
         "retailSellBillionToman": bt(m[10] if len(m) > 10 else None),
         "perCapitaBuyMillionToman": mt(m[2] if len(m) > 2 else None),
         "perCapitaSellMillionToman": mt(m[3] if len(m) > 3 else None),
         "buyPower": float(m[4]) if len(m) > 4 and m[4] is not None else None,
-        "note": "داده زنده TradersArena · ارزش سفارش = مجموع ۵ خط اول تابلو",
+        "note": "داده زنده TradersArena · سفارش ۵خط · ورود پول تفکیک‌شده",
     }
 
 
@@ -577,6 +581,9 @@ def append_pulse_history(pulse: dict) -> dict:
         "orderBuy": pulse.get("orderBuyBillionToman"),
         "orderSell": pulse.get("orderSellBillionToman"),
         "retailFlow": pulse.get("retailMoneyFlowBillionToman"),
+        "flowStocks": pulse.get("flowStocksBillionToman"),
+        "flowEquityFunds": pulse.get("flowEquityFundsBillionToman"),
+        "flowFixedIncome": pulse.get("flowFixedIncomeBillionToman"),
         "perCapitaBuy": pulse.get("perCapitaBuyMillionToman"),
         "perCapitaSell": pulse.get("perCapitaSellMillionToman"),
     }

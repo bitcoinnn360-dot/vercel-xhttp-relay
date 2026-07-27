@@ -63,6 +63,9 @@ export interface MarketPulsePoint {
   orderBuy?: number
   orderSell?: number
   retailFlow?: number
+  flowStocks?: number
+  flowEquityFunds?: number
+  flowFixedIncome?: number
   perCapitaBuy?: number
   perCapitaSell?: number
 }
@@ -76,6 +79,9 @@ export interface MarketPulseSnapshot {
   orderBuyBillionToman?: number
   orderSellBillionToman?: number
   retailMoneyFlowBillionToman?: number
+  flowStocksBillionToman?: number
+  flowEquityFundsBillionToman?: number
+  flowFixedIncomeBillionToman?: number
   retailBuyBillionToman?: number
   retailSellBillionToman?: number
   perCapitaBuyMillionToman?: number | null

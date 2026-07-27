@@ -104,6 +104,8 @@ export function SteelSection({ data }: { data: DashboardData }) {
                     color: '#fff',
                     fontSize: 12,
                   }}
+                  itemStyle={{ color: '#fff' }}
+                  labelStyle={{ color: '#fff' }}
                   formatter={(v, _n, item) => {
                     const price = (item?.payload as { price?: number })?.price
                     return [

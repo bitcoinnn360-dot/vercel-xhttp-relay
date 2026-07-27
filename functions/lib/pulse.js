@@ -4,13 +4,14 @@
  *
  * `o` ≈ [فروش ۵خط, خرید ۵خط, فروش صف, خرید صف] (ریال)
  * `m[2]`/`m[3]` ≈ سرانه خرید/فروش حقیقی (ریال)
- * `m[5]` ≈ خالص ورود پول حقیقی (ریال)
+ * `m[5]` ≈ خالص ورود پول حقیقی کل بازار (ریال)
+ * `st[5]` / `sf[5]` / `nsf[5]` ≈ ورود پول سهام+حق‌تقدم / ص.سهامی / ص.درآمدثابت
  * `pp`/`pm` ≈ تعداد نماد مثبت/منفی
  */
 const TA_MARKET = 'https://tradersarena.ir/data/market'
 const RIAL_PER_BILLION_TOMAN = 1e10
 const RIAL_PER_MILLION_TOMAN = 1e7
-const PULSE_CACHE_URL = 'https://pulse-cache.internal/market-pulse-v1'
+const PULSE_CACHE_URL = 'https://pulse-cache.internal/market-pulse-v2'
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
 
@@ -60,6 +61,11 @@ function mt(rial) {
   return round2(Number(rial) / RIAL_PER_MILLION_TOMAN)
 }
 
+function segFlow(arr) {
+  if (!Array.isArray(arr) || arr.length < 6) return null
+  return bt(arr[5])
+}
+
 export function pulsePointFromSnapshot(pulse) {
   if (!pulse) return null
   return {
@@ -70,6 +76,9 @@ export function pulsePointFromSnapshot(pulse) {
     orderBuy: pulse.orderBuyBillionToman,
     orderSell: pulse.orderSellBillionToman,
     retailFlow: pulse.retailMoneyFlowBillionToman,
+    flowStocks: pulse.flowStocksBillionToman,
+    flowEquityFunds: pulse.flowEquityFundsBillionToman,
+    flowFixedIncome: pulse.flowFixedIncomeBillionToman,
     perCapitaBuy: pulse.perCapitaBuyMillionToman,
     perCapitaSell: pulse.perCapitaSellMillionToman,
   }
@@ -80,19 +89,24 @@ export function parseTradersArenaMarket(data) {
   const today = jalaliTodayTehran()
   const o = Array.isArray(data.o) ? data.o : []
   const m = Array.isArray(data.m) ? data.m : []
+  const st = Array.isArray(data.st) ? data.st : []
+  const sf = Array.isArray(data.sf) ? data.sf : []
+  const nsf = Array.isArray(data.nsf) ? data.nsf : []
   const pp = Array.isArray(data.pp) ? data.pp[0] : data.pp
   const pm = Array.isArray(data.pm) ? data.pm[0] : data.pm
   const positive = Number(pp) || 0
   const negative = Number(pm) || 0
-  // unchanged ≈ باقی‌مانده تقریبی از توزیع وضعیت (در صورت نبود، ۰)
   const xyz = Array.isArray(data.xyz) ? data.xyz : []
   const flat = Math.max(0, Number(xyz[1]) || 0)
 
-  // o: [sell5, buy5, sellQueue, buyQueue] in rial — match TradersArena «پنج خط اول»
   const orderSell = bt(o[0])
   const orderBuy = bt(o[1])
   const orderSellQueue = bt(o[2])
   const orderBuyQueue = bt(o[3])
+
+  const flowStocks = segFlow(st)
+  const flowEquityFunds = segFlow(sf)
+  const flowFixedIncome = segFlow(nsf)
 
   return {
     asOf: new Date().toISOString(),
@@ -110,12 +124,15 @@ export function parseTradersArenaMarket(data) {
     orderBuyQueueBillionToman: orderBuyQueue,
     orderSellQueueBillionToman: orderSellQueue,
     retailMoneyFlowBillionToman: bt(m[5]),
+    flowStocksBillionToman: flowStocks,
+    flowEquityFundsBillionToman: flowEquityFunds,
+    flowFixedIncomeBillionToman: flowFixedIncome,
     retailBuyBillionToman: bt(m[7]),
     retailSellBillionToman: bt(m[10]),
     perCapitaBuyMillionToman: mt(m[2]),
     perCapitaSellMillionToman: mt(m[3]),
     buyPower: Number.isFinite(Number(m[4])) ? Number(m[4]) : null,
-    note: 'داده زنده TradersArena · ارزش سفارش = مجموع ۵ خط اول تابلو',
+    note: 'داده زنده TradersArena · سفارش ۵خط · ورود پول تفکیک‌شده',
   }
 }
 
@@ -179,7 +196,6 @@ export function mergePulseHistory(store, pulse, { maxPoints = 480 } = {}) {
   if (point?.time) {
     history = history.filter((h) => h?.time !== point.time)
     history.push(point)
-    // keep from market open (~09:00) onward; drop overnight leftovers
     history = history
       .filter((h) => {
         const t = String(h?.time || '')

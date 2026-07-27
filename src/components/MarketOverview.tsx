@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import type { DashboardData } from '../data/types'
 import type { HistoryPoint } from '../data/fetchers'
 import { changeClass, fmtChange, fmtInt, fmtNum, fmtPct } from '../lib/format'
-import { BreadthBarChart, CandlestickChart, DualLineChart, FlowBarChart, PriceAreaChart } from './charts/Charts'
+import { BreadthBarChart, CandlestickChart, DualLineChart, FlowBarChart, TripleLineChart, PriceAreaChart } from './charts/Charts'
 import { TopTrades } from './StocksSection'
 
 function Kpi({
@@ -78,10 +78,36 @@ export function MarketOverview({
         ]
       : []
   const flowSeries = hasHist
-    ? pulseHist.map((p) => ({ label: p.time, value: p.retailFlow ?? 0 }))
+    ? pulseHist.map((p) => ({
+        label: p.time,
+        stocks: p.flowStocks ?? 0,
+        equityFunds: p.flowEquityFunds ?? 0,
+        fixedIncome: p.flowFixedIncome ?? 0,
+      }))
     : pulse
-      ? [{ label: pulse.time || 'الان', value: pulse.retailMoneyFlowBillionToman ?? 0 }]
+      ? [
+          {
+            label: pulse.time || 'الان',
+            stocks: pulse.flowStocksBillionToman ?? 0,
+            equityFunds: pulse.flowEquityFundsBillionToman ?? 0,
+            fixedIncome: pulse.flowFixedIncomeBillionToman ?? 0,
+          },
+        ]
       : []
+  // drop points that predate the 3-series shape (all zeros while current is non-zero)
+  const flowSeriesClean =
+    pulse &&
+    ((pulse.flowStocksBillionToman ?? 0) !== 0 ||
+      (pulse.flowEquityFundsBillionToman ?? 0) !== 0 ||
+      (pulse.flowFixedIncomeBillionToman ?? 0) !== 0)
+      ? flowSeries.filter(
+          (p) =>
+            p.stocks !== 0 ||
+            p.equityFunds !== 0 ||
+            p.fixedIncome !== 0 ||
+            p.label === (pulse.time || 'الان'),
+        )
+      : flowSeries
   const orderSeries = hasHist
     ? pulseHist.map((p) => ({ label: p.time, buy: p.orderBuy ?? 0, sell: p.orderSell ?? 0 }))
     : pulse
@@ -328,14 +354,37 @@ export function MarketOverview({
             className="panel p-4"
           >
             <h4 className="mb-1 text-sm font-bold">ورود پول حقیقی لحظه‌ای</h4>
-            <p className="mb-2 text-[10px] text-[var(--color-muted)]">
-              خالص الان:{' '}
-              <span className={`num font-semibold ${changeClass(pulse?.retailMoneyFlowBillionToman ?? 0)}`}>
-                {fmtNum(pulse?.retailMoneyFlowBillionToman ?? 0, 1)}
-              </span>{' '}
-              میلیارد تومان
-            </p>
-            <FlowBarChart data={flowSeries} height={200} />
+            <div className="mb-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-[var(--color-muted)]">
+              <span>
+                سهام و حق‌تقدم:{' '}
+                <span className={`num font-semibold ${changeClass(pulse?.flowStocksBillionToman ?? 0)}`}>
+                  {fmtNum(pulse?.flowStocksBillionToman ?? 0, 1)}
+                </span>
+              </span>
+              <span>
+                ص.سهامی:{' '}
+                <span className={`num font-semibold ${changeClass(pulse?.flowEquityFundsBillionToman ?? 0)}`}>
+                  {fmtNum(pulse?.flowEquityFundsBillionToman ?? 0, 1)}
+                </span>
+              </span>
+              <span>
+                ص.درآمدثابت:{' '}
+                <span className={`num font-semibold ${changeClass(pulse?.flowFixedIncomeBillionToman ?? 0)}`}>
+                  {fmtNum(pulse?.flowFixedIncomeBillionToman ?? 0, 1)}
+                </span>
+              </span>
+              <span className="opacity-70">میلیارد تومان · TradersArena</span>
+            </div>
+            <TripleLineChart
+              data={flowSeriesClean}
+              series={[
+                { key: 'stocks', label: 'سهام و حق‌تقدم', color: '#15803d' },
+                { key: 'equityFunds', label: 'ص.سهامی', color: '#1a5f9e' },
+                { key: 'fixedIncome', label: 'ص.درآمدثابت', color: '#b45309' },
+              ]}
+              height={200}
+              unit="میلیارد تومان"
+            />
           </motion.div>
 
           <motion.div

@@ -2,20 +2,23 @@
   "dateJalali": "1405/05/05",
   "history": [
     {
-      "time": "12:35",
+      "time": "12:53",
       "positive": 587,
       "negative": 203,
       "flat": 83,
-      "orderBuy": 8338.1,
-      "orderSell": 2589.3,
-      "retailFlow": -1683.3,
-      "perCapitaBuy": 95.22,
-      "perCapitaSell": 78.99
+      "orderBuy": 7405.9,
+      "orderSell": 2251.0,
+      "retailFlow": -1182.7,
+      "flowStocks": 1088.2,
+      "flowEquityFunds": -978.4,
+      "flowFixedIncome": -1292.5,
+      "perCapitaBuy": 98.63,
+      "perCapitaSell": 80.29
     }
   ],
   "current": {
-    "asOf": "2026-07-27T09:05:31.024716+00:00",
-    "time": "12:35",
+    "asOf": "2026-07-27T09:23:16.213782+00:00",
+    "time": "12:53",
     "dateJalali": "1405/05/05",
     "source": "tradersarena",
     "breadth": {
@@ -24,15 +27,15 @@
       "flat": 83,
       "total": 873
     },
-    "orderBuyBillionToman": 8338.1,
-    "orderSellBillionToman": 2589.3,
-    "orderBuyQueueBillionToman": 7904.9,
-    "orderSellQueueBillionToman": 2296.1,
-    "retailMoneyFlowBillionToman": -1683.3,
-    "perCapitaBuyMillionToman": 95.22,
-    "perCapitaSellMillionToman": 78.99,
-    "buyPower": 1.21,
-    "note": "داده زنده TradersArena · ارزش سفارش = مجموع ۵ خط اول تابلو"
+    "orderBuyBillionToman": 7405.9,
+    "orderSellBillionToman": 2251.0,
+    "retailMoneyFlowBillionToman": -1182.7,
+    "flowStocksBillionToman": 1088.2,
+    "flowEquityFundsBillionToman": -978.4,
+    "flowFixedIncomeBillionToman": -1292.5,
+    "perCapitaBuyMillionToman": 98.63,
+    "perCapitaSellMillionToman": 80.29,
+    "note": "داده زنده TradersArena · سفارش ۵خط · ورود پول تفکیک‌شده"
   },
-  "updatedAt": "2026-07-27T09:05:31.024716+00:00"
+  "updatedAt": "2026-07-27T09:23:16.213782+00:00"
 }

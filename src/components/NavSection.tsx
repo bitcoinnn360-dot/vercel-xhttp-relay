@@ -75,6 +75,8 @@ export function NavSection({ data }: { data: DashboardData }) {
                     color: '#fff',
                     fontSize: 12,
                   }}
+                  itemStyle={{ color: '#fff' }}
+                  labelStyle={{ color: '#fff' }}
                   formatter={(v) => [`${fmtNum(Number(v), 1)}٪`, 'سهم از پرتفو']}
                 />
               </PieChart>

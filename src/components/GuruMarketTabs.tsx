@@ -139,6 +139,8 @@ export function GuruMarketTabs({
                         </Pie>
                         <Tooltip
                           contentStyle={{ background: '#0f2744', border: 'none', borderRadius: 8, color: '#fff', fontSize: 11 }}
+                          itemStyle={{ color: '#fff' }}
+                          labelStyle={{ color: '#fff' }}
                         />
                       </PieChart>
                     </ResponsiveContainer>
@@ -274,7 +276,11 @@ export function GuruMarketTabs({
                           <Cell key={h.symbol} fill={['#0b3d6e', '#1a5f9e', '#0e7490', '#b45309', '#334155', '#c2410c'][i % 6]} />
                         ))}
                       </Pie>
-                      <Tooltip contentStyle={{ background: '#0f2744', border: 'none', borderRadius: 8, color: '#fff', fontSize: 11 }} />
+                      <Tooltip
+                        contentStyle={{ background: '#0f2744', border: 'none', borderRadius: 8, color: '#fff', fontSize: 11 }}
+                        itemStyle={{ color: '#fff' }}
+                        labelStyle={{ color: '#fff' }}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>

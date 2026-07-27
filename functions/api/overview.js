@@ -27,7 +27,6 @@ const PARSIS_HOME = 'https://parsistahlil.ir/'
 const SOURCEARENA_API = 'https://apis.sourcearena.ir/api/'
 const RAHAVARD_API = 'https://rahavard365.com/api/v2'
 const TOP_TRADES_LIMIT = 12
-const EQUITY_FUND_RAHAVARD_CANDIDATES = 28
 /** Liquid equity ETFs often missing/zero on shakhesban QTotCap — always try Rahavard. */
 const PRIORITY_EQUITY_FUNDS = [
   'اهرم',

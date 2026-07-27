@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
+import { motion } from 'framer-motion'
 import type { DashboardData, StockRow } from '../data/types'
 import { changeClass, fmtInt, fmtPct } from '../lib/format'
+import { TopTradesBarChart } from './charts/Charts'
 
 const GROUPS = ['همه', 'سرمایه‌گذاری', 'سنگ‌آهن', 'فولادی', 'مس', 'فلزات', 'کابل'] as const
 
@@ -100,30 +102,28 @@ export function TopTrades({ data }: { data: DashboardData }) {
   const rows = (data.topTrades || [])
     .filter((t) => (t.valueBr || 0) > 0 && !isBondLikeSymbol(t.name))
     .slice(0, 12)
-  const max = Math.max(...rows.map((t) => t.valueBr), 1)
+  const total = rows.reduce((a, t) => a + (t.valueBr || 0), 0)
   return (
-    <div className="panel p-4">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: 0.05 }}
+      className="panel p-4"
+    >
       <h3 className="mb-1 text-sm font-bold">بیشترین ارزش معاملات</h3>
-      <p className="mb-3 text-[10px] text-[var(--color-muted)]">
-        ۱۲ نماد برتر · سهام و صندوق سهامی · میلیارد تومان · TradersArena / رهاورد
+      <p className="mb-2 text-[10px] text-[var(--color-muted)]">
+        ۱۲ نماد برتر · سهام و صندوق سهامی · میلیارد تومان
       </p>
-      <ul className="space-y-2.5">
-        {rows.map((t) => (
-          <li key={t.name}>
-            <div className="mb-1 flex justify-between text-sm">
-              <span className="font-semibold">{t.name}</span>
-              <span className="num text-[var(--color-ink-soft)]">{fmtInt(t.valueBr)}</span>
-            </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-[var(--color-paper-2)]">
-              <div
-                className="h-full rounded-full bg-gradient-to-l from-[var(--color-copper)] to-[var(--color-steel)]"
-                style={{ width: `${Math.max(4, (t.valueBr / max) * 100)}%` }}
-              />
-            </div>
-          </li>
-        ))}
-        {!rows.length ? <li className="text-[11px] text-[var(--color-muted)]">در انتظار داده زنده</li> : null}
-      </ul>
-    </div>
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2 text-[10px] text-[var(--color-muted)]">
+        <span>نمودار رتبه‌ای · TradersArena / رهاورد</span>
+        {total > 0 ? (
+          <span>
+            جمع ۱۲تای اول:{' '}
+            <span className="num font-semibold text-[var(--color-ink-soft)]">{fmtInt(total)}</span>
+          </span>
+        ) : null}
+      </div>
+      <TopTradesBarChart rows={rows} height={280} />
+    </motion.div>
   )
 }

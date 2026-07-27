@@ -5,14 +5,16 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  LabelList,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts'
-import { fmtInt, fmtNum } from '../../lib/format'
+import { fmtChange, fmtInt, fmtNum } from '../../lib/format'
 import type { CandlePoint } from '../../data/types'
 
 const tip = {
@@ -123,6 +125,203 @@ export function FlowBarChart({
             {data.map((d) => (
               <Cell key={d.label} fill={d.value >= 0 ? '#15803d' : '#b91c1c'} />
             ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+/** Diverging horizontal bars for index impact (pos/neg). */
+export function ImpactDivergingChart({
+  pos,
+  neg,
+  height = 280,
+  unit = 'واحد شاخص',
+}: {
+  pos: { symbol: string; impact: number }[]
+  neg: { symbol: string; impact: number }[]
+  height?: number
+  unit?: string
+}) {
+  const data = [...(pos || []).slice(0, 5), ...(neg || []).slice(0, 5)]
+    .filter((r) => r?.symbol && Number.isFinite(Number(r.impact)))
+    .map((r) => ({ symbol: r.symbol, impact: Math.round(Number(r.impact) * 10) / 10 }))
+    .sort((a, b) => b.impact - a.impact)
+
+  if (!data.length) {
+    return (
+      <div style={{ height }} className="flex items-center justify-center text-xs text-[var(--color-muted)]">
+        در انتظار داده تأثیر…
+      </div>
+    )
+  }
+
+  const maxAbs = Math.max(...data.map((d) => Math.abs(d.impact)), 1)
+
+  return (
+    <div style={{ height }} className="w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart
+          layout="vertical"
+          data={data}
+          margin={{ top: 4, right: 28, left: 4, bottom: 4 }}
+          barCategoryGap="18%"
+        >
+          <defs>
+            <linearGradient id="impactPos" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#86efac" />
+              <stop offset="100%" stopColor="#15803d" />
+            </linearGradient>
+            <linearGradient id="impactNeg" x1="1" y1="0" x2="0" y2="0">
+              <stop offset="0%" stopColor="#fca5a5" />
+              <stop offset="100%" stopColor="#b91c1c" />
+            </linearGradient>
+          </defs>
+          <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" horizontal={false} />
+          <XAxis
+            type="number"
+            domain={[-maxAbs * 1.15, maxAbs * 1.15]}
+            tick={{ fontSize: 10, fill: '#64748b' }}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={(v: number) => fmtNum(v, Math.abs(v) >= 10 ? 0 : 1)}
+          />
+          <YAxis
+            type="category"
+            dataKey="symbol"
+            width={58}
+            tick={{ fontSize: 11, fill: '#334155', fontWeight: 600 }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <ReferenceLine x={0} stroke="#94a3b8" strokeWidth={1.5} />
+          <Tooltip
+            {...tipProps}
+            formatter={(v) => [fmtChange(Number(v)), unit]}
+            labelFormatter={(l) => String(l)}
+          />
+          <Bar dataKey="impact" radius={[4, 4, 4, 4]} isAnimationActive={false}>
+            {data.map((d) => (
+              <Cell key={d.symbol} fill={d.impact >= 0 ? 'url(#impactPos)' : 'url(#impactNeg)'} />
+            ))}
+            <LabelList
+              dataKey="impact"
+              content={(props) => {
+                const { x, y, width, height, value } = props as {
+                  x?: number | string
+                  y?: number | string
+                  width?: number | string
+                  height?: number | string
+                  value?: number | string
+                }
+                const n = Number(value)
+                if (!Number.isFinite(n)) return null
+                const xx = Number(x) || 0
+                const yy = Number(y) || 0
+                const ww = Number(width) || 0
+                const hh = Number(height) || 0
+                const labelX = n >= 0 ? xx + ww + 4 : xx - 4
+                return (
+                  <text
+                    x={labelX}
+                    y={yy + hh / 2}
+                    textAnchor={n >= 0 ? 'start' : 'end'}
+                    dominantBaseline="middle"
+                    fill="#334155"
+                    fontSize={10}
+                    fontWeight={600}
+                  >
+                    {fmtChange(n)}
+                  </text>
+                )
+              }}
+            />
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+/** Ranked horizontal bars for top trade values. */
+export function TopTradesBarChart({
+  rows,
+  height = 280,
+  unit = 'میلیارد تومان',
+}: {
+  rows: { name: string; valueBr: number }[]
+  height?: number
+  unit?: string
+}) {
+  const data = (rows || [])
+    .filter((r) => r?.name && (r.valueBr || 0) > 0)
+    .slice(0, 12)
+    .map((r, i) => ({ name: r.name, valueBr: r.valueBr, rank: i + 1 }))
+
+  if (!data.length) {
+    return (
+      <div style={{ height }} className="flex items-center justify-center text-xs text-[var(--color-muted)]">
+        در انتظار داده معاملات…
+      </div>
+    )
+  }
+
+  const colors = data.map((_, i) => {
+    const t = data.length <= 1 ? 0 : i / (data.length - 1)
+    // copper → steel → brand (no purple)
+    const a = { r: 194, g: 65, b: 12 } // #c2410c
+    const b = { r: 26, g: 95, b: 158 } // #1a5f9e
+    const c = { r: 11, g: 61, b: 110 } // #0b3d6e
+    const mix = (x: { r: number; g: number; b: number }, y: { r: number; g: number; b: number }, p: number) => ({
+      r: Math.round(x.r + (y.r - x.r) * p),
+      g: Math.round(x.g + (y.g - x.g) * p),
+      b: Math.round(x.b + (y.b - x.b) * p),
+    })
+    const mid = t < 0.5 ? mix(a, b, t * 2) : mix(b, c, (t - 0.5) * 2)
+    return `rgb(${mid.r},${mid.g},${mid.b})`
+  })
+
+  return (
+    <div style={{ height }} className="w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart
+          layout="vertical"
+          data={data}
+          margin={{ top: 4, right: 36, left: 4, bottom: 4 }}
+          barCategoryGap="12%"
+        >
+          <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" horizontal={false} />
+          <XAxis
+            type="number"
+            tick={{ fontSize: 10, fill: '#64748b' }}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={(v: number) => (v >= 1000 ? fmtInt(v) : fmtNum(v, 0))}
+          />
+          <YAxis
+            type="category"
+            dataKey="name"
+            width={58}
+            tick={{ fontSize: 11, fill: '#334155', fontWeight: 600 }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <Tooltip
+            {...tipProps}
+            formatter={(v) => [fmtNum(Number(v), 1), unit]}
+            labelFormatter={(l) => String(l)}
+          />
+          <Bar dataKey="valueBr" radius={[0, 6, 6, 0]} isAnimationActive={false}>
+            {data.map((d, i) => (
+              <Cell key={d.name} fill={colors[i]} />
+            ))}
+            <LabelList
+              dataKey="valueBr"
+              position="right"
+              formatter={(v) => fmtNum(Number(v), 0)}
+              style={{ fill: '#475569', fontSize: 10, fontWeight: 600 }}
+            />
           </Bar>
         </BarChart>
       </ResponsiveContainer>

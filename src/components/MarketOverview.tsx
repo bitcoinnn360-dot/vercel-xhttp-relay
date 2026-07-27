@@ -3,7 +3,7 @@ import type { DashboardData } from '../data/types'
 import type { HistoryPoint } from '../data/fetchers'
 import { changeClass, fmtChange, fmtInt, fmtNum, fmtPct } from '../lib/format'
 import { densifyFlowSeries, PULSE_HIST_END } from '../data/fetchers'
-import { BreadthBarChart, CandlestickChart, DualLineChart, FlowBarChart, TripleLineChart, PriceAreaChart } from './charts/Charts'
+import { BreadthBarChart, CandlestickChart, DualLineChart, FlowBarChart, ImpactDivergingChart, TripleLineChart, PriceAreaChart } from './charts/Charts'
 import { TopTrades } from './StocksSection'
 
 function Kpi({
@@ -435,36 +435,32 @@ function ImpactPanel({
 }) {
   const src =
     sourceHint?.includes('rahavard')
-      ? 'رهاورد ۳۶۵ · تاثیر بر شاخص کل'
+      ? 'رهاورد ۳۶۵ · تأثیر بر شاخص · نمودار واگرا'
       : sourceHint?.includes('shakhesban')
-        ? 'محاسبه از تابلو · قیمت پایانی'
+        ? 'محاسبه از تابلو · قیمت پایانی · نمودار واگرا'
         : live
-          ? 'سورت تاثیر بر شاخص · زنده'
+          ? 'سورت تأثیر بر شاخص · زنده · نمودار واگرا'
           : 'فعلاً از گزارش PDF — در انتظار داده زنده'
   return (
-    <div className="panel p-4">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+      className="panel p-4"
+    >
       <h3 className="mb-1 text-sm font-bold">{title}</h3>
-      <p className="mb-3 text-[10px] text-[var(--color-muted)]">{src}</p>
-      <div className="grid grid-cols-2 gap-3">
-        <ul className="space-y-2">
-          {(pos || []).slice(0, 5).map((s, i) => (
-            <li key={`${s.symbol || 'p'}-${i}`} className="flex items-center justify-between text-sm">
-              <span className="font-semibold">{s.symbol || '—'}</span>
-              <span className="num pos">{fmtChange(s.impact)}</span>
-            </li>
-          ))}
-          {!pos?.length ? <li className="text-[11px] text-[var(--color-muted)]">—</li> : null}
-        </ul>
-        <ul className="space-y-2">
-          {(neg || []).slice(0, 5).map((s, i) => (
-            <li key={`${s.symbol || 'n'}-${i}`} className="flex items-center justify-between text-sm">
-              <span className="font-semibold">{s.symbol || '—'}</span>
-              <span className="num neg">{fmtChange(s.impact)}</span>
-            </li>
-          ))}
-          {!neg?.length ? <li className="text-[11px] text-[var(--color-muted)]">بدون تاثیر منفی معنادار</li> : null}
-        </ul>
+      <p className="mb-2 text-[10px] text-[var(--color-muted)]">{src}</p>
+      <div className="mb-2 flex flex-wrap gap-3 text-[10px] text-[var(--color-muted)]">
+        <span className="inline-flex items-center gap-1.5">
+          <i className="inline-block h-2 w-2 rounded-sm bg-[#15803d]" aria-hidden />
+          مثبت {pos?.length || 0}
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <i className="inline-block h-2 w-2 rounded-sm bg-[#b91c1c]" aria-hidden />
+          منفی {neg?.length || 0}
+        </span>
       </div>
-    </div>
+      <ImpactDivergingChart pos={pos} neg={neg} height={280} />
+    </motion.div>
   )
 }

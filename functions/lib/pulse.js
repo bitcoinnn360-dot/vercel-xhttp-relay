@@ -21,7 +21,8 @@ const UA =
 const INDUSTRY_FLOW_IDS = {
   basicMetals: '27', // فلزات اساسی
   metalOres: '13', // استخراج کانه های فلزی
-  goldFunds: 'gold-funds', // صندوق های طلا و سکه
+  // کل ورود پول حقیقی گروه «صندوق های طلا و سکه» (زیر صندوق‌های سهامی در جدول صنایع)
+  goldFunds: 'gold-funds',
 }
 
 export function jalaliTodayTehran() {

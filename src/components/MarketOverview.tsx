@@ -389,7 +389,7 @@ export function MarketOverview({
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <i className="inline-block h-[2px] w-4 rounded-full bg-[#a16207]" aria-hidden />
-                صندوق طلا:{' '}
+                صندوق‌های طلا و سکه:{' '}
                 <span className={`num font-semibold ${changeClass(pulse?.flowGoldFundsBillionToman ?? 0)}`}>
                   {fmtNum(pulse?.flowGoldFundsBillionToman ?? 0, 1)}
                 </span>
@@ -404,7 +404,7 @@ export function MarketOverview({
                 { key: 'fixedIncome', label: 'ص.درآمدثابت', color: '#b45309' },
                 { key: 'basicMetals', label: 'فلزات اساسی', color: '#9a3412' },
                 { key: 'metalOres', label: 'کانه‌های فلزی', color: '#0f766e' },
-                { key: 'goldFunds', label: 'صندوق طلا', color: '#a16207' },
+                { key: 'goldFunds', label: 'صندوق‌های طلا و سکه', color: '#a16207' },
               ]}
               height={220}
               unit="میلیارد تومان"

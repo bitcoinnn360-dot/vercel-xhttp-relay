@@ -325,7 +325,7 @@ function isEquityFundRow(row, fundSet) {
   const flow = row.flow || ''
   const title = row.title || row.name || ''
   if (flow.includes('بورس کالا')) return false
-  if (/طلا|سکه|نقره|زعفران|درآمد\s*ثابت|ثابت|املاک|مستغلات/.test(title)) return false
+  if (/طلا|سکه|نقره|زعفران|درآمد\s*ثابت|املاک|مستغلات/.test(title)) return false
   if (/(سهامی|در سهام|اهرم|بخشی|شاخصی|مختلط)/.test(title)) return true
   return false
 }

@@ -99,12 +99,14 @@ function isBondLikeSymbol(name: string): boolean {
 export function TopTrades({ data }: { data: DashboardData }) {
   const rows = (data.topTrades || [])
     .filter((t) => (t.valueBr || 0) > 0 && !isBondLikeSymbol(t.name))
-    .slice(0, 10)
+    .slice(0, 12)
   const max = Math.max(...rows.map((t) => t.valueBr), 1)
   return (
     <div className="panel p-4">
       <h3 className="mb-1 text-sm font-bold">بیشترین ارزش معاملات</h3>
-      <p className="mb-3 text-[10px] text-[var(--color-muted)]">فقط سهام · میلیارد تومان</p>
+      <p className="mb-3 text-[10px] text-[var(--color-muted)]">
+        ۱۲ نماد برتر · سهام و صندوق سهامی · میلیارد تومان
+      </p>
       <ul className="space-y-2.5">
         {rows.map((t) => (
           <li key={t.name}>

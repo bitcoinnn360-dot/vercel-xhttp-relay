@@ -306,6 +306,119 @@ def parse_shakhesban_tbody(tbody: str) -> list[dict]:
     return rows
 
 
+def _normalize_symbol_key(s: str) -> str:
+    return re.sub(r"[\s\u200c\u200d\xa0]+", "", str(s or "")).strip()
+
+
+def fetch_equity_fund_symbol_set() -> set[str]:
+    """TradersArena heatmap «صندوق های سهامی» (اهرم/بخشی/شاخصی/کلاسیک)."""
+    out: set[str] = set()
+    try:
+        raw = fetch(
+            "https://tradersarena.ir/data/heatmap/stock-funds",
+            timeout=30,
+            headers={
+                "Accept": "application/json, text/plain, */*",
+                "Referer": "https://tradersarena.ir/",
+            },
+        )
+        rows = json.loads(raw.decode("utf-8", errors="replace") if isinstance(raw, (bytes, bytearray)) else raw)
+        if isinstance(rows, list):
+            for row in rows:
+                key = _normalize_symbol_key((row or {}).get("name") or "")
+                if key:
+                    out.add(key)
+    except Exception as exc:  # noqa: BLE001
+        print(f"equity fund heatmap: {exc}")
+    out.add(_normalize_symbol_key("دارایکم"))
+    out.add(_normalize_symbol_key("دارا یکم"))
+    return out
+
+
+def is_equity_fund_row(row: dict, fund_set: set[str]) -> bool:
+    if (row.get("marketFa") or "") != "صندوق":
+        return False
+    key = _normalize_symbol_key(row.get("symbol") or "")
+    if fund_set and key in fund_set:
+        return True
+    flow = row.get("flow") or ""
+    title = row.get("name") or row.get("title") or ""
+    if "بورس کالا" in flow:
+        return False
+    if re.search(r"(طلا|سکه|نقره|زعفران|درآمد\s*ثابت|\-ثابت|املاک|مستغلات)", title):
+        return False
+    if re.search(r"(سهامی|در سهام|اهرم|بخشی|شاخصی|مختلط)", title):
+        return True
+    return False
+
+
+def build_top_trades(rows: list[dict], fund_set: set[str], limit: int = 12) -> list[dict]:
+    cand = []
+    for s in rows or []:
+        tv = float(s.get("tradeValue") or 0)
+        if tv <= 0:
+            continue
+        market_fa = s.get("marketFa") or ""
+        if not market_fa or market_fa == "سهام" or is_equity_fund_row(s, fund_set):
+            cand.append(s)
+    cand.sort(key=lambda s: float(s.get("tradeValue") or 0), reverse=True)
+    return [
+        {"name": s["symbol"], "valueBr": round(float(s["tradeValue"]) / RIAL_PER_BILLION_TOMAN, 1)}
+        for s in cand[:limit]
+    ]
+
+
+def scrape_shakhesban_market_pages(market: str, max_pages: int = 3, order_col: str = "trades.QTotCap") -> list[dict]:
+    all_rows: list[dict] = []
+    for page in range(1, max_pages + 1):
+        qs = urllib.parse.urlencode(
+            {
+                "limit": 100,
+                "page": page,
+                "order_col": order_col,
+                "order_dir": "desc",
+                "market": market,
+                "_": int(time.time() * 1000),
+            }
+        )
+        url = f"https://www.shakhesban.com/stocks/list-data?{qs}"
+        try:
+            payload = json.loads(
+                fetch(
+                    url,
+                    timeout=60,
+                    headers={
+                        "Accept": "application/json, text/javascript, */*; q=0.01",
+                        "Referer": "https://www.shakhesban.com/",
+                        "X-Requested-With": "XMLHttpRequest",
+                    },
+                ).decode("utf-8", errors="replace")
+            )
+        except Exception as exc:  # noqa: BLE001
+            print(f"shakhesban {market} page {page}: {exc}")
+            break
+        batch = parse_shakhesban_tbody(payload.get("tbody") or "")
+        all_rows.extend(batch)
+        if not batch:
+            break
+        time.sleep(0.05)
+    return all_rows
+
+
+def scrape_top_trade_candidates() -> list[dict]:
+    stocks = scrape_shakhesban_market_pages("stock", max_pages=3)
+    funds = scrape_shakhesban_market_pages("fund", max_pages=3)
+    by_sym: dict[str, dict] = {}
+    for row in [*stocks, *funds]:
+        sym = row.get("symbol")
+        if not sym:
+            continue
+        prev = by_sym.get(sym)
+        if not prev or float(row.get("tradeValue") or 0) > float(prev.get("tradeValue") or 0):
+            by_sym[sym] = row
+    return list(by_sym.values())
+
+
 def scrape_shakhesban_board(max_pages: int = 15) -> list[dict]:
     """Full board via shakhesban list-data (سهام+صندوق+اوراق; no market=stock)."""
     all_rows: list[dict] = []
@@ -433,7 +546,7 @@ def compute_impacts_from_board(stocks: list[dict], indices: dict, max_move: floa
 
 
 def scrape_tradersarena_pulse() -> dict | None:
-    """Live pulse from TradersArena /data/market (5-level order book + per-capita)."""
+    """Live pulse from TradersArena /data/market + /data/industries."""
     try:
         raw = fetch(
             "https://tradersarena.ir/data/market",
@@ -449,6 +562,43 @@ def scrape_tradersarena_pulse() -> dict | None:
         return None
     if not isinstance(data, dict):
         return None
+
+    industry_flows = {
+        "flowBasicMetalsBillionToman": None,
+        "flowMetalOresBillionToman": None,
+        "flowGoldFundsBillionToman": None,
+    }
+    try:
+        ind_raw = fetch(
+            "https://tradersarena.ir/data/industries",
+            timeout=30,
+            headers={
+                "Accept": "application/json, text/plain, */*",
+                "Referer": "https://tradersarena.ir/",
+            },
+        )
+        industries = json.loads(
+            ind_raw.decode("utf-8", errors="replace") if isinstance(ind_raw, (bytes, bytearray)) else ind_raw
+        )
+        by_id = {str(r.get("a")): r for r in industries if isinstance(r, dict) and r.get("a") is not None}
+
+        def ind_bt(key: str) -> float | None:
+            row = by_id.get(key)
+            if not row or row.get("t") is None:
+                return None
+            try:
+                return round(float(row["t"]) / RIAL_PER_BILLION_TOMAN, 1)
+            except (TypeError, ValueError):
+                return None
+
+        industry_flows = {
+            "flowBasicMetalsBillionToman": ind_bt("27"),
+            "flowMetalOresBillionToman": ind_bt("13"),
+            "flowGoldFundsBillionToman": ind_bt("gold-funds"),
+        }
+    except Exception as exc:  # noqa: BLE001
+        print(f"tradersarena industries: {exc}")
+
     o = data.get("o") or []
     m = data.get("m") or []
     pp = data.get("pp")
@@ -491,6 +641,7 @@ def scrape_tradersarena_pulse() -> dict | None:
         "flowStocksBillionToman": bt((data.get("st") or [None] * 6)[5]),
         "flowEquityFundsBillionToman": bt((data.get("sf") or [None] * 6)[5]),
         "flowFixedIncomeBillionToman": bt((data.get("nsf") or [None] * 6)[5]),
+        **industry_flows,
         "totalTradeValueHmt": round(float(m[1]) / RIAL_PER_HEMAT, 2) if len(m) > 1 and m[1] is not None else None,
         "totalTradeValueBillionToman": bt(m[1] if len(m) > 1 else None),
         "retailBuyBillionToman": bt(m[7] if len(m) > 7 else None),
@@ -498,7 +649,7 @@ def scrape_tradersarena_pulse() -> dict | None:
         "perCapitaBuyMillionToman": mt(m[2] if len(m) > 2 else None),
         "perCapitaSellMillionToman": mt(m[3] if len(m) > 3 else None),
         "buyPower": float(m[4]) if len(m) > 4 and m[4] is not None else None,
-        "note": "داده زنده TradersArena · سفارش ۵خط · ورود پول تفکیک‌شده",
+        "note": "داده زنده TradersArena · ورود پول بازار + صنایع",
     }
 
 
@@ -586,6 +737,9 @@ def append_pulse_history(pulse: dict) -> dict:
         "flowStocks": pulse.get("flowStocksBillionToman"),
         "flowEquityFunds": pulse.get("flowEquityFundsBillionToman"),
         "flowFixedIncome": pulse.get("flowFixedIncomeBillionToman"),
+        "flowBasicMetals": pulse.get("flowBasicMetalsBillionToman"),
+        "flowMetalOres": pulse.get("flowMetalOresBillionToman"),
+        "flowGoldFunds": pulse.get("flowGoldFundsBillionToman"),
         "perCapitaBuy": pulse.get("perCapitaBuyMillionToman"),
         "perCapitaSell": pulse.get("perCapitaSellMillionToman"),
     }
@@ -1229,19 +1383,14 @@ def build_overview_live(
     sum_trade = sum(s["tradeValue"] for s in stocks)
     today = jalali_today()
 
-    # Top trades: فقط سهام (نه اوراق اراد/صکوک/صندوق)
-    if glance.get("ok") and glance.get("topTrades"):
-        top_trades_out = list(glance.get("topTrades") or [])
+    # Top trades: ۱۲ نماد برتر سهام + صندوق سهامی (نه اوراق/طلا/درآمدثابت)
+    fund_set = fetch_equity_fund_symbol_set()
+    trade_rows = scrape_top_trade_candidates() or stocks_all
+    top_trades_out = build_top_trades(trade_rows, fund_set, limit=12)
+    top_trades_source = "shakhesban+ta-equity-funds" if top_trades_out else None
+    if glance.get("ok") and glance.get("topTrades") and not top_trades_out:
+        top_trades_out = list(glance.get("topTrades") or [])[:12]
         top_trades_source = glance.get("topTradesSource") or "sourcearena-all"
-    else:
-        equities = [s for s in stocks if s.get("marketFa") == "سهام"]
-        top_trades = sorted(equities, key=lambda s: s["tradeValue"], reverse=True)[:15]
-        top_trades_out = [
-            {"name": s["symbol"], "valueBr": round(s["tradeValue"] / RIAL_PER_BILLION_TOMAN, 1)}
-            for s in top_trades
-            if s["tradeValue"] > 0
-        ]
-        top_trades_source = "shakhesban-board-equities"
 
     ted = indices.get("tedpix") or {}
     eq = indices.get("equalWeight") or {}

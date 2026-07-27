@@ -1,6 +1,7 @@
 /**
  * TradersArena live pulse + Cloudflare Cache history helpers.
  * Source: https://tradersarena.ir/data/market
+ * Industries: https://tradersarena.ir/data/industries  (field `t` = net retail flow, rial)
  *
  * `o` ≈ [فروش ۵خط, خرید ۵خط, فروش صف, خرید صف] (ریال)
  * `m[2]`/`m[3]` ≈ سرانه خرید/فروش حقیقی (ریال)
@@ -9,11 +10,19 @@
  * `pp`/`pm` ≈ تعداد نماد مثبت/منفی
  */
 const TA_MARKET = 'https://tradersarena.ir/data/market'
+const TA_INDUSTRIES = 'https://tradersarena.ir/data/industries'
 const RIAL_PER_BILLION_TOMAN = 1e10
 const RIAL_PER_MILLION_TOMAN = 1e7
-const PULSE_CACHE_URL = 'https://pulse-cache.internal/market-pulse-v2'
+const PULSE_CACHE_URL = 'https://pulse-cache.internal/market-pulse-v3'
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+
+/** Industry ids on TradersArena industries table (bottom of tradersarena.ir). */
+const INDUSTRY_FLOW_IDS = {
+  basicMetals: '27', // فلزات اساسی
+  metalOres: '13', // استخراج کانه های فلزی
+  goldFunds: 'gold-funds', // صندوق های طلا و سکه
+}
 
 export function jalaliTodayTehran() {
   const parts = new Intl.DateTimeFormat('en-u-ca-persian-nu-latn', {
@@ -66,6 +75,29 @@ function segFlow(arr) {
   return bt(arr[5])
 }
 
+export function parseIndustryFlows(rows) {
+  const out = {
+    flowBasicMetalsBillionToman: null,
+    flowMetalOresBillionToman: null,
+    flowGoldFundsBillionToman: null,
+  }
+  if (!Array.isArray(rows)) return out
+  const byId = new Map()
+  for (const row of rows) {
+    if (!row || row.a == null) continue
+    byId.set(String(row.a), row)
+  }
+  const pick = (id) => {
+    const row = byId.get(id)
+    if (!row) return null
+    return bt(row.t)
+  }
+  out.flowBasicMetalsBillionToman = pick(INDUSTRY_FLOW_IDS.basicMetals)
+  out.flowMetalOresBillionToman = pick(INDUSTRY_FLOW_IDS.metalOres)
+  out.flowGoldFundsBillionToman = pick(INDUSTRY_FLOW_IDS.goldFunds)
+  return out
+}
+
 export function pulsePointFromSnapshot(pulse) {
   if (!pulse) return null
   return {
@@ -79,12 +111,15 @@ export function pulsePointFromSnapshot(pulse) {
     flowStocks: pulse.flowStocksBillionToman,
     flowEquityFunds: pulse.flowEquityFundsBillionToman,
     flowFixedIncome: pulse.flowFixedIncomeBillionToman,
+    flowBasicMetals: pulse.flowBasicMetalsBillionToman,
+    flowMetalOres: pulse.flowMetalOresBillionToman,
+    flowGoldFunds: pulse.flowGoldFundsBillionToman,
     perCapitaBuy: pulse.perCapitaBuyMillionToman,
     perCapitaSell: pulse.perCapitaSellMillionToman,
   }
 }
 
-export function parseTradersArenaMarket(data) {
+export function parseTradersArenaMarket(data, industryFlows = null) {
   if (!data || typeof data !== 'object') return null
   const today = jalaliTodayTehran()
   const o = Array.isArray(data.o) ? data.o : []
@@ -107,6 +142,7 @@ export function parseTradersArenaMarket(data) {
   const flowStocks = segFlow(st)
   const flowEquityFunds = segFlow(sf)
   const flowFixedIncome = segFlow(nsf)
+  const ind = industryFlows || {}
 
   return {
     asOf: new Date().toISOString(),
@@ -127,6 +163,9 @@ export function parseTradersArenaMarket(data) {
     flowStocksBillionToman: flowStocks,
     flowEquityFundsBillionToman: flowEquityFunds,
     flowFixedIncomeBillionToman: flowFixedIncome,
+    flowBasicMetalsBillionToman: ind.flowBasicMetalsBillionToman ?? null,
+    flowMetalOresBillionToman: ind.flowMetalOresBillionToman ?? null,
+    flowGoldFundsBillionToman: ind.flowGoldFundsBillionToman ?? null,
     // m[1] = ارزش معاملات کل بازار (ریال) → همت
     totalTradeValueHmt:
       m[1] != null && Number.isFinite(Number(m[1]))
@@ -138,21 +177,29 @@ export function parseTradersArenaMarket(data) {
     perCapitaBuyMillionToman: mt(m[2]),
     perCapitaSellMillionToman: mt(m[3]),
     buyPower: Number.isFinite(Number(m[4])) ? Number(m[4]) : null,
-    note: 'داده زنده TradersArena · سفارش ۵خط · ورود پول تفکیک‌شده',
+    note: 'داده زنده TradersArena · ورود پول بازار + صنایع',
   }
 }
 
-export async function fetchTradersArenaPulse() {
-  const res = await fetch(TA_MARKET, {
+async function fetchTaJson(url) {
+  const res = await fetch(url, {
     headers: {
       Accept: 'application/json, text/plain, */*',
       'User-Agent': UA,
       Referer: 'https://tradersarena.ir/',
     },
   })
-  if (!res.ok) throw new Error(`tradersarena ${res.status}`)
-  const data = await res.json()
-  const pulse = parseTradersArenaMarket(data)
+  if (!res.ok) throw new Error(`tradersarena ${url} ${res.status}`)
+  return res.json()
+}
+
+export async function fetchTradersArenaPulse() {
+  const [market, industries] = await Promise.all([
+    fetchTaJson(TA_MARKET),
+    fetchTaJson(TA_INDUSTRIES).catch(() => null),
+  ])
+  const industryFlows = parseIndustryFlows(industries)
+  const pulse = parseTradersArenaMarket(market, industryFlows)
   if (!pulse) throw new Error('tradersarena empty')
   return pulse
 }

@@ -21,9 +21,11 @@ const TGJU_AJAX = 'https://call2.tgju.org/ajax.json'
 const TGJU_TODAY = 'https://api.tgju.org/v1/market/indicator/today-table-data/bourse?lang=fa'
 const SHAKH_INDEX = 'https://www.shakhesban.com/markets/index'
 const SHAKH_LIST = 'https://www.shakhesban.com/stocks/list-data'
+const TA_HEATMAP_STOCK_FUNDS = 'https://tradersarena.ir/data/heatmap/stock-funds'
 const PARSIS_HOME = 'https://parsistahlil.ir/'
 const SOURCEARENA_API = 'https://apis.sourcearena.ir/api/'
 const RAHAVARD_API = 'https://rahavard365.com/api/v2'
+const TOP_TRADES_LIMIT = 12
 const BILLION_RIAL_PER_HEMAT = 10000
 const RIAL_PER_HEMAT = 1e13
 const RIAL_PER_BILLION_TOMAN = 1e10
@@ -216,6 +218,7 @@ function parseShakhesbanTbody(tbody) {
     const finalChg = closeChg != null && closeChg !== 0 ? closeChg : lastChg
     rows.push({
       symbol,
+      title: vals['info.title'] || '',
       marketFa,
       flow: vals['info.flow.title'] || '',
       marketValue: parseNum(vals['trades.arzesh_bazar']) || 0,
@@ -241,18 +244,18 @@ function parseShakhesbanTbody(tbody) {
   return rows
 }
 
-async function scrapeShakhesbanBoardLite(maxPages = 12) {
-  // Full board (سهام+صندوق+اوراق) — no market=stock filter. Used for IFB impacts + fallback pulse.
+async function scrapeShakhesbanPages({ maxPages = 12, orderCol = 'trades.arzesh_bazar', market = null } = {}) {
   const pages = Array.from({ length: maxPages }, (_, i) => i + 1)
   const results = await Promise.allSettled(
     pages.map(async (page) => {
       const qs = new URLSearchParams({
         limit: '100',
         page: String(page),
-        order_col: 'trades.arzesh_bazar',
+        order_col: orderCol,
         order_dir: 'desc',
         _: String(Date.now()),
       })
+      if (market) qs.set('market', market)
       const res = await fetch(`${SHAKH_LIST}?${qs}`, {
         headers: {
           Accept: 'application/json, text/javascript, */*; q=0.01',
@@ -271,6 +274,93 @@ async function scrapeShakhesbanBoardLite(maxPages = 12) {
     rows.push(...parseShakhesbanTbody(r.value?.tbody || ''))
   }
   return rows
+}
+
+async function scrapeShakhesbanBoardLite(maxPages = 12) {
+  // Full board (سهام+صندوق+اوراق) — no market=stock filter. Used for IFB impacts + fallback pulse.
+  return scrapeShakhesbanPages({ maxPages, orderCol: 'trades.arzesh_bazar' })
+}
+
+/** Normalize Persian symbols for set membership (دارا یکم ↔ دارایکم). */
+function normalizeSymbolKey(s) {
+  return String(s || '')
+    .replace(/\s+/g, '')
+    .replace(/\u200c/g, '')
+    .replace(/\u200d/g, '')
+    .replace(/\u00a0/g, '')
+    .trim()
+}
+
+/**
+ * Equity-fund universe from TradersArena heatmap «صندوق های سهامی»
+ * (includes اهرمی / بخشی / شاخصی / کلاسیک subclasses).
+ */
+async function fetchEquityFundSymbolSet() {
+  const res = await fetch(TA_HEATMAP_STOCK_FUNDS, {
+    headers: {
+      Accept: 'application/json, text/plain, */*',
+      'User-Agent': UA,
+      Referer: 'https://tradersarena.ir/',
+    },
+  })
+  if (!res.ok) throw new Error(`ta heatmap stock-funds ${res.status}`)
+  const rows = await res.json()
+  const set = new Set()
+  if (Array.isArray(rows)) {
+    for (const row of rows) {
+      const key = normalizeSymbolKey(row?.name)
+      if (key) set.add(key)
+    }
+  }
+  // shakhesban ticker spelling for دارا یکم
+  set.add(normalizeSymbolKey('دارایکم'))
+  set.add(normalizeSymbolKey('دارا یکم'))
+  return set
+}
+
+function isEquityFundRow(row, fundSet) {
+  if ((row?.marketFa || '') !== 'صندوق') return false
+  const key = normalizeSymbolKey(row.symbol)
+  if (fundSet && fundSet.size && fundSet.has(key)) return true
+  const flow = row.flow || ''
+  const title = row.title || row.name || ''
+  if (flow.includes('بورس کالا')) return false
+  if (/طلا|سکه|نقره|زعفران|درآمد\s*ثابت|ثابت|املاک|مستغلات/.test(title)) return false
+  if (/(سهامی|در سهام|اهرم|بخشی|شاخصی|مختلط)/.test(title)) return true
+  return false
+}
+
+function isTopTradeCandidate(row, fundSet) {
+  if (!row || !(row.tradeValue > 0)) return false
+  const marketFa = row.marketFa || ''
+  if (!marketFa || marketFa === 'سهام') return true
+  return isEquityFundRow(row, fundSet)
+}
+
+function buildTopTradesFromBoard(rows, fundSet, limit = TOP_TRADES_LIMIT) {
+  return (rows || [])
+    .filter((s) => isTopTradeCandidate(s, fundSet))
+    .sort((a, b) => (b.tradeValue || 0) - (a.tradeValue || 0))
+    .slice(0, limit)
+    .map((s) => ({
+      name: s.symbol,
+      valueBr: Math.round((s.tradeValue / RIAL_PER_BILLION_TOMAN) * 10) / 10,
+    }))
+}
+
+/** Dedicated scrape ordered by trade value: سهام + صندوق (filtered later). */
+async function scrapeTopTradeCandidates() {
+  const [stocks, funds] = await Promise.all([
+    scrapeShakhesbanPages({ maxPages: 3, orderCol: 'trades.QTotCap', market: 'stock' }),
+    scrapeShakhesbanPages({ maxPages: 3, orderCol: 'trades.QTotCap', market: 'fund' }),
+  ])
+  const bySym = new Map()
+  for (const row of [...stocks, ...funds]) {
+    if (!row?.symbol) continue
+    const prev = bySym.get(row.symbol)
+    if (!prev || (row.tradeValue || 0) > (prev.tradeValue || 0)) bySym.set(row.symbol, row)
+  }
+  return [...bySym.values()]
 }
 
 function computeBoardImpacts(stocks, indices, maxMove = 0.22) {
@@ -872,6 +962,8 @@ export async function onRequestGet(context) {
     fetchJson(`${origin}/data/impacts_cache.json`).catch(() => null),
     fetchTradersArenaPulse(),
     fetchJson(`${origin}/data/market.json`).catch(() => null),
+    fetchEquityFundSymbolSet(),
+    scrapeTopTradeCandidates(),
   ])
 
   if (tasks[0].status === 'fulfilled') {
@@ -939,6 +1031,20 @@ export async function onRequestGet(context) {
   const marketJson = tasks[11].status === 'fulfilled' ? tasks[11].value : null
   const staticLive = marketJson?.overviewLive || null
 
+  let equityFundSet = new Set()
+  if (tasks[12].status === 'fulfilled' && tasks[12].value) {
+    equityFundSet = tasks[12].value
+  } else if (tasks[12].status === 'rejected') {
+    errors.push(`equity-funds: ${tasks[12].reason}`)
+  }
+
+  let topTradeRows = []
+  if (tasks[13].status === 'fulfilled') {
+    topTradeRows = tasks[13].value || []
+  } else {
+    errors.push(`top-trades-board: ${tasks[13].reason}`)
+  }
+
   const boardImpacts = boardRows.length ? computeBoardImpacts(boardRows, indices) : null
   const mergedImpacts = mergeImpacts(rahavard, boardImpacts, sourcearena)
   // fill gaps from deployed cache
@@ -969,21 +1075,13 @@ export async function onRequestGet(context) {
   }
   const marketPulseHistory = Array.isArray(pulseStore?.history) ? pulseStore.history : []
 
-  const topTrades = sourcearena.topTrades?.length
-    ? sourcearena.topTrades
-    : boardRows
-        .filter((s) => (!s.marketFa || s.marketFa === 'سهام') && s.tradeValue > 0)
-        .sort((a, b) => b.tradeValue - a.tradeValue)
-        .slice(0, 13)
-        .map((s) => ({
-          name: s.symbol,
-          valueBr: Math.round((s.tradeValue / RIAL_PER_BILLION_TOMAN) * 10) / 10,
-        }))
-  const topTradesSource = sourcearena.topTrades?.length
-    ? sourcearena.topTradesSource
-    : boardRows.length
-      ? 'shakhesban-board-equities'
-      : null
+  const tradeUniverse = topTradeRows.length ? topTradeRows : boardRows
+  const topTrades = buildTopTradesFromBoard(tradeUniverse, equityFundSet, TOP_TRADES_LIMIT)
+  const topTradesSource = topTrades.length
+    ? topTradeRows.length
+      ? 'shakhesban+ta-equity-funds'
+      : 'shakhesban-board-stocks+equity-funds'
+    : null
 
   const merged = mergeMoneyFlowStore(moneyFlowStore, parsistahlil.days || [])
   moneyFlowStore = merged.store

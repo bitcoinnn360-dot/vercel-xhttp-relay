@@ -83,6 +83,9 @@ export function MarketOverview({
         stocks: p.flowStocks ?? 0,
         equityFunds: p.flowEquityFunds ?? 0,
         fixedIncome: p.flowFixedIncome ?? 0,
+        basicMetals: p.flowBasicMetals ?? 0,
+        metalOres: p.flowMetalOres ?? 0,
+        goldFunds: p.flowGoldFunds ?? 0,
       }))
     : pulse
       ? [
@@ -91,23 +94,33 @@ export function MarketOverview({
             stocks: pulse.flowStocksBillionToman ?? 0,
             equityFunds: pulse.flowEquityFundsBillionToman ?? 0,
             fixedIncome: pulse.flowFixedIncomeBillionToman ?? 0,
+            basicMetals: pulse.flowBasicMetalsBillionToman ?? 0,
+            metalOres: pulse.flowMetalOresBillionToman ?? 0,
+            goldFunds: pulse.flowGoldFundsBillionToman ?? 0,
           },
         ]
       : []
-  // drop points that predate the 3-series shape (all zeros while current is non-zero)
-  const flowSeriesClean =
+  // drop points that predate the multi-series shape (all zeros while current is non-zero)
+  const flowHasSignal =
     pulse &&
     ((pulse.flowStocksBillionToman ?? 0) !== 0 ||
       (pulse.flowEquityFundsBillionToman ?? 0) !== 0 ||
-      (pulse.flowFixedIncomeBillionToman ?? 0) !== 0)
-      ? flowSeries.filter(
-          (p) =>
-            p.stocks !== 0 ||
-            p.equityFunds !== 0 ||
-            p.fixedIncome !== 0 ||
-            p.label === (pulse.time || 'الان'),
-        )
-      : flowSeries
+      (pulse.flowFixedIncomeBillionToman ?? 0) !== 0 ||
+      (pulse.flowBasicMetalsBillionToman ?? 0) !== 0 ||
+      (pulse.flowMetalOresBillionToman ?? 0) !== 0 ||
+      (pulse.flowGoldFundsBillionToman ?? 0) !== 0)
+  const flowSeriesClean = flowHasSignal
+    ? flowSeries.filter(
+        (p) =>
+          p.stocks !== 0 ||
+          p.equityFunds !== 0 ||
+          p.fixedIncome !== 0 ||
+          p.basicMetals !== 0 ||
+          p.metalOres !== 0 ||
+          p.goldFunds !== 0 ||
+          p.label === (pulse.time || 'الان'),
+      )
+    : flowSeries
 
   return (
     <section id="overview" className="scroll-mt-8 space-y-4">
@@ -360,6 +373,27 @@ export function MarketOverview({
                   {fmtNum(pulse?.flowFixedIncomeBillionToman ?? 0, 1)}
                 </span>
               </span>
+              <span className="inline-flex items-center gap-1.5">
+                <i className="inline-block h-[2px] w-4 rounded-full bg-[#9a3412]" aria-hidden />
+                فلزات اساسی:{' '}
+                <span className={`num font-semibold ${changeClass(pulse?.flowBasicMetalsBillionToman ?? 0)}`}>
+                  {fmtNum(pulse?.flowBasicMetalsBillionToman ?? 0, 1)}
+                </span>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <i className="inline-block h-[2px] w-4 rounded-full bg-[#0f766e]" aria-hidden />
+                کانه‌های فلزی:{' '}
+                <span className={`num font-semibold ${changeClass(pulse?.flowMetalOresBillionToman ?? 0)}`}>
+                  {fmtNum(pulse?.flowMetalOresBillionToman ?? 0, 1)}
+                </span>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <i className="inline-block h-[2px] w-4 rounded-full bg-[#a16207]" aria-hidden />
+                صندوق طلا:{' '}
+                <span className={`num font-semibold ${changeClass(pulse?.flowGoldFundsBillionToman ?? 0)}`}>
+                  {fmtNum(pulse?.flowGoldFundsBillionToman ?? 0, 1)}
+                </span>
+              </span>
               <span className="opacity-70">میلیارد تومان · TradersArena</span>
             </div>
             <TripleLineChart
@@ -368,8 +402,11 @@ export function MarketOverview({
                 { key: 'stocks', label: 'سهام و حق‌تقدم', color: '#15803d' },
                 { key: 'equityFunds', label: 'ص.سهامی', color: '#1a5f9e' },
                 { key: 'fixedIncome', label: 'ص.درآمدثابت', color: '#b45309' },
+                { key: 'basicMetals', label: 'فلزات اساسی', color: '#9a3412' },
+                { key: 'metalOres', label: 'کانه‌های فلزی', color: '#0f766e' },
+                { key: 'goldFunds', label: 'صندوق طلا', color: '#a16207' },
               ]}
-              height={200}
+              height={220}
               unit="میلیارد تومان"
             />
           </motion.div>

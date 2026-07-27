@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { loadDashboardBundle, REFRESH_MS, type FredBundle, type HistoryPoint } from '../data/fetchers'
+import {
+  applyPulseToDashboard,
+  fetchPulseApi,
+  loadDashboardBundle,
+  PULSE_REFRESH_MS,
+  REFRESH_MS,
+  type FredBundle,
+  type HistoryPoint,
+} from '../data/fetchers'
 import type { DashboardData } from '../data/types'
 import { seedDashboard } from '../data/seed'
 
@@ -57,15 +65,30 @@ export function useMarketData() {
     }
   }, [])
 
+  const refreshPulse = useCallback(async () => {
+    try {
+      const pulse = await fetchPulseApi()
+      if (!mounted.current || !pulse) return
+      setData((prev) => applyPulseToDashboard(prev, pulse))
+    } catch {
+      /* keep last good pulse */
+    }
+  }, [])
+
   useEffect(() => {
     mounted.current = true
     void refresh()
     const id = window.setInterval(() => void refresh(true), REFRESH_MS)
+    const pulseId = window.setInterval(() => void refreshPulse(), PULSE_REFRESH_MS)
+    // first pulse tick shortly after load so charts start densifying
+    const firstPulse = window.setTimeout(() => void refreshPulse(), 2500)
     return () => {
       mounted.current = false
       window.clearInterval(id)
+      window.clearInterval(pulseId)
+      window.clearTimeout(firstPulse)
     }
-  }, [refresh])
+  }, [refresh, refreshPulse])
 
   return { data, histories, fred, sectors, scrapeMeta, loading, refreshing, error, refresh }
 }

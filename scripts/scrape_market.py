@@ -9,7 +9,9 @@ Works from most cloud/VPS hosts:
   - SourceArena (اکوسیستم Traders Arena) «در یک نگاه» بورس + فرابورس → ارزش بازار رسمی
 
 Needs Iran IP / login:
-  - IME, tradersarena /data (بدون لاگین 404)
+  - IME
+Live without login:
+  - tradersarena.ir/data/market (order book depth + per-capita pulse)
 """
 from __future__ import annotations
 
@@ -38,6 +40,7 @@ UA = {
 # 1 همت = 10^13 ریال | 1 میلیارد تومان = 10^10 ریال | 1 همت = 10_000 میلیارد ریال
 RIAL_PER_HEMAT = 1e13
 RIAL_PER_BILLION_TOMAN = 1e10
+RIAL_PER_MILLION_TOMAN = 1e7
 BILLION_RIAL_PER_HEMAT = 10_000.0
 TEDPIX_FROM_1401 = "2022/03/21"
 
@@ -303,8 +306,8 @@ def parse_shakhesban_tbody(tbody: str) -> list[dict]:
     return rows
 
 
-def scrape_shakhesban_board(max_pages: int = 12) -> list[dict]:
-    """Equity board via shakhesban list-data (market=stock)."""
+def scrape_shakhesban_board(max_pages: int = 15) -> list[dict]:
+    """Full board via shakhesban list-data (سهام+صندوق+اوراق; no market=stock)."""
     all_rows: list[dict] = []
     page = 1
     while page <= max_pages:
@@ -312,7 +315,6 @@ def scrape_shakhesban_board(max_pages: int = 12) -> list[dict]:
             {
                 "limit": 100,
                 "page": page,
-                "market": "stock",
                 "order_col": "trades.arzesh_bazar",
                 "order_dir": "desc",
                 "_": int(time.time() * 1000),
@@ -326,7 +328,7 @@ def scrape_shakhesban_board(max_pages: int = 12) -> list[dict]:
                     timeout=60,
                     headers={
                         "Accept": "application/json, text/javascript, */*; q=0.01",
-                        "Referer": "https://www.shakhesban.com/markets/stock",
+                        "Referer": "https://www.shakhesban.com/",
                         "X-Requested-With": "XMLHttpRequest",
                     },
                 ).decode("utf-8", errors="replace")
@@ -335,8 +337,7 @@ def scrape_shakhesban_board(max_pages: int = 12) -> list[dict]:
             print(f"shakhesban page {page}: {exc}")
             break
         batch = parse_shakhesban_tbody(payload.get("tbody") or "")
-        # Keep equities only
-        batch = [r for r in batch if r.get("marketFa") == "سهام"]
+        batch = [r for r in batch if r.get("marketFa") != "آتی"]
         all_rows.extend(batch)
         print(f"shakhesban page {page}: +{len(batch)} (total {len(all_rows)})")
         if not payload.get("is_more") or not batch:
@@ -431,14 +432,78 @@ def compute_impacts_from_board(stocks: list[dict], indices: dict, max_move: floa
     }
 
 
+def scrape_tradersarena_pulse() -> dict | None:
+    """Live pulse from TradersArena /data/market (5-level order book + per-capita)."""
+    try:
+        raw = fetch(
+            "https://tradersarena.ir/data/market",
+            timeout=30,
+            headers={
+                "Accept": "application/json, text/plain, */*",
+                "Referer": "https://tradersarena.ir/",
+            },
+        )
+        data = json.loads(raw.decode("utf-8", errors="replace") if isinstance(raw, (bytes, bytearray)) else raw)
+    except Exception as exc:  # noqa: BLE001
+        print(f"tradersarena pulse: {exc}")
+        return None
+    if not isinstance(data, dict):
+        return None
+    o = data.get("o") or []
+    m = data.get("m") or []
+    pp = data.get("pp")
+    pm = data.get("pm")
+    positive = int((pp[0] if isinstance(pp, list) else pp) or 0)
+    negative = int((pm[0] if isinstance(pm, list) else pm) or 0)
+    xyz = data.get("xyz") or []
+    flat = max(0, int(xyz[1]) if len(xyz) > 1 else 0)
+    now = tehran_now()
+
+    def bt(rial: float | int | None) -> float | None:
+        if rial is None:
+            return None
+        try:
+            return round(float(rial) / RIAL_PER_BILLION_TOMAN, 1)
+        except (TypeError, ValueError):
+            return None
+
+    def mt(rial: float | int | None) -> float | None:
+        if rial is None:
+            return None
+        try:
+            return round(float(rial) / RIAL_PER_MILLION_TOMAN, 2)
+        except (TypeError, ValueError):
+            return None
+
+    return {
+        "asOf": now.isoformat(),
+        "time": now.strftime("%H:%M"),
+        "dateJalali": data.get("j") or jalali_today()["dateJalali"],
+        "source": "tradersarena",
+        "breadth": {"positive": positive, "negative": negative, "flat": flat, "total": positive + negative + flat},
+        # o ≈ [فروش ۵خط, خرید ۵خط, فروش صف, خرید صف]
+        "orderBuyBillionToman": bt(o[1] if len(o) > 1 else None),
+        "orderSellBillionToman": bt(o[0] if len(o) > 0 else None),
+        "orderBuyQueueBillionToman": bt(o[3] if len(o) > 3 else None),
+        "orderSellQueueBillionToman": bt(o[2] if len(o) > 2 else None),
+        "retailMoneyFlowBillionToman": bt(m[5] if len(m) > 5 else None),
+        "retailBuyBillionToman": bt(m[7] if len(m) > 7 else None),
+        "retailSellBillionToman": bt(m[10] if len(m) > 10 else None),
+        "perCapitaBuyMillionToman": mt(m[2] if len(m) > 2 else None),
+        "perCapitaSellMillionToman": mt(m[3] if len(m) > 3 else None),
+        "buyPower": float(m[4]) if len(m) > 4 and m[4] is not None else None,
+        "note": "داده زنده TradersArena · ارزش سفارش = مجموع ۵ خط اول تابلو",
+    }
+
+
 def build_market_pulse(stocks: list[dict]) -> dict:
-    """TradersArena-style market pulse aggregates from equity board."""
-    equities = [s for s in stocks if s.get("marketFa") == "سهام"]
+    """Fallback pulse from board best-level (when TradersArena is unreachable)."""
+    universe = [s for s in stocks if s.get("marketFa") != "آتی"]
     pos = neg = flat = 0
     order_buy = order_sell = 0.0
     retail_buy = retail_sell = 0.0
     buy_cnt = sell_cnt = 0.0
-    for s in equities:
+    for s in universe:
         pct = s.get("changePctLast")
         if pct is None:
             pct = s.get("changePctClose")
@@ -464,7 +529,6 @@ def build_market_pulse(stocks: list[dict]) -> dict:
     flow_bt = (retail_buy - retail_sell) / RIAL_PER_BILLION_TOMAN
     per_buy = (retail_buy / buy_cnt / RIAL_PER_BILLION_TOMAN) if buy_cnt > 0 else None
     per_sell = (retail_sell / sell_cnt / RIAL_PER_BILLION_TOMAN) if sell_cnt > 0 else None
-    # order-book best-level per-capita proxy (میلیون تومان)
     per_buy_m = (per_buy * 1000) if per_buy is not None else None
     per_sell_m = (per_sell * 1000) if per_sell is not None else None
 
@@ -472,7 +536,7 @@ def build_market_pulse(stocks: list[dict]) -> dict:
         "asOf": now.isoformat(),
         "time": now.strftime("%H:%M"),
         "dateJalali": jalali_today()["dateJalali"],
-        "source": "shakhesban-board",
+        "source": "shakhesban-board-fallback",
         "breadth": {"positive": pos, "negative": neg, "flat": flat, "total": pos + neg + flat},
         "orderBuyBillionToman": round(order_buy / RIAL_PER_BILLION_TOMAN, 1),
         "orderSellBillionToman": round(order_sell / RIAL_PER_BILLION_TOMAN, 1),
@@ -481,7 +545,7 @@ def build_market_pulse(stocks: list[dict]) -> dict:
         "retailSellBillionToman": round(retail_sell / RIAL_PER_BILLION_TOMAN, 1),
         "perCapitaBuyMillionToman": round(per_buy_m, 2) if per_buy_m is not None else None,
         "perCapitaSellMillionToman": round(per_sell_m, 2) if per_sell_m is not None else None,
-        "note": "معادل نمودارهای لحظه‌ای TradersArena از تجمیع تابلو (صف خرید/فروش + حقیقی)",
+        "note": "پشتیبان · بهترین سطح تابلو (بدون عمق ۵ خط)",
     }
 
 
@@ -519,7 +583,8 @@ def append_pulse_history(pulse: dict) -> dict:
     # replace same minute if exists
     hist = [h for h in hist if h.get("time") != point["time"]]
     hist.append(point)
-    hist = hist[-120:]
+    hist = [h for h in hist if str(h.get("time") or "") >= "08:45" and str(h.get("time") or "") <= "15:00"]
+    hist = hist[-480:]
     store = {"dateJalali": today, "history": hist, "current": pulse, "updatedAt": datetime.now(timezone.utc).isoformat()}
     save_pulse_store(store)
     return store
@@ -1482,8 +1547,8 @@ def main() -> int:
         },
     )
 
-    print("market pulse (TradersArena-style)…")
-    pulse = build_market_pulse(board)
+    print("market pulse (TradersArena /data/market)…")
+    pulse = scrape_tradersarena_pulse() or build_market_pulse(board)
     pulse_store = append_pulse_history(pulse)
     print(
         "pulse",

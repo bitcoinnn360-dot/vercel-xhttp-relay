@@ -8,7 +8,15 @@
  *  - shakhesban indices (equal-weight, IFB)
  *  - SourceArena market_bourse + market_farabourse (official MV sum)
  *  - parsistahlil.ir latest retail / money-flow report
+ *  - TradersArena /data/market for order-book + per-capita pulse
  */
+import {
+  fetchTradersArenaPulse,
+  loadPulseStore,
+  savePulseStore,
+  mergePulseHistory,
+} from '../lib/pulse.js'
+
 const TGJU_AJAX = 'https://call2.tgju.org/ajax.json'
 const TGJU_TODAY = 'https://api.tgju.org/v1/market/indicator/today-table-data/bourse?lang=fa'
 const SHAKH_INDEX = 'https://www.shakhesban.com/markets/index'
@@ -196,7 +204,8 @@ function parseShakhesbanTbody(tbody) {
     let td
     while ((td = tdRe1.exec(block))) vals[td[2]] = td[1]
     while ((td = tdRe2.exec(block))) vals[td[1]] = td[2]
-    if ((vals['info.market_fa'] || '') !== 'سهام') continue
+    const marketFa = vals['info.market_fa'] || ''
+    if (marketFa === 'آتی') continue
     const yesterday = parseNum(vals['info.PriceYesterday']) || 0
     const close = parseNum(vals['info.last_price.PClosing']) || 0
     const last = parseNum(vals['info.last_trade.PDrCotVal']) || 0
@@ -207,6 +216,7 @@ function parseShakhesbanTbody(tbody) {
     const finalChg = closeChg != null && closeChg !== 0 ? closeChg : lastChg
     rows.push({
       symbol,
+      marketFa,
       flow: vals['info.flow.title'] || '',
       marketValue: parseNum(vals['trades.arzesh_bazar']) || 0,
       tradeValue: parseNum(vals['trades.QTotCap']) || 0,
@@ -231,14 +241,14 @@ function parseShakhesbanTbody(tbody) {
   return rows
 }
 
-async function scrapeShakhesbanBoardLite(maxPages = 6) {
+async function scrapeShakhesbanBoardLite(maxPages = 12) {
+  // Full board (سهام+صندوق+اوراق) — no market=stock filter. Used for IFB impacts + fallback pulse.
   const pages = Array.from({ length: maxPages }, (_, i) => i + 1)
   const results = await Promise.allSettled(
     pages.map(async (page) => {
       const qs = new URLSearchParams({
         limit: '100',
         page: String(page),
-        market: 'stock',
         order_col: 'trades.arzesh_bazar',
         order_dir: 'desc',
         _: String(Date.now()),
@@ -247,7 +257,7 @@ async function scrapeShakhesbanBoardLite(maxPages = 6) {
         headers: {
           Accept: 'application/json, text/javascript, */*; q=0.01',
           'User-Agent': UA,
-          Referer: 'https://www.shakhesban.com/markets/stock',
+          Referer: 'https://www.shakhesban.com/',
           'X-Requested-With': 'XMLHttpRequest',
         },
       })
@@ -264,8 +274,9 @@ async function scrapeShakhesbanBoardLite(maxPages = 6) {
 }
 
 function computeBoardImpacts(stocks, indices, maxMove = 0.22) {
-  const bourse = stocks.filter((s) => !(s.flow || '').includes('فرابورس'))
-  const ifb = stocks.filter((s) => (s.flow || '').includes('فرابورس'))
+  const equities = stocks.filter((s) => !s.marketFa || s.marketFa === 'سهام')
+  const bourse = equities.filter((s) => !(s.flow || '').includes('فرابورس'))
+  const ifb = equities.filter((s) => (s.flow || '').includes('فرابورس'))
   const indexB = indices?.tedpix?.value || 0
   const indexF = indices?.ifb?.value || 0
   const totalB = bourse.reduce((a, s) => a + (s.marketValue || 0), 0)
@@ -302,7 +313,8 @@ function computeBoardImpacts(stocks, indices, maxMove = 0.22) {
   }
 }
 
-function buildMarketPulse(stocks) {
+/** Fallback pulse from board best-level only (when TradersArena is unreachable). */
+function buildMarketPulseFallback(stocks) {
   let pos = 0
   let neg = 0
   let flat = 0
@@ -333,7 +345,7 @@ function buildMarketPulse(stocks) {
     asOf: new Date().toISOString(),
     time: today.time,
     dateJalali: today.dateJalali,
-    source: 'shakhesban-board',
+    source: 'shakhesban-board-fallback',
     breadth: { positive: pos, negative: neg, flat, total: pos + neg + flat },
     orderBuyBillionToman: Math.round((orderBuy / RIAL_PER_BILLION_TOMAN) * 10) / 10,
     orderSellBillionToman: Math.round((orderSell / RIAL_PER_BILLION_TOMAN) * 10) / 10,
@@ -342,7 +354,7 @@ function buildMarketPulse(stocks) {
     retailSellBillionToman: Math.round((retailSell / RIAL_PER_BILLION_TOMAN) * 10) / 10,
     perCapitaBuyMillionToman: perBuy != null ? Math.round(perBuy * 1000 * 100) / 100 : null,
     perCapitaSellMillionToman: perSell != null ? Math.round(perSell * 1000 * 100) / 100 : null,
-    note: 'معادل نمودارهای لحظه‌ای TradersArena از تجمیع تابلو',
+    note: 'پشتیبان · بهترین سطح تابلو (بدون عمق ۵ خط)',
   }
 }
 
@@ -677,9 +689,10 @@ export async function onRequestGet(context) {
     scrapeSourceArena(token),
     fetchJson(`${origin}/data/money_flow_ytd.json`).catch(() => null),
     scrapeRahavardImpacts(),
-    scrapeShakhesbanBoardLite(6),
+    scrapeShakhesbanBoardLite(12),
     fetchJson(`${origin}/data/market_pulse.json`).catch(() => null),
     fetchJson(`${origin}/data/impacts_cache.json`).catch(() => null),
+    fetchTradersArenaPulse(),
   ])
 
   if (tasks[0].status === 'fulfilled') {
@@ -734,8 +747,15 @@ export async function onRequestGet(context) {
     errors.push(`shakhesban-board: ${tasks[7].reason}`)
   }
 
-  const pulseStore = tasks[8].status === 'fulfilled' ? tasks[8].value : null
+  const pulseStoreStatic = tasks[8].status === 'fulfilled' ? tasks[8].value : null
   const impactsCache = tasks[9].status === 'fulfilled' ? tasks[9].value : null
+
+  let tradersPulse = null
+  if (tasks[10].status === 'fulfilled') {
+    tradersPulse = tasks[10].value
+  } else {
+    errors.push(`tradersarena: ${tasks[10].reason}`)
+  }
 
   const boardImpacts = boardRows.length ? computeBoardImpacts(boardRows, indices) : null
   const mergedImpacts = mergeImpacts(rahavard, boardImpacts, sourcearena)
@@ -749,25 +769,18 @@ export async function onRequestGet(context) {
     }
   }
 
-  const marketPulse = boardRows.length ? buildMarketPulse(boardRows) : pulseStore?.current || null
-  let marketPulseHistory = Array.isArray(pulseStore?.history) ? pulseStore.history : []
-  if (marketPulse?.time) {
-    const point = {
-      time: marketPulse.time,
-      positive: marketPulse.breadth?.positive,
-      negative: marketPulse.breadth?.negative,
-      flat: marketPulse.breadth?.flat,
-      orderBuy: marketPulse.orderBuyBillionToman,
-      orderSell: marketPulse.orderSellBillionToman,
-      retailFlow: marketPulse.retailMoneyFlowBillionToman,
-      perCapitaBuy: marketPulse.perCapitaBuyMillionToman,
-      perCapitaSell: marketPulse.perCapitaSellMillionToman,
-    }
-    marketPulseHistory = [
-      ...marketPulseHistory.filter((h) => h?.time !== point.time),
-      point,
-    ].slice(-120)
+  const cache = typeof caches !== 'undefined' ? caches.default : null
+  let pulseStore = await loadPulseStore(cache, pulseStoreStatic)
+  const marketPulse =
+    tradersPulse ||
+    (boardRows.length ? buildMarketPulseFallback(boardRows) : null) ||
+    pulseStore?.current ||
+    null
+  if (marketPulse) {
+    pulseStore = mergePulseHistory(pulseStore, marketPulse)
+    await savePulseStore(cache, pulseStore)
   }
+  const marketPulseHistory = Array.isArray(pulseStore?.history) ? pulseStore.history : []
 
   const topTrades =
     sourcearena.topTrades?.length

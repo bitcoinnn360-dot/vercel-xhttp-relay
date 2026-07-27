@@ -453,6 +453,96 @@ async function fetchOverviewApi(): Promise<OverviewApi | null> {
   }
 }
 
+const PULSE_SESSION_KEY = 'midco-pulse-history-v1'
+export const PULSE_REFRESH_MS = 30 * 1000
+
+type PulseApi = {
+  ok?: boolean
+  marketPulse?: DashboardData['overview']['marketPulse']
+  marketPulseHistory?: DashboardData['overview']['marketPulseHistory']
+  dateJalali?: string
+}
+
+function readSessionPulse(): {
+  dateJalali?: string
+  history: NonNullable<DashboardData['overview']['marketPulseHistory']>
+} {
+  try {
+    const raw = sessionStorage.getItem(PULSE_SESSION_KEY)
+    if (!raw) return { history: [] }
+    const parsed = JSON.parse(raw) as { dateJalali?: string; history?: DashboardData['overview']['marketPulseHistory'] }
+    return { dateJalali: parsed.dateJalali, history: Array.isArray(parsed.history) ? parsed.history : [] }
+  } catch {
+    return { history: [] }
+  }
+}
+
+function writeSessionPulse(
+  dateJalali: string | undefined,
+  history: NonNullable<DashboardData['overview']['marketPulseHistory']>,
+) {
+  try {
+    sessionStorage.setItem(PULSE_SESSION_KEY, JSON.stringify({ dateJalali, history }))
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+function mergePulsePoints(
+  ...lists: Array<DashboardData['overview']['marketPulseHistory'] | undefined>
+): NonNullable<DashboardData['overview']['marketPulseHistory']> {
+  const byTime = new Map<string, NonNullable<DashboardData['overview']['marketPulseHistory']>[number]>()
+  for (const list of lists) {
+    for (const p of list || []) {
+      if (!p?.time) continue
+      const t = String(p.time)
+      if (t < '08:45' || t > '15:00') continue
+      byTime.set(t, { ...byTime.get(t), ...p })
+    }
+  }
+  return [...byTime.values()].sort((a, b) => String(a.time).localeCompare(String(b.time))).slice(-480)
+}
+
+export async function fetchPulseApi(): Promise<{
+  marketPulse?: DashboardData['overview']['marketPulse']
+  marketPulseHistory: NonNullable<DashboardData['overview']['marketPulseHistory']>
+} | null> {
+  try {
+    const res = await fetch('/api/pulse', { cache: 'no-store' })
+    if (!res.ok) return null
+    const json = (await res.json()) as PulseApi
+    const session = readSessionPulse()
+    const dateJalali = json.dateJalali || json.marketPulse?.dateJalali || session.dateJalali
+    if (session.dateJalali && dateJalali && session.dateJalali !== dateJalali) {
+      session.history = []
+    }
+    const history = mergePulsePoints(session.history, json.marketPulseHistory)
+    writeSessionPulse(dateJalali, history)
+    return { marketPulse: json.marketPulse, marketPulseHistory: history }
+  } catch {
+    return null
+  }
+}
+
+/** Merge a pulse tick into existing dashboard overview (client-side densify). */
+export function applyPulseToDashboard(
+  data: DashboardData,
+  pulse: {
+    marketPulse?: DashboardData['overview']['marketPulse']
+    marketPulseHistory?: DashboardData['overview']['marketPulseHistory']
+  } | null,
+): DashboardData {
+  if (!pulse) return data
+  const next = { ...data, overview: { ...data.overview } }
+  if (pulse.marketPulse) next.overview.marketPulse = pulse.marketPulse
+  const session = readSessionPulse()
+  const dateJalali = pulse.marketPulse?.dateJalali || session.dateJalali
+  const history = mergePulsePoints(session.history, next.overview.marketPulseHistory, pulse.marketPulseHistory)
+  writeSessionPulse(dateJalali, history)
+  next.overview.marketPulseHistory = history
+  return next
+}
+
 function patchIndex(
   target: { name: string; value: number; change: number; changePct: number },
   live?: { name?: string; value?: number; change?: number; changePct?: number },
@@ -560,7 +650,7 @@ function applyFreshOverview(base: DashboardData, api: OverviewApi | null, intrad
   }
   if (api?.marketPulse) {
     o.marketPulse = api.marketPulse
-    sources.marketPulse = api.marketPulse.source || 'shakhesban-board'
+    sources.marketPulse = api.marketPulse.source || 'tradersarena'
   }
   if (api?.marketPulseHistory?.length) {
     o.marketPulseHistory = api.marketPulseHistory
@@ -766,6 +856,18 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   }
   if (!base.overview.marketPulseHistory?.length && scrapedPulse?.history?.length) {
     base.overview.marketPulseHistory = scrapedPulse.history
+  }
+  // densify with sessionStorage (client builds 09:00→now series while page is open)
+  {
+    const session = readSessionPulse()
+    const dateJalali =
+      base.overview.marketPulse?.dateJalali || overviewApi?.dateJalali || session.dateJalali
+    if (session.dateJalali && dateJalali && session.dateJalali !== dateJalali) {
+      session.history = []
+    }
+    const hist = mergePulsePoints(session.history, base.overview.marketPulseHistory)
+    writeSessionPulse(dateJalali, hist)
+    if (hist.length) base.overview.marketPulseHistory = hist
   }
 
   const histories: Record<string, HistoryPoint[]> = { ...(scraped?.histories || {}) }

@@ -279,15 +279,16 @@ export function MarketOverview({
       <div>
         <h3 className="mb-1 text-sm font-bold">پالس لحظه‌ای بازار (الگوی TradersArena)</h3>
         <p className="mb-3 text-[10px] text-[var(--color-muted)]">
-          وضعیت نمادها، ورود پول حقیقی، ارزش سفارش‌ها و سرانه خرید/فروش · تجمیع تابلو
+          وضعیت نمادها، ورود پول حقیقی، ارزش سفارش‌ها و سرانه خرید/فروش · منبع TradersArena
           {pulse?.time ? ` · آخرین نمونه ${pulse.time}` : ''}
+          {pulseHist.length > 1 ? ` · ${pulseHist.length} نقطه از ۹:۰۰` : ''}
         </p>
         <div className="grid gap-3 lg:grid-cols-2">
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="panel p-4">
             <h4 className="mb-1 text-sm font-bold">نمادهای مثبت / منفی</h4>
             <p className="mb-2 text-[10px] text-[var(--color-muted)]">
-              زیر نمودار: ارزش سفارش خرید {fmtNum(pulse?.orderBuyBillionToman ?? 0, 1)} · فروش{' '}
-              {fmtNum(pulse?.orderSellBillionToman ?? 0, 1)} میلیارد تومان
+              مثبت {fmtInt(pulse?.breadth?.positive ?? 0)} · منفی {fmtInt(pulse?.breadth?.negative ?? 0)}
+              {pulse?.breadth?.flat ? ` · بدون تغییر ${fmtInt(pulse.breadth.flat)}` : ''}
             </p>
             {pulse?.breadth ? (
               <BreadthBarChart
@@ -344,7 +345,10 @@ export function MarketOverview({
             className="panel p-4"
           >
             <h4 className="mb-1 text-sm font-bold">ارزش سفارش‌های خرید و فروش</h4>
-            <p className="mb-2 text-[10px] text-[var(--color-muted)]">بهترین سطح صف · میلیارد تومان</p>
+            <p className="mb-2 text-[10px] text-[var(--color-muted)]">
+              مجموع ۵ خط اول تابلو · خرید {fmtNum(pulse?.orderBuyBillionToman ?? 0, 1)} · فروش{' '}
+              {fmtNum(pulse?.orderSellBillionToman ?? 0, 1)} میلیارد تومان
+            </p>
             <DualLineChart
               data={orderSeries}
               aKey="buy"
@@ -363,7 +367,7 @@ export function MarketOverview({
           >
             <h4 className="mb-1 text-sm font-bold">سرانه خرید و فروش</h4>
             <p className="mb-2 text-[10px] text-[var(--color-muted)]">
-              سرانه صف · خرید {fmtNum(pulse?.perCapitaBuyMillionToman ?? 0, 1)} · فروش{' '}
+              سرانه حقیقی · خرید {fmtNum(pulse?.perCapitaBuyMillionToman ?? 0, 1)} · فروش{' '}
               {fmtNum(pulse?.perCapitaSellMillionToman ?? 0, 1)} میلیون تومان
             </p>
             <DualLineChart

@@ -2,36 +2,37 @@
   "dateJalali": "1405/05/05",
   "history": [
     {
-      "time": "11:30",
-      "positive": 494,
-      "negative": 270,
-      "flat": 1,
-      "orderBuy": 126.6,
-      "orderSell": 245.4,
-      "retailFlow": 652.4,
-      "perCapitaBuy": 455.96,
-      "perCapitaSell": 256.17
+      "time": "12:35",
+      "positive": 587,
+      "negative": 203,
+      "flat": 83,
+      "orderBuy": 8338.1,
+      "orderSell": 2589.3,
+      "retailFlow": -1683.3,
+      "perCapitaBuy": 95.22,
+      "perCapitaSell": 78.99
     }
   ],
   "current": {
-    "asOf": "2026-07-27T11:30:47.892308+03:30",
-    "time": "11:30",
+    "asOf": "2026-07-27T09:05:31.024716+00:00",
+    "time": "12:35",
     "dateJalali": "1405/05/05",
-    "source": "shakhesban-board",
+    "source": "tradersarena",
     "breadth": {
-      "positive": 494,
-      "negative": 270,
-      "flat": 1,
-      "total": 765
+      "positive": 587,
+      "negative": 203,
+      "flat": 83,
+      "total": 873
     },
-    "orderBuyBillionToman": 126.6,
-    "orderSellBillionToman": 245.4,
-    "retailMoneyFlowBillionToman": 652.4,
-    "retailBuyBillionToman": 1776.0,
-    "retailSellBillionToman": 1123.6,
-    "perCapitaBuyMillionToman": 455.96,
-    "perCapitaSellMillionToman": 256.17,
-    "note": "معادل نمودارهای لحظه‌ای TradersArena از تجمیع تابلو (صف خرید/فروش + حقیقی)"
+    "orderBuyBillionToman": 8338.1,
+    "orderSellBillionToman": 2589.3,
+    "orderBuyQueueBillionToman": 7904.9,
+    "orderSellQueueBillionToman": 2296.1,
+    "retailMoneyFlowBillionToman": -1683.3,
+    "perCapitaBuyMillionToman": 95.22,
+    "perCapitaSellMillionToman": 78.99,
+    "buyPower": 1.21,
+    "note": "داده زنده TradersArena · ارزش سفارش = مجموع ۵ خط اول تابلو"
   },
-  "updatedAt": "2026-07-27T08:00:47.892708+00:00"
+  "updatedAt": "2026-07-27T09:05:31.024716+00:00"
 }

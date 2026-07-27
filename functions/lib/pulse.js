@@ -1,0 +1,196 @@
+/**
+ * TradersArena live pulse + Cloudflare Cache history helpers.
+ * Source: https://tradersarena.ir/data/market
+ *
+ * `o` ≈ [فروش ۵خط, خرید ۵خط, فروش صف, خرید صف] (ریال)
+ * `m[2]`/`m[3]` ≈ سرانه خرید/فروش حقیقی (ریال)
+ * `m[5]` ≈ خالص ورود پول حقیقی (ریال)
+ * `pp`/`pm` ≈ تعداد نماد مثبت/منفی
+ */
+const TA_MARKET = 'https://tradersarena.ir/data/market'
+const RIAL_PER_BILLION_TOMAN = 1e10
+const RIAL_PER_MILLION_TOMAN = 1e7
+const PULSE_CACHE_URL = 'https://pulse-cache.internal/market-pulse-v1'
+const UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+
+export function jalaliTodayTehran() {
+  const parts = new Intl.DateTimeFormat('en-u-ca-persian-nu-latn', {
+    timeZone: 'Asia/Tehran',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date())
+  const get = (t) => parts.find((p) => p.type === t)?.value
+  let y = get('year')
+  if (y && /[^\d]/.test(y)) {
+    const map = { '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4', '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9' }
+    y = y.replace(/[۰-۹]/g, (d) => map[d] || d)
+  }
+  const mo = get('month')
+  const d = get('day')
+  const timeFmt = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Tehran',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  return {
+    dateJalali: `${y}/${mo}/${d}`,
+    dateGregorian: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tehran' }),
+    time: timeFmt.format(new Date()),
+  }
+}
+
+function round1(n) {
+  return Math.round(n * 10) / 10
+}
+
+function round2(n) {
+  return Math.round(n * 100) / 100
+}
+
+function bt(rial) {
+  if (rial == null || !Number.isFinite(Number(rial))) return null
+  return round1(Number(rial) / RIAL_PER_BILLION_TOMAN)
+}
+
+function mt(rial) {
+  if (rial == null || !Number.isFinite(Number(rial))) return null
+  return round2(Number(rial) / RIAL_PER_MILLION_TOMAN)
+}
+
+export function pulsePointFromSnapshot(pulse) {
+  if (!pulse) return null
+  return {
+    time: pulse.time,
+    positive: pulse.breadth?.positive,
+    negative: pulse.breadth?.negative,
+    flat: pulse.breadth?.flat,
+    orderBuy: pulse.orderBuyBillionToman,
+    orderSell: pulse.orderSellBillionToman,
+    retailFlow: pulse.retailMoneyFlowBillionToman,
+    perCapitaBuy: pulse.perCapitaBuyMillionToman,
+    perCapitaSell: pulse.perCapitaSellMillionToman,
+  }
+}
+
+export function parseTradersArenaMarket(data) {
+  if (!data || typeof data !== 'object') return null
+  const today = jalaliTodayTehran()
+  const o = Array.isArray(data.o) ? data.o : []
+  const m = Array.isArray(data.m) ? data.m : []
+  const pp = Array.isArray(data.pp) ? data.pp[0] : data.pp
+  const pm = Array.isArray(data.pm) ? data.pm[0] : data.pm
+  const positive = Number(pp) || 0
+  const negative = Number(pm) || 0
+  // unchanged ≈ باقی‌مانده تقریبی از توزیع وضعیت (در صورت نبود، ۰)
+  const xyz = Array.isArray(data.xyz) ? data.xyz : []
+  const flat = Math.max(0, Number(xyz[1]) || 0)
+
+  // o: [sell5, buy5, sellQueue, buyQueue] in rial — match TradersArena «پنج خط اول»
+  const orderSell = bt(o[0])
+  const orderBuy = bt(o[1])
+  const orderSellQueue = bt(o[2])
+  const orderBuyQueue = bt(o[3])
+
+  return {
+    asOf: new Date().toISOString(),
+    time: today.time,
+    dateJalali: data.j || today.dateJalali,
+    source: 'tradersarena',
+    breadth: {
+      positive,
+      negative,
+      flat,
+      total: positive + negative + flat,
+    },
+    orderBuyBillionToman: orderBuy,
+    orderSellBillionToman: orderSell,
+    orderBuyQueueBillionToman: orderBuyQueue,
+    orderSellQueueBillionToman: orderSellQueue,
+    retailMoneyFlowBillionToman: bt(m[5]),
+    retailBuyBillionToman: bt(m[7]),
+    retailSellBillionToman: bt(m[10]),
+    perCapitaBuyMillionToman: mt(m[2]),
+    perCapitaSellMillionToman: mt(m[3]),
+    buyPower: Number.isFinite(Number(m[4])) ? Number(m[4]) : null,
+    note: 'داده زنده TradersArena · ارزش سفارش = مجموع ۵ خط اول تابلو',
+  }
+}
+
+export async function fetchTradersArenaPulse() {
+  const res = await fetch(TA_MARKET, {
+    headers: {
+      Accept: 'application/json, text/plain, */*',
+      'User-Agent': UA,
+      Referer: 'https://tradersarena.ir/',
+    },
+  })
+  if (!res.ok) throw new Error(`tradersarena ${res.status}`)
+  const data = await res.json()
+  const pulse = parseTradersArenaMarket(data)
+  if (!pulse) throw new Error('tradersarena empty')
+  return pulse
+}
+
+export async function loadPulseStore(cache, fallback = null) {
+  try {
+    if (cache) {
+      const hit = await cache.match(PULSE_CACHE_URL)
+      if (hit) {
+        const json = await hit.json()
+        if (json && typeof json === 'object') return json
+      }
+    }
+  } catch {
+    /* ignore cache errors */
+  }
+  return fallback && typeof fallback === 'object'
+    ? fallback
+    : { dateJalali: null, history: [], current: null }
+}
+
+export async function savePulseStore(cache, store) {
+  if (!cache) return
+  try {
+    await cache.put(
+      PULSE_CACHE_URL,
+      new Response(JSON.stringify(store), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'public, max-age=86400',
+        },
+      }),
+    )
+  } catch {
+    /* ignore */
+  }
+}
+
+export function mergePulseHistory(store, pulse, { maxPoints = 480 } = {}) {
+  const today = pulse?.dateJalali || jalaliTodayTehran().dateJalali
+  let base =
+    store && store.dateJalali === today
+      ? store
+      : { dateJalali: today, history: [], current: null }
+  const point = pulsePointFromSnapshot(pulse)
+  let history = Array.isArray(base.history) ? [...base.history] : []
+  if (point?.time) {
+    history = history.filter((h) => h?.time !== point.time)
+    history.push(point)
+    // keep from market open (~09:00) onward; drop overnight leftovers
+    history = history
+      .filter((h) => {
+        const t = String(h?.time || '')
+        return t >= '08:45' && t <= '15:00'
+      })
+      .slice(-maxPoints)
+  }
+  return {
+    dateJalali: today,
+    history,
+    current: pulse,
+    updatedAt: new Date().toISOString(),
+  }
+}

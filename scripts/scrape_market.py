@@ -1229,18 +1229,19 @@ def build_overview_live(
     sum_trade = sum(s["tradeValue"] for s in stocks)
     today = jalali_today()
 
-    # Top trades: prefer SourceArena all (سهام واقعی)؛ وگرنه تابلو شاخص‌بان
+    # Top trades: فقط سهام (نه اوراق اراد/صکوک/صندوق)
     if glance.get("ok") and glance.get("topTrades"):
         top_trades_out = list(glance.get("topTrades") or [])
         top_trades_source = glance.get("topTradesSource") or "sourcearena-all"
     else:
-        top_trades = sorted(stocks, key=lambda s: s["tradeValue"], reverse=True)[:15]
+        equities = [s for s in stocks if s.get("marketFa") == "سهام"]
+        top_trades = sorted(equities, key=lambda s: s["tradeValue"], reverse=True)[:15]
         top_trades_out = [
             {"name": s["symbol"], "valueBr": round(s["tradeValue"] / RIAL_PER_BILLION_TOMAN, 1)}
             for s in top_trades
             if s["tradeValue"] > 0
         ]
-        top_trades_source = "shakhesban-board"
+        top_trades_source = "shakhesban-board-equities"
 
     ted = indices.get("tedpix") or {}
     eq = indices.get("equalWeight") or {}

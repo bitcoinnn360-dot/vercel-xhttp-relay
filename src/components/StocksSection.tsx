@@ -83,13 +83,28 @@ function StockTr({ s }: { s: StockRow }) {
   )
 }
 
+/** Exclude bonds/sukuk/debt instruments that sometimes leak into trade rankings. */
+function isBondLikeSymbol(name: string): boolean {
+  const n = String(name || '').trim()
+  if (!n) return true
+  if (/^اراد\d*/i.test(n)) return true
+  if (/^اخزا\d*/i.test(n)) return true
+  if (/^اجاره/i.test(n)) return true
+  if (/^مرابحه/i.test(n)) return true
+  if (/^ص[ا-ی]{2,}/.test(n) && /\d{2,}$/.test(n)) return true // صکوک با پسوند عددی
+  if (/\d{2,}$/.test(n) && /(?:اراد|صبا|طبیعت|آسمان|سامان|گستر|قرن)/.test(n)) return true
+  return false
+}
+
 export function TopTrades({ data }: { data: DashboardData }) {
-  const rows = (data.topTrades || []).filter((t) => (t.valueBr || 0) > 0).slice(0, 10)
+  const rows = (data.topTrades || [])
+    .filter((t) => (t.valueBr || 0) > 0 && !isBondLikeSymbol(t.name))
+    .slice(0, 10)
   const max = Math.max(...rows.map((t) => t.valueBr), 1)
   return (
     <div className="panel p-4">
       <h3 className="mb-1 text-sm font-bold">بیشترین ارزش معاملات</h3>
-      <p className="mb-3 text-[10px] text-[var(--color-muted)]">سهام بورس/فرابورس · میلیارد تومان</p>
+      <p className="mb-3 text-[10px] text-[var(--color-muted)]">فقط سهام · میلیارد تومان</p>
       <ul className="space-y-2.5">
         {rows.map((t) => (
           <li key={t.name}>

@@ -918,21 +918,20 @@ export async function onRequestGet(context) {
   }
   const marketPulseHistory = Array.isArray(pulseStore?.history) ? pulseStore.history : []
 
-  const topTrades =
-    sourcearena.topTrades?.length
-      ? sourcearena.topTrades
-      : boardRows
-          .filter((s) => s.tradeValue > 0)
-          .sort((a, b) => b.tradeValue - a.tradeValue)
-          .slice(0, 13)
-          .map((s) => ({
-            name: s.symbol,
-            valueBr: Math.round((s.tradeValue / RIAL_PER_BILLION_TOMAN) * 10) / 10,
-          }))
+  const topTrades = sourcearena.topTrades?.length
+    ? sourcearena.topTrades
+    : boardRows
+        .filter((s) => (!s.marketFa || s.marketFa === 'سهام') && s.tradeValue > 0)
+        .sort((a, b) => b.tradeValue - a.tradeValue)
+        .slice(0, 13)
+        .map((s) => ({
+          name: s.symbol,
+          valueBr: Math.round((s.tradeValue / RIAL_PER_BILLION_TOMAN) * 10) / 10,
+        }))
   const topTradesSource = sourcearena.topTrades?.length
     ? sourcearena.topTradesSource
     : boardRows.length
-      ? 'shakhesban-board'
+      ? 'shakhesban-board-equities'
       : null
 
   const today = jalaliToday()

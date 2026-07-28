@@ -1759,12 +1759,12 @@ alertcondition(confirmed_this_bar, title="Session Signal Confirmed by OB/Liquidi
 alertcondition(rejected_this_bar, title="Session Signal Rejected by OB/Liquidity", message="سیگنال قبلیِ سیستم سشن توسط اردربلاک/لیکوییدیتی رد شد.")
 
 //#############################################################################
-// بخش ۴: NY 9:30 — Fixed Range Volume Profile روی ۱۵ دقیقه‌ی اول
-// ۹:۳۰–۹:۴۵ NY (= ۱۷:۰۰–۱۷:۱۵ تهران) → روی ۵م = ۳ کندل
-// حجم = دقیقاً volume همین چارت (مثلاً BINANCE BTCUSDT.P) — دیتای خارجی نیست
-// الگوریتم مثل Fixed Range VP تریدینگ‌ویو: توزیع یکنواخت حجم هر کندل روی high→low
-// Row Size = تعداد ردیف (پیش‌فرض ۱۰۰) ، Value Area = ۷۰٪
-// POC در ۵۰٪ بالای VA → Sell | ۵۰٪ پایین VA → Buy ؛ خط POC کشیده نمی‌شود
+// بخش ۴: NY 9:30 — Fixed Range Volume Profile (حجم لایو همین چارت)
+// پنجره: ۹:۳۰–۹:۴۵ NY (= ۱۷:۰۰–۱۷:۱۵ تهران)
+// طبق داک TV روی فیوچرز: VP از یک TF پایین‌تر از چارت خوانده می‌شود (۵م→۱م)
+// volume از syminfo.tickerid همین چارت (مثلاً BINANCE:BTCUSDT.P) — لایو با security_lower_tf
+// Row Size=100 (Number Of Rows) ، VA=70%
+// POC در ۵۰٪ بالای VA → Sell | ۵۰٪ پایین → Buy ؛ خط POC کشیده نمی‌شود
 //#############################################################################
 show_ny_orb           = input.bool(false, "فعال‌سازی NY 9:30 VP + Liquidity", group="NY Open VP (9:30)")
 orb_startHour         = input.int(9, "NY Start Hour", minval=0, maxval=23, group="NY Open VP (9:30)")
@@ -1772,6 +1772,7 @@ orb_startMinute       = input.int(30, "NY Start Minute", minval=0, maxval=59, gr
 orb_vp_window_mins    = input.int(15, "VP Window (mins) 9:30→9:45", minval=5, maxval=30, group="NY Open VP (9:30)")
 orb_endHour           = input.int(16, "NY End Hour", minval=0, maxval=23, group="NY Open VP (9:30)")
 orb_endMinute         = input.int(0, "NY End Minute", minval=0, maxval=59, group="NY Open VP (9:30)")
+orb_vp_ltf            = input.timeframe("1", "VP Lower TF (live chart volume)", group="NY Open VP (9:30)", tooltip="مثل FRVP فیوچرز TV: یک پله پایین‌تر از چارت. روی ۵م بگذار ۱. حجم از همین سیمبل چارت خوانده می‌شود.")
 orb_vp_rows           = input.int(100, "Row Size (Number of Rows)", minval=20, maxval=200, group="NY Open VP (9:30)")
 orb_va_pct            = input.float(70.0, "Value Area Volume %", minval=50.0, maxval=90.0, step=5.0, group="NY Open VP (9:30)")
 orb_liq_wait_bars     = input.int(12, "Max Bars for Liq Confirm", minval=3, maxval=40, group="NY Open VP (9:30)")
@@ -1790,7 +1791,7 @@ orb_getDateKey() =>
 orb_clamp_row(int r, int rows) =>
     math.max(0, math.min(rows - 1, r))
 
-// Fixed Range VP (مثل ابزار FRVP تریدینگ‌ویو) — فقط high/low/volume همین چارت
+// Fixed Range VP — توزیع یکنواخت volume روی high→low هر ریز‌کندل
 orb_frvp_compute(float[] his, float[] los, float[] vols, int rows, float vaPct) =>
     float poc = na
     float vah = na
@@ -1822,7 +1823,6 @@ orb_frvp_compute(float[] his, float[] los, float[] vols, int rows, float vaPct) 
                 float l = array.get(los, i)
                 float v = nz(array.get(vols, i), 0.0)
                 if v > 0
-                    // توزیع یکنواخت حجم کندل روی تمام ردیف‌های high→low (FRVP استاندارد)
                     int r0 = orb_clamp_row(int(math.floor((l - pLo) / rowH)), rows)
                     int r1 = orb_clamp_row(int(math.floor((h - pLo) / rowH)), rows)
                     if r1 < r0
@@ -1837,7 +1837,6 @@ orb_frvp_compute(float[] his, float[] los, float[] vols, int rows, float vaPct) 
             maxBin := array.get(bucket, 0)
             for r = 1 to rows - 1
                 float bv = array.get(bucket, r)
-                // مثل TV: در تساوی، ردیف بالاتر (نزدیک‌تر به high) اولویت دارد
                 if bv > maxBin or (bv == maxBin and r > poc_i)
                     maxBin := bv
                     poc_i := r
@@ -1849,7 +1848,6 @@ orb_frvp_compute(float[] his, float[] los, float[] vols, int rows, float vaPct) 
             while acc < target and (lo_i > 0 or hi_i < rows - 1)
                 float below = lo_i > 0 ? array.get(bucket, lo_i - 1) : -1.0
                 float above = hi_i < rows - 1 ? array.get(bucket, hi_i + 1) : -1.0
-                // مثل TV FRVP: در تساوی سمت بالا را بگیر
                 if above >= below
                     hi_i := hi_i + 1
                     acc := acc + array.get(bucket, hi_i)
@@ -1867,13 +1865,21 @@ orb_inTradeSession = show_ny_orb and orb_inSession(orb_tradeSession)
 orb_currentDateKey = orb_getDateKey()
 orb_newDay = na(orb_currentDateKey[1]) or orb_currentDateKey != orb_currentDateKey[1]
 
-// پنجره‌ی Fixed Range: ۹:۳۰ تا ۹:۴۵ نیویورک
 orb_mins_ny = hour(time, "America/New_York") * 60 + minute(time, "America/New_York")
 orb_start_mins = orb_startHour * 60 + orb_startMinute
 orb_vp_end_mins = orb_start_mins + orb_vp_window_mins
 orb_in_vp_window = show_ny_orb and orb_mins_ny >= orb_start_mins and orb_mins_ny < orb_vp_end_mins
 orb_tf_mins = math.max(1, int(timeframe.in_seconds(timeframe.period) / 60))
 orb_is_last_vp_bar = orb_in_vp_window and (orb_mins_ny + orb_tf_mins) >= orb_vp_end_mins
+
+// حجم لایو همین چارت از TF پایین‌تر (مثل FRVP فیوچرز TV)
+int orb_chart_sec = timeframe.in_seconds()
+int orb_ltf_sec = timeframe.in_seconds(orb_vp_ltf)
+bool orb_want_ltf = not na(orb_chart_sec) and not na(orb_ltf_sec) and orb_ltf_sec < orb_chart_sec
+[orb_ltf_h, orb_ltf_l, orb_ltf_v] = request.security_lower_tf(syminfo.tickerid, orb_vp_ltf, [high, low, volume], ignore_invalid_timeframe=true)
+bool orb_ltf_ok = false
+if orb_want_ltf and not na(orb_ltf_h) and not na(orb_ltf_l) and not na(orb_ltf_v)
+    orb_ltf_ok := array.size(orb_ltf_h) > 0 and array.size(orb_ltf_v) == array.size(orb_ltf_h) and array.size(orb_ltf_l) == array.size(orb_ltf_h)
 
 var float orb_rangeHigh = na
 var float orb_rangeLow = na
@@ -1884,13 +1890,13 @@ var bool orb_tradedToday = false
 var int orb_build_count = 0
 var float[] orb_vp_h = array.new_float()
 var float[] orb_vp_l = array.new_float()
-var float[] orb_vp_v = array.new_float()  // volume خام همین چارت
+var float[] orb_vp_v = array.new_float()
 var float orb_poc = na
 var float orb_vah = na
 var float orb_val = na
 var float orb_poc_pct = na
 var float orb_tot_vol = na
-var int orb_bias = 0  // 1 buy, -1 sell, 0 none
+var int orb_bias = 0
 var bool orb_low_swept = false
 var bool orb_high_swept = false
 var int orb_rej_low_bar = na
@@ -1900,6 +1906,7 @@ var float orb_rej_high_low = na
 var int orb_wrong_side_bar = na
 var bool orb_canceled = false
 var bool orb_signaled = false
+var bool orb_bias_labeled = false
 var box orb_rangeBox = na
 var line orb_vahLine = na
 var line orb_valLine = na
@@ -1939,6 +1946,7 @@ if show_ny_orb and orb_newDay
     orb_wrong_side_bar := na
     orb_canceled := false
     orb_signaled := false
+    orb_bias_labeled := false
     if array.size(orb_hist_boxes) > 0
         for hi = 0 to array.size(orb_hist_boxes) - 1
             box.delete(array.get(orb_hist_boxes, hi))
@@ -1962,7 +1970,7 @@ if show_ny_orb and orb_newDay
         line.delete(orb_rangeLowLine)
         orb_rangeLowLine := na
 
-// شروع Fixed Range وقتی وارد ۹:۳۰–۹:۴۵ شدیم
+// شروع پنجره‌ی Fixed Range
 if show_ny_orb and orb_in_vp_window and not orb_rangeFinalized and not orb_collecting and orb_build_count == 0
     orb_collecting := true
     array.clear(orb_vp_h)
@@ -1973,37 +1981,79 @@ if show_ny_orb and orb_in_vp_window and not orb_rangeFinalized and not orb_colle
     orb_rangeLeftBar := bar_index
     orb_rangeHigh := high
     orb_rangeLow := low
+    orb_bias_labeled := false
 
-// کندل‌های داخل پنجره — volume = volume خام چارت فعلی (فیوچرز بایننس اگر روی همان چارت باشی)
-bool orb_can_push = show_ny_orb and orb_collecting and orb_in_vp_window and not orb_rangeFinalized and (na(orb_last_push_bar) or bar_index != orb_last_push_bar) and barstate.isconfirmed
-if orb_can_push
-    array.push(orb_vp_h, high)
-    array.push(orb_vp_l, low)
-    array.push(orb_vp_v, volume)
+// ثبت حجم لایو چارت: ترجیحاً ریز‌کندل‌های TF پایین‌ترِ همین tickerid
+bool orb_commit_bar = show_ny_orb and orb_collecting and orb_in_vp_window and not orb_rangeFinalized and barstate.isconfirmed and (na(orb_last_push_bar) or orb_last_push_bar != bar_index)
+if orb_commit_bar
+    if orb_ltf_ok
+        for i = 0 to array.size(orb_ltf_v) - 1
+            float lh = array.get(orb_ltf_h, i)
+            float ll = array.get(orb_ltf_l, i)
+            float lv = nz(array.get(orb_ltf_v, i), 0.0)
+            array.push(orb_vp_h, lh)
+            array.push(orb_vp_l, ll)
+            array.push(orb_vp_v, lv)
+            orb_rangeHigh := math.max(nz(orb_rangeHigh, lh), lh)
+            orb_rangeLow := math.min(nz(orb_rangeLow, ll), ll)
+            orb_build_count += 1
+    else
+        // اگر LTF در دسترس نبود: خودِ کندل چارت (همان volume لایو)
+        array.push(orb_vp_h, high)
+        array.push(orb_vp_l, low)
+        array.push(orb_vp_v, volume)
+        orb_rangeHigh := math.max(nz(orb_rangeHigh, high), high)
+        orb_rangeLow := math.min(nz(orb_rangeLow, low), low)
+        orb_build_count += 1
     orb_last_push_bar := bar_index
-    orb_build_count := orb_build_count + 1
-    orb_rangeHigh := math.max(nz(orb_rangeHigh, high), high)
-    orb_rangeLow := math.min(nz(orb_rangeLow, low), low)
     orb_rangeRightBar := bar_index
     if orb_is_last_vp_bar
         orb_collecting := false
 
-// نهایی کردن Fixed Range VP
-bool orb_ready_finalize = show_ny_orb and not orb_rangeFinalized and orb_build_count > 0 and barstate.isconfirmed and (orb_is_last_vp_bar or not orb_in_vp_window)
-if orb_ready_finalize
-    orb_rangeFinalized := true
-    orb_collecting := false
-    [p, vh, vl, pct, bucket, pHi, pLo, rowH, totV, maxBin, poc_i, lo_i, hi_i] = orb_frvp_compute(orb_vp_h, orb_vp_l, orb_vp_v, orb_vp_rows, orb_va_pct)
+// آرایه‌ی کاری = داده‌ی commit‌شده + حجم لایوِ کندل جاری (قبل از confirm)
+float[] orb_work_h = orb_vp_h
+float[] orb_work_l = orb_vp_l
+float[] orb_work_v = orb_vp_v
+bool orb_live_slice = show_ny_orb and orb_in_vp_window and not orb_rangeFinalized and not barstate.isconfirmed and (na(orb_last_push_bar) or orb_last_push_bar != bar_index)
+if orb_live_slice
+    orb_work_h := array.copy(orb_vp_h)
+    orb_work_l := array.copy(orb_vp_l)
+    orb_work_v := array.copy(orb_vp_v)
+    if orb_ltf_ok
+        for i = 0 to array.size(orb_ltf_v) - 1
+            array.push(orb_work_h, array.get(orb_ltf_h, i))
+            array.push(orb_work_l, array.get(orb_ltf_l, i))
+            array.push(orb_work_v, nz(array.get(orb_ltf_v, i), 0.0))
+    else
+        array.push(orb_work_h, high)
+        array.push(orb_work_l, low)
+        array.push(orb_work_v, volume)
+
+bool orb_ready_finalize = show_ny_orb and not orb_rangeFinalized and array.size(orb_vp_v) > 0 and barstate.isconfirmed and (orb_is_last_vp_bar or not orb_in_vp_window)
+bool orb_live_update = show_ny_orb and not orb_rangeFinalized and orb_in_vp_window and array.size(orb_work_v) > 0
+bool orb_run_vp = orb_ready_finalize or orb_live_update
+
+if orb_run_vp
+    float[] use_h = orb_ready_finalize ? orb_vp_h : orb_work_h
+    float[] use_l = orb_ready_finalize ? orb_vp_l : orb_work_l
+    float[] use_v = orb_ready_finalize ? orb_vp_v : orb_work_v
+    [p, vh, vl, pct, bucket, pHi, pLo, rowH, totV, maxBin, poc_i, lo_i, hi_i] = orb_frvp_compute(use_h, use_l, use_v, orb_vp_rows, orb_va_pct)
     orb_poc := p
     orb_vah := vh
     orb_val := vl
     orb_poc_pct := pct
     orb_tot_vol := totV
-    // بایاس نسبت به Value Area (VAL↔VAH): بالای mid → Sell ، پایین → Buy
-    if not na(orb_poc) and not na(orb_vah) and not na(orb_val)
-        float va_mid = (orb_val + orb_vah) * 0.5
-        orb_bias := orb_poc >= va_mid ? -1 : 1
-    // هیستوگرام Fixed Range روی خودِ رنج ۱۵ دقیقه (برای مقایسه‌ی چشمی با FRVP)
+    if not na(pHi)
+        orb_rangeHigh := pHi
+    if not na(pLo)
+        orb_rangeLow := pLo
+    if orb_ready_finalize
+        orb_rangeFinalized := true
+        orb_collecting := false
+        if not na(orb_poc) and not na(orb_vah) and not na(orb_val)
+            float va_mid = (orb_val + orb_vah) * 0.5
+            orb_bias := orb_poc >= va_mid ? -1 : 1
+    // هیستوگرام از حجم لایو همین چارت
     if array.size(orb_hist_boxes) > 0
         for hi = 0 to array.size(orb_hist_boxes) - 1
             box.delete(array.get(orb_hist_boxes, hi))
@@ -2012,20 +2062,20 @@ if orb_ready_finalize
         int x1 = orb_rangeLeftBar
         for r = 0 to orb_vp_rows - 1
             float bv = array.get(bucket, r)
-            if bv <= 0
-                continue
-            float yb = pLo + r * rowH
-            float yt = pLo + (r + 1) * rowH
-            float w = bv / maxBin * orb_hist_width_bars
-            int x0 = int(math.round(x1 - w))
-            bool inVA = r >= lo_i and r <= hi_i
-            bool isPoc = r == poc_i
-            color bc = isPoc ? color.new(color.orange, 35) : inVA ? color.new(color.teal, 55) : color.new(color.blue, 75)
-            array.push(orb_hist_boxes, box.new(x0, yt, x1, yb, xloc=xloc.bar_index, border_color=color.new(bc, 0), bgcolor=bc, extend=extend.none))
+            if bv > 0
+                float yb = pLo + r * rowH
+                float yt = pLo + (r + 1) * rowH
+                float w = bv / maxBin * orb_hist_width_bars
+                int x0 = int(math.round(x1 - w))
+                bool inVA = r >= lo_i and r <= hi_i
+                bool isPoc = r == poc_i
+                color bc = isPoc ? color.new(color.orange, 35) : inVA ? color.new(color.teal, 55) : color.new(color.blue, 75)
+                array.push(orb_hist_boxes, box.new(x0, yt, x1, yb, xloc=xloc.bar_index, border_color=color.new(bc, 0), bgcolor=bc, extend=extend.none))
     if orb_showRangeBox and not na(orb_rangeHigh) and not na(orb_rangeLow)
         if not na(orb_rangeBox)
             box.delete(orb_rangeBox)
-        orb_rangeBox := box.new(orb_rangeLeftBar, orb_rangeHigh, orb_rangeRightBar, orb_rangeLow, xloc=xloc.bar_index, border_color=color.blue, bgcolor=color.new(color.blue, 92))
+        int rbRight = nz(orb_rangeRightBar, bar_index)
+        orb_rangeBox := box.new(orb_rangeLeftBar, orb_rangeHigh, rbRight, orb_rangeLow, xloc=xloc.bar_index, border_color=color.blue, bgcolor=color.new(color.blue, 92))
         if not na(orb_vahLine)
             line.delete(orb_vahLine)
         if not na(orb_valLine)
@@ -2036,19 +2086,21 @@ if orb_ready_finalize
             line.delete(orb_rangeHighLine)
         if not na(orb_rangeLowLine)
             line.delete(orb_rangeLowLine)
-        orb_rangeHighLine := line.new(orb_rangeLeftBar, orb_rangeHigh, orb_rangeRightBar, orb_rangeHigh, xloc=xloc.bar_index, extend=extend.right, color=color.blue, width=1)
-        orb_rangeLowLine := line.new(orb_rangeLeftBar, orb_rangeLow, orb_rangeRightBar, orb_rangeLow, xloc=xloc.bar_index, extend=extend.right, color=color.blue, width=1)
+        orb_rangeHighLine := line.new(orb_rangeLeftBar, orb_rangeHigh, rbRight, orb_rangeHigh, xloc=xloc.bar_index, extend=extend.right, color=color.blue, width=1)
+        orb_rangeLowLine := line.new(orb_rangeLeftBar, orb_rangeLow, rbRight, orb_rangeLow, xloc=xloc.bar_index, extend=extend.right, color=color.blue, width=1)
         if not na(orb_vah)
-            orb_vahLine := line.new(orb_rangeLeftBar, orb_vah, orb_rangeRightBar, orb_vah, xloc=xloc.bar_index, extend=extend.right, color=color.new(color.teal, 0), width=1)
+            orb_vahLine := line.new(orb_rangeLeftBar, orb_vah, rbRight, orb_vah, xloc=xloc.bar_index, extend=extend.right, color=color.new(color.teal, 0), width=1)
         if not na(orb_val)
-            orb_valLine := line.new(orb_rangeLeftBar, orb_val, orb_rangeRightBar, orb_val, xloc=xloc.bar_index, extend=extend.right, color=color.new(color.teal, 0), width=1)
+            orb_valLine := line.new(orb_rangeLeftBar, orb_val, rbRight, orb_val, xloc=xloc.bar_index, extend=extend.right, color=color.new(color.teal, 0), width=1)
         if not na(orb_vah) and not na(orb_val)
             float vaMid = (orb_vah + orb_val) * 0.5
-            orb_vaMidLine := line.new(orb_rangeLeftBar, vaMid, orb_rangeRightBar, vaMid, xloc=xloc.bar_index, extend=extend.none, color=color.new(color.gray, 20), width=1, style=line.style_dotted)
-        if orb_bias == 1
-            label.new(bar_index, orb_rangeLow, "VP↑", style=label.style_label_up, color=color.new(color.green, 30), textcolor=color.white, size=size.tiny)
-        else if orb_bias == -1
-            label.new(bar_index, orb_rangeHigh, "VP↓", style=label.style_label_down, color=color.new(color.red, 30), textcolor=color.white, size=size.tiny)
+            orb_vaMidLine := line.new(orb_rangeLeftBar, vaMid, rbRight, vaMid, xloc=xloc.bar_index, extend=extend.none, color=color.new(color.gray, 20), width=1, style=line.style_dotted)
+        if orb_ready_finalize and not orb_bias_labeled
+            orb_bias_labeled := true
+            if orb_bias == 1
+                label.new(bar_index, orb_rangeLow, "VP↑", style=label.style_label_up, color=color.new(color.green, 30), textcolor=color.white, size=size.tiny)
+            else if orb_bias == -1
+                label.new(bar_index, orb_rangeHigh, "VP↓", style=label.style_label_down, color=color.new(color.red, 30), textcolor=color.white, size=size.tiny)
 
 if show_ny_orb and orb_rangeFinalized and orb_showRangeBox
     if not na(orb_rangeBox)
@@ -2061,7 +2113,6 @@ if show_ny_orb and orb_rangeFinalized and orb_showRangeBox
         line.set_x2(orb_vahLine, bar_index)
     if not na(orb_valLine)
         line.set_x2(orb_valLine, bar_index)
-    // mid VA و POC امتداد داده نمی‌شوند ؛ هیستوگرام هم ثابت می‌ماند
 
 // ---------- تشخیص جمع نقدینگی ----------
 bool orb_active = show_ny_orb and orb_rangeFinalized and not orb_signaled and not orb_canceled and orb_bias != 0 and orb_inTradeSession and (not orb_maxOneTradePerDay or not orb_tradedToday)

@@ -242,7 +242,7 @@ export const seedDashboard: DashboardData = {
     },
     {
       group: 'سرمایه‌گذاری',
-      name: 'تغییرات صنعت سرمایه‌گذاری',
+      name: 'صنعت سرمایه‌گذاری',
       marketValueBr: 0,
       marketValueUsdM: 0,
       volume: 0,
@@ -321,7 +321,7 @@ export const seedDashboard: DashboardData = {
     },
     {
       group: 'سنگ‌آهن',
-      name: 'تغییرات صنعت سنگ آهن',
+      name: 'صنعت سنگ‌آهن',
       marketValueBr: 0,
       marketValueUsdM: 0,
       volume: 0,
@@ -478,7 +478,7 @@ export const seedDashboard: DashboardData = {
     },
     {
       group: 'فلزات',
-      name: 'تغییرات صنعت فلزات',
+      name: 'صنعت فلزات',
       marketValueBr: 0,
       marketValueUsdM: 0,
       volume: 0,

@@ -1001,7 +1001,7 @@ function rebuildIndustryRows(base: DashboardData) {
 
     rebuilt.push({
       group: g,
-      name: `تغییرات صنعت ${g}`,
+      name: `صنعت ${g}`,
       isIndustry: true,
       marketValueBr: mv,
       marketValueUsdM: usd,

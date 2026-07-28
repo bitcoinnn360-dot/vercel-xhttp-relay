@@ -83,7 +83,7 @@ export function StocksSection({ data }: { data: DashboardData }) {
           <h2 className="section-title">وضعیت معاملات سهام شرکت‌های معدنی و فلزی</h2>
           <p className="section-sub">
             بورس‌ویو · پایانی / تعدیلی · فولادی+مس = فلزات
-            {liveCount ? ` · ${liveCount} نماد · خالص حقیقی ${fmtNum(flowSum, 1)} م‌ت` : ' · در حال دریافت…'}
+            {liveCount ? ` · ${liveCount} نماد · ورود پول حقیقی ${fmtNum(flowSum, 1)} م‌ت` : ' · در حال دریافت…'}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -96,7 +96,7 @@ export function StocksSection({ data }: { data: DashboardData }) {
             <option value="marketValueBr">ارزش بازار</option>
             <option value="dailyPct">بازدهی روز</option>
             <option value="weekPct">بازدهی هفته</option>
-            <option value="netIndividualBt">خالص حقیقی</option>
+            <option value="netIndividualBt">ورود پول حقیقی</option>
           </select>
           <div className="flex flex-wrap gap-1.5">
             {GROUPS.map((g) => (
@@ -161,7 +161,10 @@ export function StocksSection({ data }: { data: DashboardData }) {
             <tr>
               <th>صنعت</th>
               <th>نام / نماد</th>
-              <th>ارزش بازار</th>
+              <th>
+                ارزش بازار
+                <span className="unit-hint"> (میلیارد ریال)</span>
+              </th>
               <th>دلاری (m$)</th>
               <th>حجم</th>
               <th>ارزش معاملات</th>
@@ -170,7 +173,7 @@ export function StocksSection({ data }: { data: DashboardData }) {
               <th>هفته</th>
               <th>ماه</th>
               <th>سال</th>
-              <th>خالص حقیقی</th>
+              <th>ورود پول حقیقی</th>
             </tr>
           </thead>
           <tbody>

@@ -346,42 +346,42 @@ export function MarketOverview({
             <h4 className="mb-1 text-sm font-bold">ورود پول حقیقی لحظه‌ای</h4>
             <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[10px] text-[var(--color-muted)]">
               <span className="inline-flex items-center gap-1.5">
-                <i className="inline-block h-[2px] w-4 rounded-full bg-[#15803d]" aria-hidden />
+                <i className="inline-block h-[2px] w-4 rounded-full bg-[#16a34a]" aria-hidden />
                 سهام و حق‌تقدم:{' '}
                 <span className={`num font-semibold ${changeClass(pulse?.flowStocksBillionToman ?? 0)}`}>
                   {fmtNum(pulse?.flowStocksBillionToman ?? 0, 1)}
                 </span>
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <i className="inline-block h-[2px] w-4 rounded-full bg-[#1a5f9e]" aria-hidden />
+                <i className="inline-block h-[2px] w-4 rounded-full bg-[#4f46e5]" aria-hidden />
                 ص.سهامی:{' '}
                 <span className={`num font-semibold ${changeClass(pulse?.flowEquityFundsBillionToman ?? 0)}`}>
                   {fmtNum(pulse?.flowEquityFundsBillionToman ?? 0, 1)}
                 </span>
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <i className="inline-block h-[2px] w-4 rounded-full bg-[#b45309]" aria-hidden />
+                <i className="inline-block h-[2px] w-4 rounded-full bg-[#0891b2]" aria-hidden />
                 ص.درآمدثابت:{' '}
                 <span className={`num font-semibold ${changeClass(pulse?.flowFixedIncomeBillionToman ?? 0)}`}>
                   {fmtNum(pulse?.flowFixedIncomeBillionToman ?? 0, 1)}
                 </span>
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <i className="inline-block h-[2px] w-4 rounded-full bg-[#9a3412]" aria-hidden />
+                <i className="inline-block h-[2px] w-4 rounded-full bg-[#ea580c]" aria-hidden />
                 فلزات اساسی:{' '}
                 <span className={`num font-semibold ${changeClass(pulse?.flowBasicMetalsBillionToman ?? 0)}`}>
                   {fmtNum(pulse?.flowBasicMetalsBillionToman ?? 0, 1)}
                 </span>
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <i className="inline-block h-[2px] w-4 rounded-full bg-[#0f766e]" aria-hidden />
+                <i className="inline-block h-[2px] w-4 rounded-full bg-[#db2777]" aria-hidden />
                 کانه‌های فلزی:{' '}
                 <span className={`num font-semibold ${changeClass(pulse?.flowMetalOresBillionToman ?? 0)}`}>
                   {fmtNum(pulse?.flowMetalOresBillionToman ?? 0, 1)}
                 </span>
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <i className="inline-block h-[2px] w-4 rounded-full bg-[#a16207]" aria-hidden />
+                <i className="inline-block h-[2px] w-4 rounded-full bg-[#ca8a04]" aria-hidden />
                 صندوق‌های طلا و سکه:{' '}
                 <span className={`num font-semibold ${changeClass(pulse?.flowGoldFundsBillionToman ?? 0)}`}>
                   {fmtNum(pulse?.flowGoldFundsBillionToman ?? 0, 1)}
@@ -393,12 +393,12 @@ export function MarketOverview({
             <TripleLineChart
               data={flowSeriesClean}
               series={[
-                { key: 'stocks', label: 'سهام و حق‌تقدم', color: '#15803d' },
-                { key: 'equityFunds', label: 'ص.سهامی', color: '#1a5f9e' },
-                { key: 'fixedIncome', label: 'ص.درآمدثابت', color: '#b45309' },
-                { key: 'basicMetals', label: 'فلزات اساسی', color: '#9a3412' },
-                { key: 'metalOres', label: 'کانه‌های فلزی', color: '#0f766e' },
-                { key: 'goldFunds', label: 'صندوق‌های طلا و سکه', color: '#a16207' },
+                { key: 'stocks', label: 'سهام و حق‌تقدم', color: '#16a34a' },
+                { key: 'equityFunds', label: 'ص.سهامی', color: '#4f46e5' },
+                { key: 'fixedIncome', label: 'ص.درآمدثابت', color: '#0891b2' },
+                { key: 'basicMetals', label: 'فلزات اساسی', color: '#ea580c' },
+                { key: 'metalOres', label: 'کانه‌های فلزی', color: '#db2777' },
+                { key: 'goldFunds', label: 'صندوق‌های طلا و سکه', color: '#ca8a04' },
               ]}
               height={220}
               unit="میلیارد تومان"

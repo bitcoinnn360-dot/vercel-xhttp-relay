@@ -8,12 +8,13 @@ import {
   type FredBundle,
   type HistoryPoint,
 } from '../data/fetchers'
-import type { DashboardData } from '../data/types'
+import type { CandlePoint, DashboardData } from '../data/types'
 import { seedDashboard } from '../data/seed'
 
 export function useMarketData() {
   const [data, setData] = useState<DashboardData>(seedDashboard)
   const [histories, setHistories] = useState<Record<string, HistoryPoint[]>>({})
+  const [candles, setCandles] = useState<Record<string, CandlePoint[]>>({})
   const [fred, setFred] = useState<Record<string, FredBundle>>({})
   const [sectors, setSectors] = useState<
     { name: string; color: string; count: number; avgChangePct: number; members: string[] }[]
@@ -49,6 +50,7 @@ export function useMarketData() {
       }
       setData(bundle.data)
       setHistories(bundle.histories)
+      setCandles(bundle.candles || {})
       setFred(bundle.fred)
       setSectors(bundle.sectors)
       setScrapeMeta(bundle.scrapeMeta)
@@ -90,5 +92,5 @@ export function useMarketData() {
     }
   }, [refresh, refreshPulse])
 
-  return { data, histories, fred, sectors, scrapeMeta, loading, refreshing, error, refresh }
+  return { data, histories, candles, fred, sectors, scrapeMeta, loading, refreshing, error, refresh }
 }

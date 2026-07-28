@@ -253,6 +253,212 @@ def scrape_tgju_ohlc(key: str = "bourse", length: int = 2800) -> list[dict]:
     return out
 
 
+def scrape_tgju_ohlc_from(key: str, from_greg: str = "2022/01/01") -> list[dict]:
+    """OHLC newest-first fetch, keep rows with date >= from_greg."""
+    url = f"https://api.tgju.org/v1/market/indicator/summary-table-data/{key}"
+    try:
+        payload = json.loads(fetch(url, timeout=90))
+    except Exception as exc:  # noqa: BLE001
+        print(f"ohlc-from {key}: {exc}")
+        return []
+    out: list[dict] = []
+    for row in payload.get("data") or []:
+        if not isinstance(row, list) or len(row) < 8:
+            continue
+        greg = str(row[6]).replace("-", "/")[:10]
+        if not greg or greg < from_greg:
+            break
+        o, lo, hi, c = num(row[0]), num(row[1]), num(row[2]), num(row[3])
+        if None in (o, lo, hi, c):
+            continue
+        out.append(
+            {
+                "date": greg,
+                "dateJalali": str(row[7]),
+                "open": o,
+                "high": hi,
+                "low": lo,
+                "close": c,
+            }
+        )
+    out.reverse()
+    return out
+
+
+MINERAL_STOCKS = [
+    {"name": "توسعه معادن و فلزات", "symbol": "ومعادن"},
+    {"name": "تجلی توسعه معادن و فلزات", "symbol": "تجلی"},
+    {"name": "گروه مدیریت سرمایه‌گذاری امید", "symbol": "وامید"},
+    {"name": "سرمایه‌گذاری صدر تأمین", "symbol": "تاصیکو"},
+    {"name": "هلدینگ صنایع معدنی خاورمیانه", "symbol": "میدکو"},
+    {"name": "صنایع و معادن احیاء سپاهان", "symbol": "واحیا"},
+    {"name": "بین‌المللی توسعه صنایع و معادن غدیر", "symbol": "وغدیر"},
+    {"name": "گروه صنایع معادن فلات ایرانیان", "symbol": "فلات"},
+    {"name": "معدنی و صنعتی گل‌گهر", "symbol": "کگل"},
+    {"name": "معدنی و صنعتی چادرملو", "symbol": "کچاد"},
+    {"name": "سنگ آهن گهرزمین", "symbol": "کگهر"},
+    {"name": "توسعه معدنی و صنعتی صبانور", "symbol": "کنور"},
+    {"name": "فرآوری معدنی اپال کانی پارس", "symbol": "اپال"},
+    {"name": "فولاد مبارکه اصفهان", "symbol": "فولاد"},
+    {"name": "فولاد خوزستان", "symbol": "فخوز"},
+    {"name": "فولاد هرمزگان جنوب", "symbol": "هرمز"},
+    {"name": "آهن و فولاد ارفع", "symbol": "ارفع"},
+    {"name": "فولاد خراسان", "symbol": "فخاس"},
+    {"name": "فولاد امیرکبیر کاشان", "symbol": "فاما"},
+    {"name": "فولاد کاوه جنوب کیش", "symbol": "کاوه"},
+    {"name": "ذوب آهن اصفهان", "symbol": "ذوب"},
+    {"name": "جهان فولاد سیرجان", "symbol": "فجهان"},
+    {"name": "فولاد سیرجان ایرانیان", "symbol": "فسپا"},
+    {"name": "ملی صنایع مس ایران", "symbol": "فملی"},
+    {"name": "کارخانجات تولیدی شهید قندی", "symbol": "بکام"},
+]
+
+
+def _jalali_year_start_ms(jy: int) -> int:
+    known = {
+        1400: 1616284800000,  # 2021-03-21
+        1401: 1647820800000,
+        1402: 1679356800000,
+        1403: 1710892800000,  # 2024-03-20
+        1404: 1742515200000,  # 2025-03-21
+        1405: 1774051200000,  # 2026-03-21
+        1406: 1805587200000,
+    }
+    if jy in known:
+        return known[jy]
+    gy = jy + 621
+    return int(datetime(gy, 3, 21, tzinfo=timezone.utc).timestamp() * 1000)
+
+
+def _pct(a: float | None, b: float | None) -> float | None:
+    if a is None or b is None or not (a > 0):
+        return None
+    return round((b / a - 1) * 100, 2)
+
+
+def _closest_before(closes: list[tuple[int, float]], ts_target: int) -> float | None:
+    best = None
+    for ts, v in closes:
+        if ts <= ts_target:
+            best = v
+        else:
+            break
+    return best
+
+
+def scrape_mineral_stock_symbol(symbol: str) -> dict:
+    """Adjusted closes from Shakhesban embedded Highcharts candle history."""
+    url = f"https://www.shakhesban.com/markets/stock/{urllib.parse.quote(symbol)}"
+    html = fetch(
+        url,
+        timeout=90,
+        headers={
+            "Accept": "text/html,application/xhtml+xml",
+            "Referer": "https://www.shakhesban.com/",
+        },
+    ).decode("utf-8", errors="replace")
+    m = re.search(
+        r'\$\("#chart-candle-history"\)\.msHighcharts\(\{\s*chartData:\s*(\[\[.*?\]\])',
+        html,
+        re.S,
+    )
+    closes: list[tuple[int, float]] = []
+    if m:
+        try:
+            data = json.loads(m.group(1))
+            for row in data:
+                if not isinstance(row, list) or len(row) < 2:
+                    continue
+                ts = int(row[0])
+                close = float(row[1])
+                if close > 0:
+                    closes.append((ts, close))
+        except Exception:  # noqa: BLE001
+            closes = []
+
+    def pick(col: str) -> float | None:
+        a = re.search(rf'data-col="{re.escape(col)}"[^>]*data-val="([^"]*)"', html)
+        if a:
+            return num(a.group(1))
+        b = re.search(rf'data-val="([^"]*)"[^>]*data-col="{re.escape(col)}"', html)
+        return num(b.group(1)) if b else None
+
+    last_price = pick("info.last_trade.PDrCotVal")
+    close_price = pick("info.last_price.PClosing")
+    daily_pct = pick("info.last_trade.last_change_percentage")
+    mv = pick("trades.arzesh_bazar")
+    tv = pick("trades.QTotCap")
+    vol = pick("trades.QTotTran5J")
+
+    week_pct = month_pct = ytd_pct = None
+    adj_close = None
+    stale = False
+    if closes:
+        last_ts, last = closes[-1]
+        adj_close = last
+        age_days = (time.time() * 1000 - last_ts) / 86400000
+        stale = age_days > 10
+        if not stale:
+            week_pct = _pct(_closest_before(closes, last_ts - 7 * 86400 * 1000), last)
+            month_pct = _pct(_closest_before(closes, last_ts - 30 * 86400 * 1000), last)
+            try:
+                import jdatetime  # type: ignore
+
+                jy = jdatetime.datetime.now().year
+            except Exception:
+                jy = 1405
+            ytd_anchor = _jalali_year_start_ms(jy)
+            y0 = _closest_before(closes, ytd_anchor)
+            if y0 is None:
+                for ts, v in closes:
+                    if ts >= ytd_anchor:
+                        y0 = v
+                        break
+            ytd_pct = _pct(y0, last)
+
+    price = last_price or close_price or adj_close
+    adjusted = (not stale) and (week_pct is not None or ytd_pct is not None)
+    return {
+        "symbol": symbol,
+        "closePrice": close_price or price,
+        "lastPrice": last_price or price,
+        "dailyPct": daily_pct,
+        "weekPct": week_pct if adjusted else None,
+        "monthPct": month_pct if adjusted else None,
+        "ytdPct": ytd_pct if adjusted else None,
+        "marketValueBr": round(mv / 1e9) if mv else None,
+        "volume": vol,
+        "tradeValueMr": round(tv / 1e6) if tv else None,
+        "returnsAdjusted": adjusted,
+        "returnsSource": "shakhesban-stale" if stale else "shakhesban-adjusted-chart",
+        "candleCount": len(closes),
+    }
+
+
+def scrape_mineral_stocks() -> list[dict]:
+    out: list[dict] = []
+    for row in MINERAL_STOCKS:
+        sym = row["symbol"]
+        try:
+            snap = scrape_mineral_stock_symbol(sym)
+            snap["name"] = row["name"]
+            out.append(snap)
+            print(f"  mineral {sym}: ytd={snap.get('ytdPct')} week={snap.get('weekPct')} candles={snap.get('candleCount')}")
+        except Exception as exc:  # noqa: BLE001
+            print(f"  mineral {sym}: FAIL {exc}")
+            out.append(
+                {
+                    "symbol": sym,
+                    "name": row["name"],
+                    "returnsAdjusted": False,
+                    "returnsSource": "error",
+                    "error": str(exc),
+                }
+            )
+        time.sleep(0.15)
+    return out
+
+
 def parse_shakhesban_tbody(tbody: str) -> list[dict]:
     rows: list[dict] = []
     for m in re.finditer(r'<tr\s+data-symbol="([^"]+)">(.*?)</tr>', tbody, re.S):
@@ -1694,6 +1900,15 @@ def main() -> int:
     print("TGJU histories…")
     histories = {k: scrape_tgju_history(k) for k in HIST_KEYS}
 
+    print("TGJU OHLC from 2022…")
+    candle_histories = {k: scrape_tgju_ohlc_from(k, "2022/01/01") for k in HIST_KEYS}
+    for k, rows in candle_histories.items():
+        print(f"  candles {k}: {len(rows)}")
+        if rows and k in histories:
+            histories[k] = [
+                {"date": c["date"], "dateJalali": c["dateJalali"], "value": c["close"]} for c in rows
+            ]
+
     print("TEDPIX OHLC from 1401…")
     ohlc = scrape_tgju_ohlc("bourse", 2800)
     candles = candles_from_1401(ohlc)
@@ -1702,6 +1917,10 @@ def main() -> int:
             {"date": c["date"], "dateJalali": c["dateJalali"], "value": c["close"]} for c in candles
         ]
     print(f"candles1401={len(candles)}")
+
+    print("mineral stocks (adjusted returns from Shakhesban)…")
+    mineral_stocks = scrape_mineral_stocks()
+    print(f"mineralStocks={sum(1 for s in mineral_stocks if s.get('returnsAdjusted'))}/{len(mineral_stocks)}")
 
     print("parsistahlil market status…")
     pars = scrape_parsistahlil_market_status()
@@ -1838,9 +2057,12 @@ def main() -> int:
             "ime": "usually needs Iran IP",
             "custeel": "paid; interim uses TGJU iron-ore/steel-coil + FRED",
             "fred": "scripts/fetch_fred.py",
+            "shakhesbanCharts": "قیمت تعدیل‌شده سهام معدنی (هفته/ماه/سال جاری)",
         },
         "tgju": tgju,
         "histories": {k: v for k, v in histories.items() if v},
+        "candleHistories": {k: v for k, v in candle_histories.items() if v},
+        "mineralStocks": mineral_stocks,
         "candles1401": candles,
         "intraday": overview_live.get("intraday"),
         "overviewLive": overview_live,
@@ -1892,6 +2114,18 @@ def main() -> int:
 
     (OUT_DIR / "market.json").write_text(json.dumps(market, ensure_ascii=False, indent=2), encoding="utf-8")
     (OUT_DIR / "scraped.json").write_text(json.dumps(scraped, ensure_ascii=False, indent=2), encoding="utf-8")
+    (OUT_DIR / "mineral_stocks.json").write_text(
+        json.dumps(
+            {
+                "updatedAt": market["updatedAt"],
+                "source": "shakhesban-adjusted-chart",
+                "stocks": mineral_stocks,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
     print(f"wrote {OUT_DIR / 'market.json'}")
     print(f"tgju quotes={tgju.get('quoteCount')} histories={len(market['histories'])}")
     print(f"tsetmc ok={tsetmc.get('ok')} ime ok={ime.get('ok')} overview ok={overview_live.get('ok')}")

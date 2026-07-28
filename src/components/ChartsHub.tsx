@@ -1,6 +1,6 @@
 import type { FredBundle, HistoryPoint } from '../data/fetchers'
-import type { DashboardData } from '../data/types'
-import { PriceAreaChart } from './charts/Charts'
+import type { CandlePoint, DashboardData } from '../data/types'
+import { CandlestickChart, PriceAreaChart } from './charts/Charts'
 
 function toSeries(points?: HistoryPoint[]) {
   return (points || []).map((p) => ({
@@ -9,44 +9,48 @@ function toSeries(points?: HistoryPoint[]) {
   }))
 }
 
+const TGJU_CANDLE_BLOCKS: { key: string; title: string }[] = [
+  { key: 'bourse', title: 'شاخص کل بورس (TGJU)' },
+  { key: 'ons', title: 'انس طلا' },
+  { key: 'price_dollar_rl', title: 'دلار آزاد' },
+  { key: 'sekee', title: 'سکه بهار آزادی' },
+  { key: 'copper', title: 'مس جهانی' },
+  { key: 'aluminium', title: 'آلومینیوم' },
+  { key: 'zinc', title: 'روی جهانی' },
+  { key: 'oil_brent', title: 'نفت برنت' },
+  { key: 'crypto-bitcoin', title: 'بیت‌کوین' },
+  { key: 'base-us-iron-ore', title: 'سنگ‌آهن (جایگزین Custeel)' },
+  { key: 'base-us-steel-coil', title: 'ورق گرم آمریکا' },
+]
+
 export function ChartsHub({
   histories,
+  candles,
   fred,
 }: {
   data: DashboardData
   histories: Record<string, HistoryPoint[]>
+  candles?: Record<string, CandlePoint[]>
   fred: Record<string, FredBundle>
 }) {
-  const blocks: { title: string; color: string; series: { label: string; value: number }[] }[] = [
-    { title: 'شاخص کل بورس (TGJU)', color: '#0b3d6e', series: toSeries(histories.bourse) },
-    { title: 'انس طلا', color: '#b45309', series: toSeries(histories.ons) },
-    { title: 'دلار آزاد', color: '#0e7490', series: toSeries(histories.price_dollar_rl) },
-    { title: 'سکه بهار آزادی', color: '#a16207', series: toSeries(histories.sekee) },
-    { title: 'مس جهانی', color: '#b45309', series: toSeries(histories.copper) },
-    { title: 'آلومینیوم', color: '#475569', series: toSeries(histories.aluminium) },
-    { title: 'روی جهانی', color: '#64748b', series: toSeries(histories.zinc) },
-    { title: 'نفت برنت', color: '#1e3a5f', series: toSeries(histories.oil_brent) },
-    { title: 'بیت‌کوین', color: '#c2410c', series: toSeries(histories['crypto-bitcoin']) },
-    { title: 'سنگ‌آهن (جایگزین Custeel)', color: '#334155', series: toSeries(histories['base-us-iron-ore']) },
-    { title: 'ورق گرم آمریکا', color: '#1a5f9e', series: toSeries(histories['base-us-steel-coil']) },
-  ]
+  const fredBlocks: { title: string; color: string; series: { label: string; value: number }[] }[] = []
 
   if (fred.fred_iron_ore?.history?.length) {
-    blocks.push({
+    fredBlocks.push({
       title: 'سنگ‌آهن ماهانه FRED',
       color: '#0f766e',
       series: fred.fred_iron_ore.history.map((h) => ({ label: h.date.slice(2, 7), value: h.value })),
     })
   }
   if (fred.fred_dxy?.history?.length) {
-    blocks.push({
+    fredBlocks.push({
       title: 'شاخص دلار FRED',
       color: '#1d4ed8',
       series: fred.fred_dxy.history.map((h) => ({ label: h.date.slice(5), value: h.value })),
     })
   }
   if (fred.fred_dgs10?.history?.length) {
-    blocks.push({
+    fredBlocks.push({
       title: 'بازدهی اوراق ۱۰ساله آمریکا',
       color: '#7c2d12',
       series: fred.fred_dgs10.history.map((h) => ({ label: h.date.slice(5), value: h.value })),
@@ -58,11 +62,34 @@ export function ChartsHub({
       <div>
         <h2 className="section-title">نمودار قیمت‌های گزارش روزانه</h2>
         <p className="section-sub">
-          تاریخچه زنده از TGJU و سری‌های کلان از FRED — مطابق اقلام گزارش اکسل/PDF
+          کندل OHLC از TGJU از ۲۰۲۲ تا امروز (هفتگی برای خوانایی) · سری‌های کلان FRED به صورت خطی
         </p>
       </div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {blocks.map((b) => (
+        {TGJU_CANDLE_BLOCKS.map((b) => {
+          const ohlc = candles?.[b.key] || []
+          const fallback = toSeries(histories[b.key])
+          return (
+            <div key={b.key} className="panel p-3">
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <h3 className="text-sm font-bold text-[var(--color-brand)]">{b.title}</h3>
+                {ohlc.length ? (
+                  <span className="chip chip-live text-[10px]">کندل · از ۲۰۲۲</span>
+                ) : null}
+              </div>
+              {ohlc.length ? (
+                <CandlestickChart data={ohlc} height={200} ariaLabel={`کندل ${b.title}`} />
+              ) : fallback.length ? (
+                <PriceAreaChart data={fallback} color="#0b3d6e" height={200} />
+              ) : (
+                <div className="grid h-[200px] place-items-center text-xs text-[var(--color-muted)]">
+                  در حال دریافت تاریخچه…
+                </div>
+              )}
+            </div>
+          )
+        })}
+        {fredBlocks.map((b) => (
           <div key={b.title} className="panel p-3">
             <h3 className="mb-1 text-sm font-bold text-[var(--color-brand)]">{b.title}</h3>
             {b.series.length ? (

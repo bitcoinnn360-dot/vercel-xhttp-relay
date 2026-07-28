@@ -34,7 +34,7 @@ function useActiveSection() {
 }
 
 export default function App() {
-  const { data, histories, fred, sectors, scrapeMeta, loading, refreshing, error, refresh } = useMarketData()
+  const { data, histories, candles, fred, sectors, scrapeMeta, loading, refreshing, error, refresh } = useMarketData()
   const active = useActiveSection()
 
   return (
@@ -64,7 +64,7 @@ export default function App() {
             )}
             <MarketOverview data={data} histories={histories} />
             <GuruMarketTabs data={data} histories={histories} fred={fred} sectors={sectors} />
-            <ChartsHub data={data} histories={histories} fred={fred} />
+            <ChartsHub data={data} histories={histories} candles={candles} fred={fred} />
             <StocksSection data={data} />
             <NavSection data={data} />
             <CommoditiesSection data={data} />

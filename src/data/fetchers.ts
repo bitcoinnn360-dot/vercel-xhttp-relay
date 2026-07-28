@@ -1,5 +1,6 @@
-import type { CommodityQuote, DashboardData, SourceStatus } from './types'
+import type { CandlePoint, CommodityQuote, DashboardData, SourceStatus } from './types'
 import { seedDashboard } from './seed'
+import { MINERAL_SYMBOL_BY_NAME } from './mineralUniverse'
 
 const TGJU_AJAX = 'https://call2.tgju.org/ajax.json'
 const TGJU_HIST = 'https://api.tgju.org/v1/market/indicator/summary-table-data'
@@ -61,6 +62,24 @@ export interface FredBundle {
   history: HistoryPoint[]
 }
 
+/** Snapshot of a mineral equity with adjusted period returns (from Shakhesban chart). */
+export interface MineralStockSnap {
+  symbol: string
+  name?: string
+  closePrice?: number
+  lastPrice?: number
+  dailyPct?: number
+  weekPct?: number
+  monthPct?: number
+  ytdPct?: number
+  marketValueBr?: number
+  volume?: number
+  tradeValueMr?: number
+  returnsAdjusted?: boolean
+  returnsSource?: string
+  candleCount?: number
+}
+
 export interface IntradayPoint {
   time: string
   value: number
@@ -70,6 +89,7 @@ export interface IntradayPoint {
 export interface LiveBundle {
   data: DashboardData
   histories: Record<string, HistoryPoint[]>
+  candles: Record<string, CandlePoint[]>
   fred: Record<string, FredBundle>
   sectors: { name: string; color: string; count: number; avgChangePct: number; members: string[] }[]
   scrapeMeta: {
@@ -107,6 +127,31 @@ async function fetchTgjuHistory(key: string, limit = 90): Promise<HistoryPoint[]
       }))
       .filter((p) => Number.isFinite(p.value))
       .reverse()
+  } catch {
+    return []
+  }
+}
+
+/** Full OHLC from TGJU, filtered from `fromGreg` (YYYY/MM/DD). Newest-first API → reverse. */
+async function fetchTgjuOhlc(key: string, fromGreg = '2022/01/01'): Promise<CandlePoint[]> {
+  try {
+    const res = await fetch(`${TGJU_HIST}/${key}`, { headers: { Accept: 'application/json' } })
+    if (!res.ok) return []
+    const json = (await res.json()) as { data?: string[][] }
+    const out: CandlePoint[] = []
+    for (const row of json.data || []) {
+      if (!Array.isArray(row) || row.length < 8) continue
+      const date = String(row[6] || '').replace(/-/g, '/').slice(0, 10)
+      if (!date || date < fromGreg) break // newest-first
+      const open = parseFaNumber(row[0])
+      const low = parseFaNumber(row[1])
+      const high = parseFaNumber(row[2])
+      const close = parseFaNumber(row[3])
+      if (![open, low, high, close].every(Number.isFinite)) continue
+      out.push({ date, dateJalali: String(row[7] || ''), open, high, low, close })
+    }
+    out.reverse()
+    return out
   } catch {
     return []
   }
@@ -258,6 +303,8 @@ function markSources(base: DashboardData, liveCount: number, fredOk: number, now
 
 async function fetchScrapedMarket(): Promise<{
   histories: Record<string, HistoryPoint[]>
+  candleHistories?: Record<string, CandlePoint[]>
+  mineralStocks?: MineralStockSnap[]
   sectors: LiveBundle['sectors']
   meta: LiveBundle['scrapeMeta']
   overviewLive?: {
@@ -306,6 +353,8 @@ async function fetchScrapedMarket(): Promise<{
     const json = (await res.json()) as {
       updatedAt?: string
       histories?: Record<string, HistoryPoint[]>
+      candleHistories?: Record<string, CandlePoint[]>
+      mineralStocks?: MineralStockSnap[]
       sectors?: LiveBundle['sectors']
       tsetmc?: { ok?: boolean }
       ime?: { ok?: boolean }
@@ -364,6 +413,8 @@ async function fetchScrapedMarket(): Promise<{
       : json.overviewLive
     return {
       histories: json.histories || {},
+      candleHistories: json.candleHistories,
+      mineralStocks: json.mineralStocks,
       sectors: json.sectors || [],
       meta: {
         updatedAt: json.updatedAt,
@@ -869,22 +920,83 @@ function applyOverviewLive(
   return true
 }
 
+async function fetchMineralStocksApi(): Promise<MineralStockSnap[] | null> {
+  const endpoints = ['/api/stocks', '/data/mineral_stocks.json']
+  for (const endpoint of endpoints) {
+    try {
+      const res = await fetch(endpoint, { cache: 'no-store' })
+      if (!res.ok) continue
+      const json = (await res.json()) as { ok?: boolean; stocks?: MineralStockSnap[] } | MineralStockSnap[]
+      if (Array.isArray(json)) return json.length ? json : null
+      if (json.stocks?.length) return json.stocks
+    } catch {
+      // try next
+    }
+  }
+  return null
+}
+
+function applyMineralStockReturns(base: DashboardData, snaps: MineralStockSnap[] | null | undefined) {
+  if (!snaps?.length) {
+    // still attach symbols from universe
+    for (const s of base.stocks) {
+      if (s.isIndustry) continue
+      const sym = MINERAL_SYMBOL_BY_NAME[s.name]
+      if (sym) s.symbol = sym
+    }
+    return
+  }
+  const bySym = new Map(snaps.map((r) => [r.symbol, r]))
+
+  const usd = base.overview.usdRate || seedDashboard.overview.usdRate || 1
+  for (const s of base.stocks) {
+    if (s.isIndustry) continue
+    const sym = MINERAL_SYMBOL_BY_NAME[s.name]
+    if (sym) s.symbol = sym
+    const snap = sym ? bySym.get(sym) : undefined
+    if (!snap) continue
+
+    if (snap.closePrice != null && snap.closePrice > 0) s.closePrice = snap.closePrice
+    else if (snap.lastPrice != null && snap.lastPrice > 0) s.closePrice = snap.lastPrice
+    if (snap.dailyPct != null && Number.isFinite(snap.dailyPct)) s.dailyPct = snap.dailyPct
+    // Only overwrite period returns when adjusted series is fresh
+    if (snap.returnsAdjusted) {
+      if (snap.weekPct != null && Number.isFinite(snap.weekPct)) s.weekPct = snap.weekPct
+      if (snap.monthPct != null && Number.isFinite(snap.monthPct)) s.monthPct = snap.monthPct
+      if (snap.ytdPct != null && Number.isFinite(snap.ytdPct)) s.ytdPct = snap.ytdPct
+      s.returnsAdjusted = true
+      s.returnsSource = snap.returnsSource || 'shakhesban-adjusted-chart'
+    }
+    if (snap.volume != null && snap.volume > 0) s.volume = snap.volume
+    if (snap.tradeValueMr != null && snap.tradeValueMr > 0) s.tradeValueMr = snap.tradeValueMr
+    if (snap.marketValueBr != null && snap.marketValueBr > 0) {
+      s.marketValueBr = snap.marketValueBr
+      // ارزش دلاری: میلیارد ریال / نرخ دلار
+      s.marketValueUsdM = Math.round((snap.marketValueBr * 1_000_000_000) / usd / 1_000_000)
+    }
+  }
+}
+
 export async function loadDashboardBundle(): Promise<LiveBundle> {
   const base: DashboardData = structuredClone(seedDashboard)
   const now = new Date().toISOString()
 
-  const [current, histEntries, fredEntries, scraped, overviewApi, intradayFallback] = await Promise.all([
-    fetchTgjuAjax(),
-    Promise.all(HIST_KEYS.map(async (k) => [k, await fetchTgjuHistory(k)] as const)),
-    Promise.all(FRED_SERIES.map(async (s) => [s.mapTo || s.id, await fetchFred(s.id, s.label)] as const)),
-    fetchScrapedMarket(),
-    fetchOverviewApi(),
-    fetchTgjuIntraday(),
-  ])
+  const [current, histEntries, candleEntries, fredEntries, scraped, overviewApi, intradayFallback, stocksApi] =
+    await Promise.all([
+      fetchTgjuAjax(),
+      Promise.all(HIST_KEYS.map(async (k) => [k, await fetchTgjuHistory(k)] as const)),
+      Promise.all(HIST_KEYS.map(async (k) => [k, await fetchTgjuOhlc(k, '2022/01/01')] as const)),
+      Promise.all(FRED_SERIES.map(async (s) => [s.mapTo || s.id, await fetchFred(s.id, s.label)] as const)),
+      fetchScrapedMarket(),
+      fetchOverviewApi(),
+      fetchTgjuIntraday(),
+      fetchMineralStocksApi(),
+    ])
 
   const liveCount = applyLiveQuotes(base, current)
   const overviewLiveOk = applyOverviewLive(base, scraped?.overviewLive, scraped?.candles1401)
   const freshOk = applyFreshOverview(base, overviewApi, intradayFallback)
+  applyMineralStockReturns(base, stocksApi || scraped?.mineralStocks)
   const apiImpacts = normalizeImpacts(overviewApi?.impacts)
   if (apiImpacts && (overviewApi?.impactsFromSourceArena || overviewApi?.impactsFromRahavard || overviewApi?.impactsSource)) {
     base.impacts = apiImpacts
@@ -935,6 +1047,22 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   for (const [k, pts] of histEntries) {
     if (k === 'bourse' && (histories.bourse?.length || 0) > pts.length) continue
     if (pts.length) histories[k] = pts
+  }
+
+  const candles: Record<string, CandlePoint[]> = { ...(scraped?.candleHistories || {}) }
+  for (const [k, pts] of candleEntries) {
+    if (pts.length) candles[k] = pts
+    else if (!candles[k]?.length && histories[k]?.length) {
+      // degrade: synthesize flat candles from close-only history
+      candles[k] = histories[k].map((p) => ({
+        date: p.date,
+        dateJalali: p.dateJalali,
+        open: p.value,
+        high: p.value,
+        low: p.value,
+        close: p.value,
+      }))
+    }
   }
 
   for (const c of base.commodities) {
@@ -1039,6 +1167,7 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   return {
     data: base,
     histories,
+    candles,
     fred,
     sectors: scraped?.sectors || [],
     scrapeMeta: {

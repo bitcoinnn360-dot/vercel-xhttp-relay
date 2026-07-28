@@ -478,8 +478,8 @@ export function BreadthBarChart({
 }
 
 /** Weekly OHLC aggregation so ~4y of daily candles stays readable */
-function toWeeklyCandles(rows: CandlePoint[]): CandlePoint[] {
-  if (rows.length <= 420) return rows
+function toWeeklyCandles(rows: CandlePoint[], maxDaily = 420): CandlePoint[] {
+  if (rows.length <= maxDaily) return rows
   const byWeek = new Map<string, CandlePoint>()
   for (const c of rows) {
     const d = new Date(c.date.replace(/\//g, '-'))
@@ -507,11 +507,16 @@ function toWeeklyCandles(rows: CandlePoint[]): CandlePoint[] {
 export function CandlestickChart({
   data,
   height = 280,
+  ariaLabel = 'نمودار شمعی',
+  weeklyIfLongerThan = 420,
 }: {
   data: CandlePoint[]
   height?: number
+  ariaLabel?: string
+  /** اگر تعداد کندل روزانه بیشتر از این باشد، هفتگی تجمیع می‌شود */
+  weeklyIfLongerThan?: number
 }) {
-  const rows = toWeeklyCandles(data)
+  const rows = toWeeklyCandles(data, weeklyIfLongerThan)
   if (!rows.length) {
     return (
       <div style={{ height }} className="flex items-center justify-center text-xs text-[var(--color-muted)]">
@@ -538,8 +543,8 @@ export function CandlestickChart({
   const xLabels = [0, Math.floor(rows.length / 2), rows.length - 1].filter((i, idx, arr) => arr.indexOf(i) === idx)
 
   return (
-    <div style={{ height }} className="w-full overflow-hidden">
-      <svg viewBox={`0 0 ${w} ${h}`} className="h-full w-full" role="img" aria-label="کندل شاخص کل از ۱۴۰۱">
+    <div style={{ height }} className="w-full overflow-hidden" dir="ltr">
+      <svg viewBox={`0 0 ${w} ${h}`} className="h-full w-full" role="img" aria-label={ariaLabel}>
         {yTicks.map((v) => (
           <g key={v}>
             <line x1={pad.left} x2={w - pad.right} y1={yScale(v)} y2={yScale(v)} stroke="#e2e8f0" strokeDasharray="3 3" />

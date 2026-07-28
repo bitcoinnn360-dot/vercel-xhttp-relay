@@ -103,6 +103,8 @@ export interface ImpactStock {
 export interface StockRow {
   group: string
   name: string
+  /** نماد تابلو (برای سهام، نه ردیف صنعت) */
+  symbol?: string
   marketValueBr: number
   marketValueUsdM: number
   volume: number
@@ -113,6 +115,9 @@ export interface StockRow {
   monthPct: number
   weekPct: number
   isIndustry?: boolean
+  /** بازدهی از قیمت تعدیل‌شده (افزایش سرمایه / سود تقسیمی) */
+  returnsAdjusted?: boolean
+  returnsSource?: string
 }
 
 export interface PortfolioHolding {

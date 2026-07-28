@@ -14,12 +14,19 @@ export function StocksSection({ data }: { data: DashboardData }) {
     return data.stocks.filter((s) => s.group === group)
   }, [data.stocks, group])
 
+  const adjustedCount = rows.filter((s) => s.returnsAdjusted && !s.isIndustry).length
+
   return (
     <section id="stocks" className="scroll-mt-28 space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="section-title">وضعیت معاملات سهام شرکت‌های معدنی و فلزی</h2>
-          <p className="section-sub">ارزش بازار، حجم، بازدهی روزانه تا سال جاری</p>
+          <p className="section-sub">
+            ارزش بازار، حجم، بازدهی روزانه تا سال جاری
+            {adjustedCount
+              ? ` · بازدهی هفته/ماه/سال از قیمت تعدیل‌شده شاخص‌بان (${adjustedCount} نماد)`
+              : ' · بازدهی دوره‌ای پس از بارگذاری نمودار تعدیل‌شده'}
+          </p>
         </div>
         <div className="flex flex-wrap gap-1.5">
           {GROUPS.map((g) => (
@@ -71,7 +78,17 @@ function StockTr({ s }: { s: StockRow }) {
   return (
     <tr className={s.isIndustry ? 'industry' : undefined}>
       <td>{s.group}</td>
-      <td className="font-semibold">{s.name}</td>
+      <td className="font-semibold">
+        {s.name}
+        {s.symbol ? (
+          <span className="mr-1 text-[10px] font-normal text-[var(--color-muted)]">({s.symbol})</span>
+        ) : null}
+        {s.returnsAdjusted ? (
+          <span className="mr-1 text-[9px] font-semibold text-emerald-700" title={s.returnsSource || 'تعدیل‌شده'}>
+            تعدیل‌شده
+          </span>
+        ) : null}
+      </td>
       <td className="num">{s.isIndustry ? '—' : fmtInt(s.marketValueBr)}</td>
       <td className="num">{s.isIndustry ? '—' : fmtInt(s.marketValueUsdM)}</td>
       <td className="num">{s.isIndustry || !s.volume ? '—' : fmtInt(s.volume)}</td>

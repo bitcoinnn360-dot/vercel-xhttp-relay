@@ -17,7 +17,7 @@ const CHART_IDS: { id: string; title: string; color: string }[] = [
   { id: 'br_pellet', title: 'گندله برزیل ۶۵٪ FOB', color: '#9a3412' },
   { id: 'tangshan_billet', title: 'بیلت تانگشان', color: '#0f766e' },
   { id: 'hr_shanghai', title: 'ورق گرم شانگهای', color: '#a16207' },
-  { id: 'rebar_beijing', title: 'میلگرد تانگشان', color: '#7c2d12' },
+  { id: 'rebar_beijing', title: 'میلگرد پکن ۱۶ میل', color: '#7c2d12' },
   { id: 'seaborne62', title: 'شاخص دریایی CSI ۶۲٪', color: '#334155' },
 ]
 

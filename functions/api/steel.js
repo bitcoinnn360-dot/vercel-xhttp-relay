@@ -11,61 +11,73 @@ const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
 
 const CUSTEEL_LOGIN =
-  'http://www.custeel.net/sec/dgserverlet?classname=login.LoginCtrl&method=loginInUiHomeByXmlHttp&ENG=yes'
-const CUSTEEL_PRICE = 'http://www.custeel.net/luliao/price_center_image_en.jsp'
-const CUSTEEL_INDICATORS = 'http://www.custeel.com/reform/title/indexup_en.html'
+  'https://www.custeel.net/sec/dgserverlet?classname=login.LoginCtrl&method=loginInUiHomeByXmlHttp&ENG=yes'
+const CUSTEEL_INDICATORS = 'https://www.custeel.com/reform/title/indexup_en.html'
 const IME_URL =
   'https://www.ime.co.ir/subsystems/ime/services/home/imedata.asmx/GetAmareMoamelatList'
 
-const SERIES = {
+/** Seaborne FOB from country articles — not price-center CFR/外盘. */
+const FOB_SERIES = {
   pb61: {
-    code: '001005001001008',
+    country: 'Australia',
+    desc: ['pb fines'],
+    grade: '61.5',
+    name: 'Australian PB fines 61.5% FOB',
     nameFa: 'نرمه استرالیا PB ۶۱.۵٪ FOB',
     region: 'global',
-    currency: 'usd',
-    basis: 'FOB',
     unit: 'دلار/تن FOB',
   },
   brbf: {
-    code: '001005001001005',
-    nameFa: 'نرمه کاراجاس برزیل ۶۵٪ FOB',
+    country: 'Brazil',
+    desc: ['brbf'],
+    grade: '62.5',
+    name: 'Brazilian BRBF fines 62.5% FOB',
+    nameFa: 'نرمه BRBF برزیل ۶۲.۵٪ FOB',
     region: 'global',
-    currency: 'usd',
-    basis: 'FOB',
     unit: 'دلار/تن FOB',
   },
   br_pellet: {
-    code: '001005001001007',
+    country: 'Brazil',
+    desc: ['brazilian pellets', 'pellets'],
+    grade: '65',
+    name: 'Brazilian pellets 65% FOB',
     nameFa: 'گندله برزیل ۶۵٪ FOB',
     region: 'global',
-    currency: 'usd',
-    basis: 'FOB',
     unit: 'دلار/تن FOB',
   },
-  tangshan_billet: {
-    code: '001002001001001',
-    nameFa: 'بیلت تانگشان',
-    region: 'china',
-    currency: 'cny',
-    basis: 'market',
-    unit: 'دلار/تن',
+  iran_conc: {
+    country: 'Iran',
+    desc: ['iranian concentrates', 'concentrates'],
+    grade: '67',
+    name: 'Iranian concentrates 67% FOB',
+    nameFa: 'کنسانتره ایران ۶۷٪ FOB',
+    region: 'iran',
+    unit: 'دلار/تن FOB',
   },
-  hr_shanghai: {
-    code: '001001001001005031',
-    nameFa: 'ورق گرم شانگهای',
-    region: 'china',
-    currency: 'cny',
-    basis: 'market',
-    unit: 'دلار/تن',
+  iran_hem: {
+    country: 'Iran',
+    desc: ['iranian hematite', 'hematite'],
+    grade: '62',
+    name: 'Iranian hematite fines 62% FOB',
+    nameFa: 'هماتیت ایران ۶۲٪ FOB',
+    region: 'iran',
+    unit: 'دلار/تن FOB',
   },
-  rebar_beijing: {
-    code: '001001001001002075',
-    nameFa: 'میلگرد تانگشان',
-    region: 'china',
-    currency: 'cny',
-    basis: 'market',
-    unit: 'دلار/تن',
+  chile_conc: {
+    country: 'Chile',
+    desc: ['chilean concentrates', 'concentrates'],
+    grade: '67',
+    name: 'Chilean concentrates 67% FOB',
+    nameFa: 'کنسانتره شیلی ۶۷٪ FOB',
+    region: 'global',
+    unit: 'دلار/تن FOB',
   },
+}
+
+const DOMESTIC_META = {
+  rebar_beijing: { name: 'Beijing Rebar 16mm HRB400E', nameFa: 'میلگرد پکن ۱۶ میل', region: 'china' },
+  hr_shanghai: { name: 'Shanghai HRC 3.0×1500 Q235B', nameFa: 'ورق گرم شانگهای', region: 'china' },
+  tangshan_billet: { name: 'Tangshan Billet 150×150', nameFa: 'بیلت تانگشان', region: 'china' },
 }
 
 const IME_PRODUCTS = [
@@ -140,7 +152,7 @@ async function custeelSession(env) {
   const url = `${CUSTEEL_LOGIN}&username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'User-Agent': UA, Referer: 'http://www.custeel.net/en/' },
+    headers: { 'User-Agent': UA, Referer: 'https://www.custeel.net/en/' },
     body: '',
   })
   const text = (await res.text()).trim()
@@ -148,73 +160,310 @@ async function custeelSession(env) {
   return cookieFromSetCookie(res.headers.getSetCookie?.() || res.headers.get('set-cookie'))
 }
 
-function parsePriceHtml(raw) {
-  const parts = String(raw).split('|')
-  const title = (parts[3] || '').replace(/<[^>]+>/g, '').trim()
-  const table = parts[2] || ''
-  const pts = []
-  const trs = table.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) || []
-  for (const tr of trs) {
-    const cells = [...tr.matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((m) =>
-      m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
-    )
-    if (cells.length < 2 || cells[0].toLowerCase() === 'date') continue
-    const v = num(cells[1])
-    if (cells[0] && v != null) pts.push({ date: cells[0].slice(0, 10), value: v })
+function tableRows(html) {
+  const rows = []
+  for (const tr of String(html).match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) || []) {
+    const cells = [...tr.matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)]
+      .map((m) => m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim())
+      .filter(Boolean)
+    if (cells.length) rows.push(cells)
   }
-  pts.reverse()
-  return { title, pts }
+  return rows
+}
+
+function articleTitle(html) {
+  const m = String(html).match(/formatTitle\("([^"]+)"/)
+  return m ? m[1] : ''
+}
+
+function absCusteel(href) {
+  if (!href) return ''
+  if (href.startsWith('http')) return href
+  return `https://www.custeel.net/en/${href.replace(/^\//, '')}`
+}
+
+function listLinks(html, flag, limit = 8) {
+  const out = []
+  const seen = new Set()
+  for (const m of String(html).matchAll(/href="(viewDetail\.do\?flag=(\d+)&id=[^"]+)"[^>]*>([^<]+)/gi)) {
+    const href = m[1]
+    const fl = Number(m[2])
+    const title = m[3].replace(/\s+/g, ' ').trim()
+    if (flag != null && fl !== flag) continue
+    if (seen.has(href)) continue
+    seen.add(href)
+    out.push({ href, title })
+    if (out.length >= limit) break
+  }
+  return out
+}
+
+function gradeMatches(cell, want) {
+  const g = String(cell || '').replace(/[^\d.]/g, '')
+  const w = String(want || '').replace(/[^\d.]/g, '')
+  if (!g || !w) return false
+  return Math.abs(Number(g) - Number(w)) < 0.05
+}
+
+function fobFromRows(rows, descNeedles, grade) {
+  let fobI, chgI, descI, gradeI
+  for (const row of rows) {
+    const low = row.map((c) => c.toLowerCase())
+    if (low.includes('fob') && (low.includes('description') || low.includes('grade'))) {
+      fobI = low.indexOf('fob')
+      chgI = low.indexOf('change')
+      descI = low.indexOf('description')
+      gradeI = low.indexOf('grade')
+      continue
+    }
+    if (fobI == null || descI == null) continue
+    const desc = (row[descI] || '').toLowerCase()
+    if (!descNeedles.some((n) => desc.includes(n.toLowerCase()))) continue
+    if (gradeI != null && row[gradeI] != null && !gradeMatches(row[gradeI], grade)) continue
+    const fob = num(row[fobI])
+    if (fob == null) continue
+    return { fob, change: chgI >= 0 ? num(row[chgI]) : null }
+  }
+  return null
+}
+
+function isSize16(size) {
+  return /^[^\d]*16(?:\s*mm)?$/i.test(String(size || '').trim())
+}
+
+function pickBeijingRebar(rows) {
+  const cands = []
+  for (const row of rows) {
+    if (row.length < 5) continue
+    if (row[0].toLowerCase() !== 'beijing' || row[1].toLowerCase() !== 'rebar') continue
+    if (!isSize16(row[2]) || !/hrb400/i.test(row[3])) continue
+    const price = num(row[4])
+    if (price == null) continue
+    const mill = row[5] || ''
+    cands.push({ rank: /hebei/i.test(mill) ? 0 : 1, price, change: num(row[6]), mill })
+  }
+  cands.sort((a, b) => a.rank - b.rank)
+  return cands[0] || null
+}
+
+function pickShanghaiHrc(rows) {
+  const cands = []
+  for (const row of rows) {
+    if (row.length < 5) continue
+    if (row[0].toLowerCase() !== 'shanghai' || row[1].toUpperCase() !== 'HRC') continue
+    const spec = row[2].replace(/\s+/g, '').toUpperCase()
+    const grade = row[3].toUpperCase()
+    const price = num(row[4])
+    if (price == null) continue
+    let rank = 99
+    if (spec.includes('3.0*1500') && grade.includes('Q235')) rank = 0
+    else if (spec.includes('5.5*1500')) rank = 1
+    else if (spec.includes('3.0*') && grade.includes('Q235')) rank = 2
+    else continue
+    cands.push({ rank, price, change: num(row[6]), note: `${spec} ${grade}` })
+  }
+  cands.sort((a, b) => a.rank - b.rank)
+  return cands[0] || null
+}
+
+function pickTangshanBillet(rows) {
+  for (const row of rows) {
+    const joined = row.join(' ').toLowerCase()
+    if (!joined.includes('tangshan') || !joined.includes('billet')) continue
+    if (/\bexcluded\b/.test(joined)) continue
+    const spec = row.join(' ').replace(/[×x]/gi, '*').toLowerCase()
+    if (!spec.includes('150*150')) continue
+    for (let i = 0; i < row.length; i++) {
+      if (!/^-?\d+(?:\.\d+)?$/.test(String(row[i]).trim())) continue
+      const price = num(row[i])
+      if (price == null || price < 1000 || price > 20000) continue
+      return { price, change: num(row[i + 1]), note: 'Common Carbon Square Billet(150*150)' }
+    }
+  }
+  return null
+}
+
+async function fetchText(url, cookie, attempts = 4) {
+  let lastErr
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          'User-Agent': UA,
+          Cookie: cookie || '',
+          Referer: 'https://www.custeel.net/en/',
+        },
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return await res.text()
+    } catch (err) {
+      lastErr = err
+      await new Promise((r) => setTimeout(r, 400 * (i + 1)))
+    }
+  }
+  throw lastErr || new Error(url)
+}
+
+function countryListUrl(country) {
+  const q = new URLSearchParams({
+    menuCode: '1006004',
+    typeCode: '1009001002',
+    title: country,
+    urlName: `Seaborne Iron Ore Price > ${country}`,
+  })
+  return `https://www.custeel.net/en/listMore.do?${q}`
 }
 
 async function scrapeCusteel(cookie, cnyUsd) {
   const steel = []
   const histories = {}
   let ok = 0
-  for (const [sid, meta] of Object.entries(SERIES)) {
-    const body = new URLSearchParams({
-      table: meta.code,
-      typeNum: '1',
-      quanxian: 'true',
-    })
-    const res = await fetch(CUSTEEL_PRICE, {
-      method: 'POST',
-      headers: {
-        'User-Agent': UA,
-        Cookie: cookie,
-        Referer: 'http://www.custeel.net/luliao/price_center_en.jsp',
-        Origin: 'http://www.custeel.net',
-        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-      },
-      body,
-    })
-    if (!res.ok) continue
-    const { title, pts } = parsePriceHtml(await res.text())
-    if (pts.length < 2) continue
-    const last = pts[pts.length - 1]
-    const prev = pts[pts.length - 2]
-    const lastUsd = meta.currency === 'cny' ? +(last.value * cnyUsd).toFixed(2) : +last.value.toFixed(2)
-    const prevUsd = meta.currency === 'cny' ? +(prev.value * cnyUsd).toFixed(2) : +prev.value.toFixed(2)
+
+  // Warm home (login cookies sometimes need a GET first).
+  try {
+    await fetchText('https://www.custeel.net/en/', cookie, 2)
+  } catch {
+    /* ignore */
+  }
+
+  const byCountry = {}
+  for (const [sid, meta] of Object.entries(FOB_SERIES)) {
+    ;(byCountry[meta.country] ||= []).push([sid, meta])
+  }
+
+  for (const [country, items] of Object.entries(byCountry)) {
+    let listHtml
+    try {
+      listHtml = await fetchText(countryListUrl(country), cookie)
+    } catch {
+      continue
+    }
+    const links = listLinks(listHtml, 5, 3)
+    const perSid = Object.fromEntries(items.map(([sid]) => [sid, []]))
+    for (const { href, title } of links) {
+      let html
+      try {
+        html = await fetchText(absCusteel(href), cookie)
+      } catch {
+        continue
+      }
+      const asOf = parseEnglishDate(articleTitle(html) || title)
+      if (!asOf) continue
+      const rows = tableRows(html)
+      for (const [sid, meta] of items) {
+        const hit = fobFromRows(rows, meta.desc, meta.grade)
+        if (!hit) continue
+        const pts = perSid[sid]
+        if (pts.length && pts[pts.length - 1].date === asOf) continue
+        pts.push({ date: asOf, value: hit.fob })
+      }
+    }
+    for (const [sid, meta] of items) {
+      const pts = [...perSid[sid]].reverse()
+      if (!pts.length) continue
+      const last = pts[pts.length - 1]
+      const prev = pts.length > 1 ? pts[pts.length - 2] : null
+      const change = prev ? +(last.value - prev.value).toFixed(3) : 0
+      const changePct = prev?.value ? +((change / prev.value) * 100).toFixed(2) : 0
+      steel.push({
+        id: sid,
+        name: meta.name,
+        nameFa: meta.nameFa,
+        value: +last.value.toFixed(2),
+        unit: meta.unit,
+        change,
+        changePct,
+        region: meta.region,
+        basis: 'FOB',
+        nativeValue: last.value,
+        nativeUnit: meta.unit,
+        asOf: last.date,
+        source: 'custeel-seaborne-fob',
+      })
+      histories[sid] = pts.map((p) => ({ date: p.date, value: +p.value.toFixed(3) }))
+      ok += 1
+    }
+  }
+
+  const domesticSpecs = [
+    {
+      id: 'rebar_beijing',
+      page: 'https://www.custeel.net/en/steelpz.do?id=011004',
+      need: ['beijing', 'rebar'],
+      pick: pickBeijingRebar,
+    },
+    {
+      id: 'hr_shanghai',
+      page: 'https://www.custeel.net/en/steelpz.do?id=011001',
+      need: ['shanghai', 'hr coil'],
+      pick: pickShanghaiHrc,
+    },
+    {
+      id: 'tangshan_billet',
+      page: 'https://www.custeel.net/en/steelpz.do?id=011008',
+      need: ['summarization of billet'],
+      pick: pickTangshanBillet,
+    },
+  ]
+
+  for (const spec of domesticSpecs) {
+    let page
+    try {
+      page = await fetchText(spec.page, cookie)
+    } catch {
+      continue
+    }
+    const links = listLinks(page, 3, 40).filter((l) =>
+      spec.need.every((n) => l.title.toLowerCase().includes(n)),
+    ).slice(0, 3)
+    const pts = []
+    for (const { href, title } of links) {
+      let html
+      try {
+        html = await fetchText(absCusteel(href), cookie)
+      } catch {
+        continue
+      }
+      const asOf = parseEnglishDate(articleTitle(html) || title)
+      if (!asOf) continue
+      const picked = spec.pick(tableRows(html))
+      if (!picked) continue
+      if (pts.length && pts[pts.length - 1].date === asOf) continue
+      pts.push({ date: asOf, value: picked.price, change: picked.change })
+    }
+    const chrono = [...pts].reverse()
+    if (!chrono.length) continue
+    const last = chrono[chrono.length - 1]
+    const prev = chrono.length > 1 ? chrono[chrono.length - 2] : null
+    const lastUsd = +(last.value * cnyUsd).toFixed(2)
+    const prevUsd = prev ? +(prev.value * cnyUsd).toFixed(2) : last.change != null
+      ? +((last.value - last.change) * cnyUsd).toFixed(2)
+      : lastUsd
     const change = +(lastUsd - prevUsd).toFixed(3)
     const changePct = prevUsd ? +((change / prevUsd) * 100).toFixed(2) : 0
+    const meta = DOMESTIC_META[spec.id]
     steel.push({
-      id: sid,
-      name: title || sid,
+      id: spec.id,
+      name: meta.name,
       nameFa: meta.nameFa,
       value: lastUsd,
-      unit: meta.unit || 'دلار/تن',
+      unit: 'دلار/تن',
       change,
       changePct,
       region: meta.region,
-      basis: meta.basis,
+      basis: 'market',
+      nativeValue: last.value,
+      nativeUnit: 'یوان/تن',
       asOf: last.date,
-      source: 'custeel-price-center',
+      source: 'custeel-steel-market',
     })
-    histories[sid] = pts.slice(-180).map((p) => ({
+    histories[spec.id] = chrono.map((p) => ({
       date: p.date,
-      value: meta.currency === 'cny' ? +(p.value * cnyUsd).toFixed(3) : +p.value.toFixed(3),
+      value: +(p.value * cnyUsd).toFixed(3),
     }))
     ok += 1
   }
+
   return { steel, histories, ok }
 }
 
@@ -225,7 +474,7 @@ function findIndicatorRow(rows, ...needles) {
   })
 }
 
-const CUSTEEL_HOME = 'http://www.custeel.net/en/'
+const CUSTEEL_HOME = 'https://www.custeel.net/en/'
 
 const MONTHS = {
   jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
@@ -257,7 +506,7 @@ async function scrapeTangshanBf(cookie) {
   const links = [...home.matchAll(/href="(viewDetail\.do\?flag=3&id=\d+)"[^>]*>\s*([^<]*BF Operating Rate in Tangshan[^<]*)/gi)]
   if (!links.length) return { ok: false, error: 'no BF links' }
   const href = links[0][1]
-  const url = href.startsWith('http') ? href : `http://www.custeel.net/en/${href}`
+  const url = href.startsWith('http') ? href : `https://www.custeel.net/en/${href}`
   const res = await fetch(url, { headers: { 'User-Agent': UA, Cookie: cookie || '' } })
   if (!res.ok) return { ok: false }
   const text = articlePlain(await res.text())
@@ -298,7 +547,7 @@ async function scrapeOrePortStocks(cookie) {
   if (!links.length) return { ok: false }
   const href = links[0][1]
   const title = links[0][2]
-  const url = href.startsWith('http') ? href : `http://www.custeel.net/en/${href}`
+  const url = href.startsWith('http') ? href : `https://www.custeel.net/en/${href}`
   const res = await fetch(url, { headers: { 'User-Agent': UA, Cookie: cookie || '' } })
   if (!res.ok) return { ok: false }
   const html = await res.text()
@@ -561,6 +810,9 @@ function mergeSteel(...lists) {
     'pb61',
     'brbf',
     'br_pellet',
+    'chile_conc',
+    'iran_conc',
+    'iran_hem',
     'ime_ore',
     'ime_conc',
     'ime_pellet',

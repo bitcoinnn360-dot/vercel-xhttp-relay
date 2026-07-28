@@ -58,6 +58,40 @@ export function StocksSection({ data }: { data: DashboardData }) {
   const liveCount = equities.filter((s) => s.returnsSource).length
   const flowSum = equities.reduce((a, s) => a + (s.netIndividualBt || 0), 0)
 
+  const totals = useMemo(() => {
+    if (!equities.length) return null
+    const mv = equities.reduce((a, s) => a + (s.marketValueBr || 0), 0)
+    const usd = equities.reduce((a, s) => a + (s.marketValueUsdM || 0), 0)
+    const vol = equities.reduce((a, s) => a + (s.volume || 0), 0)
+    const tv = equities.reduce((a, s) => a + (s.tradeValueMr || 0), 0)
+    const net = equities.reduce((a, s) => a + (s.netIndividualBt || 0), 0)
+    const wAvg = (key: 'dailyPct' | 'weekPct' | 'monthPct' | 'ytdPct') => {
+      let num = 0
+      let den = 0
+      for (const s of equities) {
+        const w = s.marketValueBr || 0
+        const v = s[key]
+        if (w > 0 && v != null && Number.isFinite(v)) {
+          num += w * v
+          den += w
+        }
+      }
+      return den > 0 ? Math.round((num / den) * 100) / 100 : 0
+    }
+    return {
+      count: equities.length,
+      marketValueBr: mv,
+      marketValueUsdM: usd,
+      volume: vol,
+      tradeValueMr: tv,
+      netIndividualBt: Math.round(net * 100) / 100,
+      dailyPct: wAvg('dailyPct'),
+      weekPct: wAvg('weekPct'),
+      monthPct: wAvg('monthPct'),
+      ytdPct: wAvg('ytdPct'),
+    }
+  }, [equities])
+
   const sectorCards = useMemo(() => {
     const map = new Map<string, StockRow[]>()
     for (const s of data.stocks) {
@@ -184,6 +218,7 @@ export function StocksSection({ data }: { data: DashboardData }) {
                 <IndustryTr key={`${row.sector}-ind`} row={row} showSector={!equitiesInSector(displayRows, row.sector)} />
               ),
             )}
+            {totals ? <TotalsTr totals={totals} /> : null}
           </tbody>
         </table>
       </div>
@@ -297,6 +332,49 @@ function IndustryTr({
       <PctPill value={s.monthPct} />
       <PctPill value={s.ytdPct} />
       <FlowCell value={s.netIndividualBt} />
+    </tr>
+  )
+}
+
+function TotalsTr({
+  totals,
+}: {
+  totals: {
+    count: number
+    marketValueBr: number
+    marketValueUsdM: number
+    volume: number
+    tradeValueMr: number
+    netIndividualBt: number
+    dailyPct: number
+    weekPct: number
+    monthPct: number
+    ytdPct: number
+  }
+}) {
+  return (
+    <tr className="totals">
+      <td className="sector-cell totals-sector">
+        <div className="sector-stack">
+          <span className="sector-dot" style={{ background: '#0f172a' }} />
+          <span className="sector-label">کل صنایع</span>
+        </div>
+      </td>
+      <td className="font-semibold name-cell">
+        جمع کل
+        <span className="symbol-tag">{totals.count} نماد</span>
+        <span className="adj-tag">وزنی</span>
+      </td>
+      <td className="num">{fmtInt(totals.marketValueBr)}</td>
+      <td className="num">{fmtInt(totals.marketValueUsdM)}</td>
+      <td className="num">{fmtInt(totals.volume)}</td>
+      <td className="num">{fmtInt(totals.tradeValueMr)}</td>
+      <td className="num">—</td>
+      <PctPill value={totals.dailyPct} />
+      <PctPill value={totals.weekPct} />
+      <PctPill value={totals.monthPct} />
+      <PctPill value={totals.ytdPct} />
+      <FlowCell value={totals.netIndividualBt} />
     </tr>
   )
 }

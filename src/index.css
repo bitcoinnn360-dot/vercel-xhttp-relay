@@ -236,6 +236,45 @@
     font-weight: 700;
     border-top: 1px solid color-mix(in oklab, var(--color-brand-2) 25%, transparent);
   }
+  .data-table tr.totals td {
+    background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+    color: #f8fafc;
+    font-weight: 800;
+    border-top: 2px solid #0b3d6e;
+  }
+  .data-table tr.totals .num,
+  .data-table tr.totals .name-cell,
+  .data-table tr.totals .sector-label {
+    color: #f8fafc;
+  }
+  .data-table tr.totals .symbol-tag {
+    background: rgba(255, 255, 255, 0.12);
+    color: #e2e8f0;
+  }
+  .data-table tr.totals .adj-tag {
+    background: rgba(16, 185, 129, 0.2);
+    color: #6ee7b7;
+  }
+  .data-table tr.totals .pct-pill.pos {
+    background: rgba(16, 185, 129, 0.18);
+    color: #6ee7b7;
+  }
+  .data-table tr.totals .pct-pill.neg {
+    background: rgba(248, 113, 113, 0.18);
+    color: #fca5a5;
+  }
+  .data-table tr.totals .pct-pill.flat {
+    background: rgba(255, 255, 255, 0.08);
+    color: #cbd5e1;
+  }
+  .data-table tr.totals .flow-bar-wrap {
+    background: rgba(255, 255, 255, 0.1);
+  }
+  .data-table tr.totals .sector-cell,
+  .data-table tr.totals .totals-sector {
+    background: #0b1220 !important;
+    border-inline-end-color: rgba(255, 255, 255, 0.08);
+  }
   .data-table tr.halted td {
     opacity: 0.72;
   }

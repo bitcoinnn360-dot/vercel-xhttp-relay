@@ -17,31 +17,48 @@
       "flowGoldFunds": 0.0,
       "perCapitaBuy": 102.78,
       "perCapitaSell": 88.67
+    },
+    {
+      "time": "13:44",
+      "positive": 622,
+      "negative": 178,
+      "flat": 84,
+      "orderBuy": 6878.1,
+      "orderSell": 988.5,
+      "retailFlow": 998.0,
+      "flowStocks": 2252.4,
+      "flowEquityFunds": -713.2,
+      "flowFixedIncome": -541.2,
+      "flowBasicMetals": 84.7,
+      "flowMetalOres": 135.8,
+      "flowGoldFunds": -153.7,
+      "perCapitaBuy": 111.9,
+      "perCapitaSell": 88.59
     }
   ],
   "current": {
-    "asOf": "2026-07-28T07:29:09.134446+00:00",
-    "time": "10:59",
+    "asOf": "2026-07-28T10:14:57.419681+00:00",
+    "time": "13:44",
     "dateJalali": "1405/05/06",
     "source": "tradersarena",
     "breadth": {
-      "positive": 618,
-      "negative": 164,
-      "flat": 93,
-      "total": 875
+      "positive": 622,
+      "negative": 178,
+      "flat": 84,
+      "total": 884
     },
-    "orderBuyBillionToman": 11207.9,
-    "orderSellBillionToman": 1832.9,
-    "retailMoneyFlowBillionToman": -759.8,
-    "flowStocksBillionToman": 1181.0,
-    "flowEquityFundsBillionToman": -496.4,
-    "flowFixedIncomeBillionToman": -1444.4,
-    "flowBasicMetalsBillionToman": 37.3,
-    "flowMetalOresBillionToman": 43.9,
-    "flowGoldFundsBillionToman": 0.0,
-    "perCapitaBuyMillionToman": 102.78,
-    "perCapitaSellMillionToman": 88.67,
+    "orderBuyBillionToman": 6878.1,
+    "orderSellBillionToman": 988.5,
+    "retailMoneyFlowBillionToman": 998.0,
+    "flowStocksBillionToman": 2252.4,
+    "flowEquityFundsBillionToman": -713.2,
+    "flowFixedIncomeBillionToman": -541.2,
+    "flowBasicMetalsBillionToman": 84.7,
+    "flowMetalOresBillionToman": 135.8,
+    "flowGoldFundsBillionToman": -153.7,
+    "perCapitaBuyMillionToman": 111.9,
+    "perCapitaSellMillionToman": 88.59,
     "note": "داده زنده TradersArena · ورود پول بازار + صنایع"
   },
-  "updatedAt": "2026-07-28T07:29:09.134743+00:00"
+  "updatedAt": "2026-07-28T10:14:57.419995+00:00"
 }

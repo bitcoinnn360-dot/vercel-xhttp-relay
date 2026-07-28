@@ -20,7 +20,7 @@ export function SourceBar({ sources }: { sources: SourceStatus[] }) {
       <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
         <h2 className="section-title text-sm">وضعیت منابع داده</h2>
         <p className="section-sub m-0 text-[0.72rem]">
-          بورس از TGJU · کلان از FRED · فولاد چین موقت از TGJU/FRED تا Custeel
+          بورس از TGJU · کلان از FRED · فولاد چین از Custeel · بورس کالا از offer-stat
         </p>
       </div>
       <div className="flex flex-wrap gap-2">

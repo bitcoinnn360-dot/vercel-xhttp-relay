@@ -68,7 +68,7 @@ export default function App() {
             <StocksSection data={data} />
             <NavSection data={data} />
             <CommoditiesSection data={data} />
-            <SteelSection data={data} />
+            <SteelSection data={data} histories={histories} />
             <PeriodicSection data={data} />
             <FredMacroSection fred={fred} />
             <footer className="border-t border-[var(--color-line)] pt-5 text-center text-xs text-[var(--color-muted)]">

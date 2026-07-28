@@ -176,6 +176,9 @@ export interface SteelQuote {
   change: number
   changePct: number
   region: 'china' | 'iran' | 'global'
+  asOf?: string
+  source?: string
+  history?: { t: string; v: number }[]
 }
 
 export interface ImeSteelRow {
@@ -183,6 +186,8 @@ export interface ImeSteelRow {
   priceRialKg: number
   ratioToBilletPct: number
   tradeDate: string
+  source?: string
+  samples?: number
 }
 
 export interface PeriodicRow {
@@ -216,6 +221,7 @@ export interface DashboardData {
   imeChain: ImeSteelRow[]
   inventories: { label: string; value: number; wowChange: number }
   bfRate: { rate: number; wowChangePct: number }
+  billetStocks?: { label: string; value: number; wowChange: number }
   periodic: PeriodicRow[]
   sources: SourceStatus[]
   updatedAt: string

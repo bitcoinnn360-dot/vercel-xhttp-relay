@@ -22,7 +22,8 @@ npx wrangler pages deploy dist --project-name=arz-digital-dashboard --branch=mai
 | **FRED** | کلان جهانی (جایگزین Trading Economics): برنت، سنگ‌آهن، مس، شاخص دلار، اوراق ۱۰ساله |
 | **گزارش روزانه / seed** | NAV، جدول سهام معدنی، جریان پول، ضرایب IME |
 | **scripts/scrape_market.py** | اسکرپر اختیاری TSETMC/IME وقتی IP ایران در دسترس است |
-| **Custeel / Mysteel** | هنوز اشتراک لازم دارد؛ تا آن زمان TGJU+FRED |
+| **Custeel** | زنجیره فولاد چین (لاگین اشتراک) — `scripts/scrape_steel.py` / `/api/steel` |
+| **بورس کالا (IME)** | آمار فیزیکی `offer-stat` — از IP ایران؛ endpoint: `imedata.asmx/GetAmareMoamelatList` |
 
 ## ساختار مهم
 

@@ -19,7 +19,7 @@ const TGJU_CANDLE_BLOCKS: { key: string; title: string }[] = [
   { key: 'zinc', title: 'روی جهانی' },
   { key: 'oil_brent', title: 'نفت برنت' },
   { key: 'crypto-bitcoin', title: 'بیت‌کوین' },
-  { key: 'base-us-iron-ore', title: 'سنگ‌آهن (جایگزین Custeel)' },
+  { key: 'base-us-iron-ore', title: 'سنگ‌آهن (مرجع فرعی TGJU)' },
   { key: 'base-us-steel-coil', title: 'ورق گرم آمریکا' },
 ]
 

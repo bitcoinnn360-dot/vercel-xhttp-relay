@@ -99,6 +99,7 @@ export interface LiveBundle {
     updatedAt?: string
     tsetmcOk?: boolean
     imeOk?: boolean
+    custeelOk?: boolean
     infra?: Record<string, string>
     overviewApiAt?: string
   }
@@ -295,7 +296,7 @@ function markSources(base: DashboardData, liveCount: number, fredOk: number, now
       return {
         ...s,
         status: liveCount > 0 ? 'live' : 'seed',
-        note: 'موقت: TGJU iron-ore/steel-coil + FRED PIORECRUSDM تا اشتراک Custeel',
+        note: 'لاگین اشتراک — قیمت زنجیره چین (اسکرپر /api/steel)',
         lastOk: liveCount > 0 ? now : s.lastOk,
       }
     }
@@ -943,6 +944,128 @@ function applyOverviewLive(
   return true
 }
 
+type SteelChainBundle = {
+  ok?: boolean
+  updatedAt?: string
+  custeelOk?: boolean
+  imeOk?: boolean
+  steel?: DashboardData['steel']
+  imeChain?: DashboardData['imeChain']
+  inventories?: DashboardData['inventories'] | null
+  bfRate?: DashboardData['bfRate'] | null
+  billetStocks?: NonNullable<DashboardData['billetStocks']> | null
+  histories?: Record<string, { date: string; value: number }[]>
+  source?: string
+}
+
+async function fetchSteelChainApi(): Promise<SteelChainBundle | null> {
+  for (const endpoint of ['/api/steel', '/data/steel_chain.json']) {
+    try {
+      const res = await fetch(endpoint, { cache: 'no-store' })
+      if (!res.ok) continue
+      const json = (await res.json()) as SteelChainBundle
+      if (json?.ok || json?.steel?.length || json?.imeChain?.length) return json
+    } catch {
+      // try next
+    }
+  }
+  return null
+}
+
+function applySteelChain(base: DashboardData, bundle: SteelChainBundle | null | undefined) {
+  if (!bundle) return { custeelOk: false, imeOk: false }
+  const byId = new Map(base.steel.map((s) => [s.id, s]))
+  for (const row of bundle.steel || []) {
+    if (!row?.id) continue
+    const prev = byId.get(row.id)
+    byId.set(row.id, {
+      ...(prev || row),
+      ...row,
+      nameFa: row.nameFa || prev?.nameFa || row.name,
+      unit: row.unit || prev?.unit || 'دلار/تن',
+    })
+  }
+  // attach short history sparklines
+  if (bundle.histories) {
+    for (const [id, pts] of Object.entries(bundle.histories)) {
+      const row = byId.get(id)
+      if (!row || !pts?.length) continue
+      row.history = pts.slice(-60).map((p) => ({ t: p.date, v: p.value }))
+    }
+  }
+  const preferred = [
+    'seaborne62',
+    'portside62',
+    'pb61',
+    'brbf',
+    'chile_conc',
+    'iran_hem',
+    'iran_conc',
+    'br_pellet',
+    'ime_ore',
+    'ime_pellet',
+    'tangshan_billet',
+    'iran_export_billet',
+    'ime_billet',
+    'hr_shanghai',
+    'ime_hr',
+    'rebar_beijing',
+    'ime_rebar',
+    'ime_conc',
+    'ime_dri',
+  ]
+  const merged: DashboardData['steel'] = []
+  const seen = new Set<string>()
+  for (const id of preferred) {
+    const row = byId.get(id)
+    if (row) {
+      merged.push(row)
+      seen.add(id)
+    }
+  }
+  for (const [id, row] of byId) {
+    if (!seen.has(id)) merged.push(row)
+  }
+  base.steel = merged
+
+  if (bundle.imeChain?.length) base.imeChain = bundle.imeChain
+  if (bundle.inventories?.value != null) base.inventories = bundle.inventories
+  if (bundle.bfRate?.rate != null) base.bfRate = bundle.bfRate
+  if (bundle.billetStocks?.value != null) base.billetStocks = bundle.billetStocks
+
+  const custeelOk = Boolean(
+    bundle.custeelOk ||
+      bundle.source?.includes('custeel') ||
+      (bundle.steel || []).some((s) => String(s.source || '').includes('custeel')),
+  )
+  const imeOk = Boolean(
+    bundle.imeOk ||
+      (bundle.imeChain?.length && (bundle.source?.includes('ime') || (bundle.imeChain || []).some((r) => r.source?.includes('ime')))),
+  )
+  base.sources = base.sources.map((s) => {
+    if (s.id === 'custeel') {
+      return {
+        ...s,
+        status: custeelOk ? 'live' : s.status,
+        note: custeelOk ? `زنده · ${bundle.source || 'custeel'}` : s.note,
+        lastOk: custeelOk ? bundle.updatedAt || s.lastOk : s.lastOk,
+      }
+    }
+    if (s.id === 'ime') {
+      return {
+        ...s,
+        status: imeOk ? 'live' : bundle.imeOk === false ? 'blocked' : s.status,
+        note: imeOk
+          ? `آمار فیزیکی offer-stat · ${bundle.imeChain?.length || 0} قلم`
+          : 'IME از این محیط در دسترس نیست — IP ایران / VPS',
+        lastOk: imeOk ? bundle.updatedAt || s.lastOk : s.lastOk,
+      }
+    }
+    return s
+  })
+  return { custeelOk, imeOk }
+}
+
 async function fetchMineralStocksApi(): Promise<MineralStockSnap[] | null> {
   const endpoints = ['/api/stocks', '/data/mineral_stocks.json']
   for (const endpoint of endpoints) {
@@ -1072,7 +1195,7 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   const base: DashboardData = structuredClone(seedDashboard)
   const now = new Date().toISOString()
 
-  const [current, histEntries, candleEntries, fredEntries, scraped, overviewApi, intradayFallback, stocksApi] =
+  const [current, histEntries, candleEntries, fredEntries, scraped, overviewApi, intradayFallback, stocksApi, steelApi] =
     await Promise.all([
       fetchTgjuAjax(),
       Promise.all(HIST_KEYS.map(async (k) => [k, await fetchTgjuHistory(k)] as const)),
@@ -1082,12 +1205,14 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
       fetchOverviewApi(),
       fetchTgjuIntraday(),
       fetchMineralStocksApi(),
+      fetchSteelChainApi(),
     ])
 
   const liveCount = applyLiveQuotes(base, current)
   const overviewLiveOk = applyOverviewLive(base, scraped?.overviewLive, scraped?.candles1401)
   const freshOk = applyFreshOverview(base, overviewApi, intradayFallback)
   applyMineralStockReturns(base, stocksApi || scraped?.mineralStocks)
+  const steelStatus = applySteelChain(base, steelApi)
   const apiImpacts = normalizeImpacts(overviewApi?.impacts)
   if (apiImpacts && (overviewApi?.impactsFromSourceArena || overviewApi?.impactsFromRahavard || overviewApi?.impactsSource)) {
     base.impacts = apiImpacts
@@ -1138,6 +1263,13 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   for (const [k, pts] of histEntries) {
     if (k === 'bourse' && (histories.bourse?.length || 0) > pts.length) continue
     if (pts.length) histories[k] = pts
+  }
+  // Merge Custeel steel histories for ChartsHub / SteelSection
+  if (steelApi?.histories) {
+    for (const [id, pts] of Object.entries(steelApi.histories)) {
+      if (!pts?.length) continue
+      histories[`steel:${id}`] = pts.map((p) => ({ date: p.date, value: p.value }))
+    }
   }
 
   const candles: Record<string, CandlePoint[]> = { ...(scraped?.candleHistories || {}) }
@@ -1245,15 +1377,18 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   }
   base.sources = base.sources.map((s) => {
     if (s.id === 'ime') {
+      const liveIme = steelStatus.imeOk || scraped?.meta?.imeOk
       return {
         ...s,
-        status: scraped?.meta?.imeOk ? 'live' : 'seed',
-        note: scraped?.meta?.imeOk ? 'اسکرپر IME موفق' : 'IME از گزارش؛ اسکرپر کامل با IP ایران',
+        status: liveIme ? 'live' : 'blocked',
+        note: liveIme
+          ? 'آمار فیزیکی offer-stat'
+          : 'IME از این محیط در دسترس نیست — اسکرپر با IP ایران',
       }
     }
     return s
   })
-  base.updatedAt = overviewApi?.updatedAt || now
+  base.updatedAt = overviewApi?.updatedAt || steelApi?.updatedAt || now
 
   return {
     data: base,
@@ -1264,6 +1399,8 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
     scrapeMeta: {
       ...(scraped?.meta || {}),
       overviewApiAt: overviewApi?.updatedAt,
+      custeelOk: steelStatus.custeelOk,
+      imeOk: steelStatus.imeOk || scraped?.meta?.imeOk,
     },
   }
 }

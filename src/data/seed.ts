@@ -909,7 +909,7 @@ export const seedDashboard: DashboardData = {
     {
       id: 'rebar_beijing',
       name: 'Rebar Beijing',
-      nameFa: 'میلگرد پکن',
+      nameFa: 'میلگرد تانگشان',
       value: 480.2,
       unit: 'دلار/تن',
       change: 0.626,
@@ -944,6 +944,11 @@ export const seedDashboard: DashboardData = {
   bfRate: {
     rate: 90.36,
     wowChangePct: -3.62,
+  },
+  billetStocks: {
+    label: 'موجودی بیلت تانگشان',
+    value: 1868,
+    wowChange: -44.5,
   },
   periodic: [
     {
@@ -1148,13 +1153,13 @@ export const seedDashboard: DashboardData = {
       id: 'custeel',
       name: 'Custeel',
       status: 'seed',
-      note: 'موقت: TGJU/FRED تا اشتراک Mysteel/Custeel',
+      note: 'لاگین اشتراک — قیمت زنجیره چین + شاخص‌ها',
     },
     {
       id: 'ime',
       name: 'بورس کالا',
       status: 'seed',
-      note: 'از گزارش + اسکرپر scripts/scrape_market.py',
+      note: 'آمار معاملات فیزیکی offer-stat (نیاز به IP ایران)',
     },
   ],
   updatedAt: new Date().toISOString(),

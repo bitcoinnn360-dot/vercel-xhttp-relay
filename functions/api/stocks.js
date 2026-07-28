@@ -553,11 +553,11 @@ export async function onRequestGet(context) {
     note = 'بازدهی از قیمت تعدیل‌شده SourceArena'
   }
 
-  // Per-symbol / full static fill when BV cookie is dead (403: logged in elsewhere).
-  const usableLive = ordered.filter(
-    (s) => s.returnsSource !== 'error' && (s.ytdPct != null || s.closePrice != null || s.historyCount > 0),
-  )
-  if (usableLive.length < Math.max(8, Math.floor(MINERAL_STOCKS.length * 0.5))) {
+  // Fill remaining error stubs from last good static snapshot (expired/partial BV cookie).
+  const badCount = ordered.filter(
+    (s) => s.returnsSource === 'error' || !(s.ytdPct != null || s.closePrice != null || s.historyCount > 0),
+  ).length
+  if (badCount > 0) {
     const fallback = await loadStaticFallback(origin)
     if (fallback?.stocks?.length) {
       const fbBy = new Map(fallback.stocks.map((s) => [s.symbol, s]))
@@ -568,15 +568,19 @@ export async function onRequestGet(context) {
         const fb = fbBy.get(s.symbol)
         return fb ? { ...fb, name: s.name || fb.name } : s
       })
-      // If still mostly empty, take the whole static snapshot.
       const usable = ordered.filter(
         (s) => s.returnsSource !== 'error' && (s.ytdPct != null || s.closePrice != null),
       )
       if (usable.length < Math.max(8, Math.floor(MINERAL_STOCKS.length * 0.5))) {
         ordered = fallback.stocks
+        source = fallback.source || 'static-mineral_stocks'
+        note = 'fallback static — کوکی بورس‌ویو منقضی یا از دستگاه دیگر لاگین شده'
+      } else if (bvOk === 0) {
+        source = fallback.source || source
+        note = 'fallback static — کوکی بورس‌ویو منقضی یا از دستگاه دیگر لاگین شده'
+      } else if (badCount > 0) {
+        note = `${note} · ${badCount} نماد از snapshot استاتیک`
       }
-      source = fallback.source || 'static-mineral_stocks'
-      note = 'fallback static — کوکی بورس‌ویو منقضی یا از دستگاه دیگر لاگین شده'
     }
   }
 

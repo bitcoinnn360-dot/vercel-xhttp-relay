@@ -1,0 +1,141 @@
+import type { FredBundle, HistoryPoint } from '../data/fetchers'
+import type { CandlePoint, DashboardData } from '../data/types'
+import { CandlestickChart, PriceAreaChart } from './charts/Charts'
+
+function toSeries(points?: HistoryPoint[]) {
+  return (points || []).map((p) => ({
+    label: (p.dateJalali || p.date || '').slice(5),
+    value: p.value,
+  }))
+}
+
+const TGJU_CANDLE_BLOCKS: { key: string; title: string }[] = [
+  { key: 'bourse', title: 'شاخص کل بورس (TGJU)' },
+  { key: 'ons', title: 'انس طلا' },
+  { key: 'price_dollar_rl', title: 'دلار آزاد' },
+  { key: 'sekee', title: 'سکه بهار آزادی' },
+  { key: 'copper', title: 'مس جهانی' },
+  { key: 'aluminium', title: 'آلومینیوم' },
+  { key: 'zinc', title: 'روی جهانی' },
+  { key: 'oil_brent', title: 'نفت برنت' },
+  { key: 'crypto-bitcoin', title: 'بیت‌کوین' },
+  { key: 'base-us-iron-ore', title: 'سنگ‌آهن (جایگزین Custeel)' },
+  { key: 'base-us-steel-coil', title: 'ورق گرم آمریکا' },
+]
+
+export function ChartsHub({
+  histories,
+  candles,
+  fred,
+}: {
+  data: DashboardData
+  histories: Record<string, HistoryPoint[]>
+  candles?: Record<string, CandlePoint[]>
+  fred: Record<string, FredBundle>
+}) {
+  const fredBlocks: { title: string; color: string; series: { label: string; value: number }[] }[] = []
+
+  if (fred.fred_iron_ore?.history?.length) {
+    fredBlocks.push({
+      title: 'سنگ‌آهن ماهانه FRED',
+      color: '#0f766e',
+      series: fred.fred_iron_ore.history.map((h) => ({ label: h.date.slice(2, 7), value: h.value })),
+    })
+  }
+  if (fred.fred_dxy?.history?.length) {
+    fredBlocks.push({
+      title: 'شاخص دلار FRED',
+      color: '#1d4ed8',
+      series: fred.fred_dxy.history.map((h) => ({ label: h.date.slice(5), value: h.value })),
+    })
+  }
+  if (fred.fred_dgs10?.history?.length) {
+    fredBlocks.push({
+      title: 'بازدهی اوراق ۱۰ساله آمریکا',
+      color: '#7c2d12',
+      series: fred.fred_dgs10.history.map((h) => ({ label: h.date.slice(5), value: h.value })),
+    })
+  }
+
+  return (
+    <section id="charts" className="scroll-mt-8 space-y-4">
+      <div>
+        <h2 className="section-title">نمودار قیمت‌های گزارش روزانه</h2>
+        <p className="section-sub">
+          کندل OHLC از TGJU از ۲۰۲۲ تا امروز (هفتگی برای خوانایی) · سری‌های کلان FRED به صورت خطی
+        </p>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {TGJU_CANDLE_BLOCKS.map((b) => {
+          const ohlc = candles?.[b.key] || []
+          const fallback = toSeries(histories[b.key])
+          return (
+            <div key={b.key} className="panel p-3">
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <h3 className="text-sm font-bold text-[var(--color-brand)]">{b.title}</h3>
+                {ohlc.length ? (
+                  <span className="chip chip-live text-[10px]">کندل · از ۲۰۲۲</span>
+                ) : null}
+              </div>
+              {ohlc.length ? (
+                <CandlestickChart data={ohlc} height={200} ariaLabel={`کندل ${b.title}`} />
+              ) : fallback.length ? (
+                <PriceAreaChart data={fallback} color="#0b3d6e" height={200} />
+              ) : (
+                <div className="grid h-[200px] place-items-center text-xs text-[var(--color-muted)]">
+                  در حال دریافت تاریخچه…
+                </div>
+              )}
+            </div>
+          )
+        })}
+        {fredBlocks.map((b) => (
+          <div key={b.title} className="panel p-3">
+            <h3 className="mb-1 text-sm font-bold text-[var(--color-brand)]">{b.title}</h3>
+            {b.series.length ? (
+              <PriceAreaChart data={b.series} color={b.color} height={180} />
+            ) : (
+              <div className="grid h-[180px] place-items-center text-xs text-[var(--color-muted)]">
+                در حال دریافت تاریخچه…
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+export function FredMacroSection({ fred }: { fred: Record<string, FredBundle> }) {
+  const rows = Object.values(fred)
+  return (
+    <section id="macro" className="scroll-mt-8 space-y-4">
+      <div>
+        <h2 className="section-title">شاخص‌های کلان — FRED</h2>
+        <p className="section-sub">جایگزین Trading Economics · منبع: بانک فدرال رزرو سنت‌لوئیس</p>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {rows.length === 0 && (
+          <div className="panel p-4 text-sm text-[var(--color-muted)] md:col-span-2">
+            داده FRED روی دیپلوی Cloudflare از مسیر api فعال می‌شود. در حالت محلی اگر خالی بود، پس از
+            دیپلوی دوباره تازه‌سازی کنید.
+          </div>
+        )}
+        {rows.map((r) => (
+          <div key={r.id} className="panel p-3">
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-bold">{r.label}</h3>
+              <span className="chip chip-live">FRED</span>
+            </div>
+            <div className="kpi-value num text-[1.35rem]">{r.last == null ? '—' : r.last.toLocaleString('en-US')}</div>
+            <PriceAreaChart
+              data={r.history.map((h) => ({ label: h.date.slice(5), value: h.value }))}
+              color="#0b3d6e"
+              height={160}
+            />
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}

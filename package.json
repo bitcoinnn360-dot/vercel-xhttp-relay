@@ -1,7 +1,35 @@
 {
-  "name": "vercel-xhttp-relay",
-  "version": "1.0.0",
-  "description": "Edge-runtime XHTTP relay for Xray/V2Ray on Vercel",
+  "name": "midco-daily-market-dashboard",
   "private": true,
-  "license": "MIT"
+  "version": "1.0.0",
+  "type": "module",
+  "description": "داشبورد مدیریتی گزارش روزانه بازار — توسعه معادن و فلزات",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "scrape": "python3 scripts/scrape_market.py",
+    "fred": "python3 scripts/fetch_fred.py",
+    "data": "python3 scripts/scrape_market.py && python3 scripts/fetch_fred.py",
+    "deploy": "npm run data && npm run build && npx wrangler pages deploy dist --project-name=arz-digital-dashboard --branch=main"
+  },
+  "dependencies": {
+    "framer-motion": "^12.42.2",
+    "lucide-react": "^1.25.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "recharts": "^3.9.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^24.13.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "oxlint": "^1.71.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.1"
+  }
 }

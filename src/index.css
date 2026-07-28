@@ -1,0 +1,270 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-display: 'Vazirmatn', 'IBM Plex Sans', sans-serif;
+  --font-body: 'Vazirmatn', 'IBM Plex Sans', sans-serif;
+  --font-num: 'IBM Plex Sans', 'Vazirmatn', sans-serif;
+
+  --color-ink: #0f172a;
+  --color-ink-soft: #334155;
+  --color-muted: #64748b;
+  --color-paper: #f1f5f9;
+  --color-panel: #ffffff;
+  --color-line: #e2e8f0;
+  --color-brand: #0b3d6e;
+  --color-brand-2: #1a5f9e;
+  --color-accent: #0e7490;
+  --color-pos: #15803d;
+  --color-neg: #b91c1c;
+  --color-warn: #b45309;
+}
+
+@layer base {
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: var(--font-body);
+    color: var(--color-ink);
+    background:
+      linear-gradient(180deg, #e8eef5 0%, #f1f5f9 40%, #f8fafc 100%);
+  }
+  #root { min-height: 100vh; }
+  .num {
+    font-family: var(--font-num);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    direction: ltr;
+    unicode-bidi: plaintext;
+  }
+  .pos { color: var(--color-pos); }
+  .neg { color: var(--color-neg); }
+  .flat { color: var(--color-muted); }
+}
+
+@layer components {
+  .app-shell {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    min-height: 100vh;
+  }
+
+  .side-nav {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    background: linear-gradient(180deg, #0b3d6e 0%, #0a2f54 100%);
+    color: #e2e8f0;
+    padding: 1.1rem 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .side-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.35rem 0.5rem 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.12);
+    margin-bottom: 0.6rem;
+  }
+
+  .side-brand svg {
+    width: 1.5rem;
+    height: 1.5rem;
+    flex: none;
+  }
+
+  .side-link {
+    display: block;
+    border-radius: 8px;
+    padding: 0.55rem 0.7rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #cbd5e1;
+    text-decoration: none;
+    transition: 0.15s ease;
+  }
+  .side-link:hover,
+  .side-link[data-active='true'] {
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+  }
+
+  /* Mobile top nav — shown only when sidebar is hidden */
+  .mobile-nav {
+    display: none;
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: linear-gradient(180deg, #0b3d6e 0%, #0a2f54 100%);
+    color: #e2e8f0;
+    border-bottom: 1px solid rgba(255,255,255,0.12);
+  }
+  .mobile-nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.65rem 1rem 0.4rem;
+  }
+  .mobile-nav-brand svg {
+    width: 1.35rem;
+    height: 1.35rem;
+    flex: none;
+  }
+  .mobile-nav-links {
+    display: flex;
+    gap: 0.25rem;
+    overflow-x: auto;
+    padding: 0 0.65rem 0.55rem;
+    -webkit-overflow-scrolling: touch;
+  }
+  .mobile-nav-links a {
+    flex: none;
+    white-space: nowrap;
+    border-radius: 8px;
+    padding: 0.4rem 0.7rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #cbd5e1;
+    text-decoration: none;
+  }
+  .mobile-nav-links a:hover,
+  .mobile-nav-links a[data-active='true'] {
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+  }
+
+  .main-wrap {
+    width: min(1280px, calc(100% - 2rem));
+    margin-inline: auto;
+    padding: 1rem 0 2.5rem;
+    min-width: 0;
+    overflow-x: clip;
+  }
+
+  /* Recharts needs LTR coordinate space inside RTL pages */
+  .chart-ltr {
+    direction: ltr;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .panel {
+    background: var(--color-panel);
+    border: 1px solid var(--color-line);
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  }
+
+  .section-title {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: var(--color-brand);
+    letter-spacing: -0.01em;
+  }
+  .section-sub {
+    font-size: 0.8rem;
+    color: var(--color-muted);
+    margin-top: 0.15rem;
+  }
+
+  .kpi-label {
+    font-size: 0.72rem;
+    color: var(--color-muted);
+    font-weight: 600;
+  }
+  .kpi-value {
+    font-size: clamp(1.2rem, 2vw, 1.65rem);
+    font-weight: 700;
+    line-height: 1.15;
+    margin-top: 0.3rem;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    border: 1px solid var(--color-line);
+    background: #fff;
+  }
+  .chip-live {
+    border-color: color-mix(in oklab, var(--color-pos) 40%, var(--color-line));
+    color: var(--color-pos);
+    background: color-mix(in oklab, var(--color-pos) 8%, white);
+  }
+  .chip-blocked {
+    border-color: color-mix(in oklab, var(--color-neg) 35%, var(--color-line));
+    color: var(--color-neg);
+    background: color-mix(in oklab, var(--color-neg) 7%, white);
+  }
+  .chip-seed {
+    border-color: color-mix(in oklab, var(--color-brand-2) 30%, var(--color-line));
+    color: var(--color-brand);
+    background: color-mix(in oklab, var(--color-brand-2) 6%, white);
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+  }
+  .data-table th {
+    text-align: right;
+    padding: 0.55rem 0.45rem;
+    color: var(--color-muted);
+    font-weight: 700;
+    border-bottom: 1px solid var(--color-line);
+    background: #f8fafc;
+    white-space: nowrap;
+  }
+  .data-table td {
+    padding: 0.5rem 0.45rem;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .data-table tr.industry td {
+    background: #f0f7ff;
+    font-weight: 700;
+  }
+
+  .gf-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.85rem 0 1rem;
+    border-bottom: 1px solid var(--color-line);
+    margin-bottom: 1rem;
+  }
+
+  /* Recharts default tooltip items ignore contentStyle.color — force white text */
+  .recharts-default-tooltip {
+    color: #fff !important;
+  }
+  .recharts-default-tooltip,
+  .recharts-default-tooltip * {
+    color: #fff !important;
+  }
+  .recharts-tooltip-item,
+  .recharts-tooltip-item-name,
+  .recharts-tooltip-item-value,
+  .recharts-tooltip-item-separator,
+  .recharts-tooltip-label {
+    color: #fff !important;
+  }
+
+  /* MUST come after .side-nav { display:flex } / .main-wrap base so overrides win */
+  @media (max-width: 960px) {
+    .app-shell { grid-template-columns: 1fr; }
+    .side-nav { display: none !important; }
+    .mobile-nav { display: block; }
+    .main-wrap { width: min(1280px, calc(100% - 1.25rem)); }
+  }
+}

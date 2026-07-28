@@ -1,0 +1,33 @@
+name: Refresh mineral stocks cache
+
+# After Tehran cash close, hit /api/stocks?refresh=1 so BourseView-adjusted
+# mineral returns are recomputed (uses Cloudflare secret BOURSEVIEW_COOKIE).
+
+on:
+  schedule:
+    # 12:45 UTC ≈ 16:15 Tehran (after cash board)
+    - cron: '45 12 * * 0-3,6'
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Warm /api/stocks
+        run: |
+          set -e
+          url="${STOCKS_API_URL:-https://www.arz-digital.xyz/api/stocks?refresh=1}"
+          echo "GET $url"
+          body=$(curl -fsS --max-time 120 "$url")
+          echo "$body" | python3 -c "
+          import json,sys
+          d=json.load(sys.stdin)
+          print('source=', d.get('source'), 'bvOk=', d.get('bourseviewOk'), 'ok=', d.get('ok'))
+          stocks=d.get('stocks') or []
+          print('n=', len(stocks), 'adj=', sum(1 for s in stocks if s.get('returnsAdjusted')))
+          m=next((s for s in stocks if s.get('symbol')=='ومعادن'), None)
+          if m:
+            print('ومعادن close=', m.get('closePrice'), 'week=', m.get('weekPct'), 'month=', m.get('monthPct'), 'ytd=', m.get('ytdPct'))
+          if not d.get('ok'):
+            raise SystemExit('stocks refresh failed')
+          "

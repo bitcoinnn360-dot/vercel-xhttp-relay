@@ -1,0 +1,200 @@
+{
+  "baselineYtdBillionToman": -25271,
+  "baselineThroughJalali": "1405/04/29",
+  "ytdBillionToman": -15905,
+  "asOfJalali": "1405/05/04",
+  "asOfLabel": "05/04",
+  "updatedAt": "2026-07-26T14:06:45.148215+00:00",
+  "source": "parsistahlil.ir",
+  "series": [
+    {
+      "date": "02/29",
+      "dateJalali": "1405/02/29",
+      "value": 2339
+    },
+    {
+      "date": "02/30",
+      "dateJalali": "1405/02/30",
+      "value": 1249
+    },
+    {
+      "date": "03/02",
+      "dateJalali": "1405/03/02",
+      "value": 718
+    },
+    {
+      "date": "03/03",
+      "dateJalali": "1405/03/03",
+      "value": -73
+    },
+    {
+      "date": "03/04",
+      "dateJalali": "1405/03/04",
+      "value": 556
+    },
+    {
+      "date": "03/05",
+      "dateJalali": "1405/03/05",
+      "value": 533
+    },
+    {
+      "date": "03/09",
+      "dateJalali": "1405/03/09",
+      "value": 2166
+    },
+    {
+      "date": "03/10",
+      "dateJalali": "1405/03/10",
+      "value": 528
+    },
+    {
+      "date": "03/11",
+      "dateJalali": "1405/03/11",
+      "value": 477
+    },
+    {
+      "date": "03/12",
+      "dateJalali": "1405/03/12",
+      "value": 2228
+    },
+    {
+      "date": "03/13",
+      "dateJalali": "1405/03/13",
+      "value": 372
+    },
+    {
+      "date": "03/16",
+      "dateJalali": "1405/03/16",
+      "value": 645
+    },
+    {
+      "date": "03/17",
+      "dateJalali": "1405/03/17",
+      "value": 324
+    },
+    {
+      "date": "03/18",
+      "dateJalali": "1405/03/18",
+      "value": 142
+    },
+    {
+      "date": "03/19",
+      "dateJalali": "1405/03/19",
+      "value": 318
+    },
+    {
+      "date": "03/20",
+      "dateJalali": "1405/03/20",
+      "value": -3612
+    },
+    {
+      "date": "03/23",
+      "dateJalali": "1405/03/23",
+      "value": 288
+    },
+    {
+      "date": "03/24",
+      "dateJalali": "1405/03/24",
+      "value": -6160
+    },
+    {
+      "date": "03/25",
+      "dateJalali": "1405/03/25",
+      "value": 285
+    },
+    {
+      "date": "03/26",
+      "dateJalali": "1405/03/26",
+      "value": -2101
+    },
+    {
+      "date": "03/27",
+      "dateJalali": "1405/03/27",
+      "value": 254
+    },
+    {
+      "date": "03/30",
+      "dateJalali": "1405/03/30",
+      "value": 2957
+    },
+    {
+      "date": "03/31",
+      "dateJalali": "1405/03/31",
+      "value": 1823
+    },
+    {
+      "date": "04/01",
+      "dateJalali": "1405/04/01",
+      "value": -5108
+    },
+    {
+      "date": "04/02",
+      "dateJalali": "1405/04/02",
+      "value": -4405
+    },
+    {
+      "date": "04/06",
+      "dateJalali": "1405/04/06",
+      "value": -3944
+    },
+    {
+      "date": "04/07",
+      "dateJalali": "1405/04/07",
+      "value": -3247
+    },
+    {
+      "date": "04/08",
+      "dateJalali": "1405/04/08",
+      "value": -2617
+    },
+    {
+      "date": "04/09",
+      "dateJalali": "1405/04/09",
+      "value": -4681
+    },
+    {
+      "date": "04/10",
+      "dateJalali": "1405/04/10",
+      "value": -2613
+    },
+    {
+      "date": "04/16",
+      "dateJalali": "1405/04/16",
+      "value": 2974
+    },
+    {
+      "date": "04/29",
+      "dateJalali": "1405/04/29",
+      "value": 4339
+    },
+    {
+      "date": "04/30",
+      "dateJalali": "1405/04/30",
+      "value": 3740,
+      "contentId": "1177"
+    },
+    {
+      "date": "04/31",
+      "dateJalali": "1405/04/31",
+      "value": -719,
+      "contentId": "1178"
+    },
+    {
+      "date": "05/03",
+      "dateJalali": "1405/05/03",
+      "value": 152,
+      "contentId": "1179"
+    },
+    {
+      "date": "05/04",
+      "dateJalali": "1405/05/04",
+      "value": 6193,
+      "contentId": "1180"
+    }
+  ],
+  "notes": [
+    "baselineYtd تا پایان ۱۴۰۵/۰۴/۲۹ از گزارش PDF (= -25271).",
+    "روزهای بعد از پارسیس‌تحلیل اضافه و به YTD جمع می‌شوند.",
+    "اسکرپر/API هر روز جدید را فقط یک‌بار اعمال می‌کند."
+  ]
+}

@@ -27,8 +27,9 @@ const UA =
 
 /** Raw JSON written by GitHub Actions cron (scripts/collect_pulse.py). */
 export const PULSE_REMOTE_URLS = [
+  'https://raw.githubusercontent.com/bitcoinnn360-dot/vercel-xhttp-relay/pulse-data/public/data/market_pulse.json',
   'https://raw.githubusercontent.com/bitcoinnn360-dot/vercel-xhttp-relay/pulse-data/market_pulse.json',
-  'https://cdn.jsdelivr.net/gh/bitcoinnn360-dot/vercel-xhttp-relay@pulse-data/market_pulse.json',
+  'https://cdn.jsdelivr.net/gh/bitcoinnn360-dot/vercel-xhttp-relay@pulse-data/public/data/market_pulse.json',
 ]
 
 /** Industry ids on TradersArena industries table. */

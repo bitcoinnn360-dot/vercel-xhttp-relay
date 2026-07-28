@@ -90,9 +90,9 @@ export function MarketOverview({
         goldFunds: p.flowGoldFunds,
       }))
     : []
-  // merge current snapshot onto the series so new industry fields appear immediately
+  // merge current snapshot onto the series (gold ETFs continue after cash close)
   if (pulse) {
-    const curLabel = pulse.time && pulse.time > '12:30' ? '12:30' : pulse.time || 'الان'
+    const curLabel = pulse.time || 'الان'
     const curPoint = {
       label: curLabel,
       stocks: pulse.flowStocksBillionToman,
@@ -390,6 +390,7 @@ export function MarketOverview({
                 <span className={`num font-semibold ${changeClass(pulse?.flowGoldFundsBillionToman ?? 0)}`}>
                   {fmtNum(pulse?.flowGoldFundsBillionToman ?? 0, 1)}
                 </span>
+                <span className="opacity-70">(تا ~۱۸:۰۰)</span>
               </span>
               <span className="opacity-70">میلیارد تومان · TradersArena</span>
             </div>

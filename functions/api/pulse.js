@@ -3,7 +3,8 @@
  * GET /api/pulse
  * GET /api/pulse?date=1405/05/06  → history for that Jalali day
  *
- * Fetches TradersArena, merges cron/static/cache history (08:45→12:30),
+ * Fetches TradersArena, merges cron/static/cache history (08:45→18:00;
+ * cash board ~12:30, gold ETFs into the afternoon),
  * returns current snapshot + intraday series.
  */
 import {
@@ -14,6 +15,7 @@ import {
   jalaliTodayTehran,
   historyForDay,
   PULSE_HIST_START,
+  PULSE_CASH_END,
   PULSE_HIST_END,
 } from '../lib/pulse.js'
 
@@ -56,7 +58,7 @@ export async function onRequestGet(context) {
       marketPulse: pulse,
       marketPulseHistory: history,
       availableDays: days.slice(-45),
-      session: { start: PULSE_HIST_START, end: PULSE_HIST_END },
+      session: { start: PULSE_HIST_START, cashEnd: PULSE_CASH_END, end: PULSE_HIST_END },
       source: pulse?.source || null,
       errors,
     },

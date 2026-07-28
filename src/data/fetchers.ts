@@ -456,7 +456,10 @@ async function fetchOverviewApi(): Promise<OverviewApi | null> {
 const PULSE_SESSION_KEY = 'midco-pulse-history-v5'
 export const PULSE_REFRESH_MS = 30 * 1000
 export const PULSE_HIST_START = '08:45'
-export const PULSE_HIST_END = '12:30'
+/** Cash equities / bond / equity-ETF board close. */
+export const PULSE_CASH_END = '12:30'
+/** Gold commodity ETFs keep trading into the afternoon (~18:00). */
+export const PULSE_HIST_END = '18:00'
 
 function clampPulseHistoryTime(hhmm: string | undefined | null): string | null {
   const t = String(hhmm || '')
@@ -528,7 +531,7 @@ function mergePulsePoints(
       byTime.set(t, { ...byTime.get(t), ...p, time: t })
     }
   }
-  return [...byTime.values()].sort((a, b) => String(a.time).localeCompare(String(b.time))).slice(-480)
+  return [...byTime.values()].sort((a, b) => String(a.time).localeCompare(String(b.time))).slice(-720)
 }
 
 /** Forward-fill series values. Optional endLabel draws a flat tail to that time. */

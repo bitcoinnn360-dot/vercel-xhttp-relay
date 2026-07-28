@@ -851,9 +851,9 @@ def append_pulse_history(pulse: dict) -> dict:
         store = {"dateJalali": today, "history": []}
     hist = list(store.get("history") or [])
     raw_time = str(pulse.get("time") or "")
-    # After cash-market close, keep refreshing the end slot (flat live line).
-    if raw_time and raw_time > "12:30":
-        slot = "12:30"
+    # Cash board ~12:30; gold ETFs continue until ~18:00 — keep afternoon slots.
+    if raw_time and raw_time > "18:00":
+        slot = "18:00"
     elif raw_time and raw_time < "08:45":
         slot = None
     else:
@@ -878,8 +878,8 @@ def append_pulse_history(pulse: dict) -> dict:
     if slot:
         hist = [h for h in hist if h.get("time") != slot]
         hist.append(point)
-    hist = [h for h in hist if str(h.get("time") or "") >= "08:45" and str(h.get("time") or "") <= "12:30"]
-    hist = sorted(hist, key=lambda h: str(h.get("time") or ""))[-480:]
+    hist = [h for h in hist if str(h.get("time") or "") >= "08:45" and str(h.get("time") or "") <= "18:00"]
+    hist = sorted(hist, key=lambda h: str(h.get("time") or ""))[-720:]
     store = {"dateJalali": today, "history": hist, "current": pulse, "updatedAt": datetime.now(timezone.utc).isoformat()}
     save_pulse_store(store)
     return store

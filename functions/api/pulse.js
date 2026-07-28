@@ -3,7 +3,7 @@
  * GET /api/pulse
  * GET /api/pulse?date=1405/05/06  → history for that Jalali day
  *
- * Fetches TradersArena, merges cron/static/cache history (08:45→18:00;
+ * Fetches TradersArena, merges cron/static/cache history (08:45→17:00;
  * cash board ~12:30, gold ETFs into the afternoon),
  * returns current snapshot + intraday series.
  */

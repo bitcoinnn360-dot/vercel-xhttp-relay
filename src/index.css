@@ -216,7 +216,7 @@
     font-size: 0.8rem;
   }
   .data-table th {
-    text-align: right;
+    text-align: center;
     padding: 0.55rem 0.45rem;
     color: var(--color-muted);
     font-weight: 700;
@@ -227,10 +227,72 @@
   .data-table td {
     padding: 0.5rem 0.45rem;
     border-bottom: 1px solid #f1f5f9;
+    text-align: center;
+    vertical-align: middle;
+  }
+  .data-table .num {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    direction: ltr;
   }
   .data-table tr.industry td {
-    background: #f0f7ff;
+    background: color-mix(in oklab, var(--color-brand-2) 10%, #f0f7ff);
     font-weight: 700;
+    border-top: 1px solid color-mix(in oklab, var(--color-brand-2) 25%, transparent);
+  }
+  .data-table tr.halted td {
+    opacity: 0.72;
+  }
+  .stocks-table .name-cell {
+    text-align: center;
+    min-width: 11rem;
+  }
+  .stocks-table .symbol-tag {
+    margin-inline-start: 0.25rem;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--color-muted);
+  }
+  .stocks-table .adj-tag,
+  .stocks-table .halt-tag {
+    display: inline-block;
+    margin-inline-start: 0.3rem;
+    padding: 0.05rem 0.35rem;
+    border-radius: 999px;
+    font-size: 9px;
+    font-weight: 700;
+  }
+  .stocks-table .adj-tag {
+    background: color-mix(in oklab, #059669 14%, white);
+    color: #047857;
+  }
+  .stocks-table .halt-tag {
+    background: #f1f5f9;
+    color: #64748b;
+  }
+  .stocks-table .flow-cell {
+    position: relative;
+    min-width: 5.5rem;
+  }
+  .stocks-table .flow-bar-wrap {
+    position: absolute;
+    inset: 18% 12%;
+    border-radius: 999px;
+    background: #f1f5f9;
+    overflow: hidden;
+    opacity: 0.55;
+  }
+  .stocks-table .flow-bar {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+  }
+  .stocks-table .flow-bar.in {
+    background: color-mix(in oklab, #059669 55%, white);
+    margin-inline-start: auto;
+  }
+  .stocks-table .flow-bar.out {
+    background: color-mix(in oklab, #b91c1c 50%, white);
   }
 
   .gf-head {

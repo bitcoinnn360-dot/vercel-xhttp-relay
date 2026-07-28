@@ -421,15 +421,27 @@ function computeBoardImpacts(stocks, indices, maxMove = 0.22) {
   const totalB = bourse.reduce((a, s) => a + (s.marketValue || 0), 0)
   const totalF = ifb.reduce((a, s) => a + (s.marketValue || 0), 0)
 
-  const build = (rows, index, total) => {
+  /**
+   * TSE: prefer قیمت پایانی (final) — matches Rahavard official style.
+   * IFB: Rahavard has no IFB effects; prefer آخرین معامله so the panel
+   * does not freeze mid-session while final price barely moves.
+   */
+  const build = (rows, index, total, preferLastTrade) => {
     if (!index || !total) return { pos: [], neg: [] }
     const items = []
     for (const s of rows) {
       const mv = s.marketValue || 0
       const yest = s.yesterday || 0
-      let chg = s.finalChg
-      if (chg == null || chg === 0) chg = s.closeChg
-      if (chg == null || chg === 0) chg = s.lastChg
+      let chg
+      if (preferLastTrade) {
+        chg = s.lastChg
+        if (chg == null || chg === 0) chg = s.finalChg
+        if (chg == null || chg === 0) chg = s.closeChg
+      } else {
+        chg = s.finalChg
+        if (chg == null || chg === 0) chg = s.closeChg
+        if (chg == null || chg === 0) chg = s.lastChg
+      }
       if (!mv || !yest || chg == null) continue
       const move = chg / yest
       if (Math.abs(move) > maxMove) continue
@@ -441,8 +453,8 @@ function computeBoardImpacts(stocks, indices, maxMove = 0.22) {
     }
   }
 
-  const b = build(bourse, indexB, totalB)
-  const f = build(ifb, indexF, totalF)
+  const b = build(bourse, indexB, totalB, false)
+  const f = build(ifb, indexF, totalF, true)
   return {
     boursePos: b.pos,
     bourseNeg: b.neg,

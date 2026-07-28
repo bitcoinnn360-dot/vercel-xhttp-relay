@@ -1,15 +1,15 @@
 name: Collect market pulse
 
 # Samples TradersArena every 5 minutes during Tehran trading.
-# Cash board ~08:45–12:30; gold commodity ETFs continue until ~18:00.
+# Cash board ~08:45–12:30; gold commodity ETFs continue until ~17:00.
 # Writes public/data/market_pulse.json to the pulse-data branch so /api/pulse
 # can load a full-day series even if nobody opened the dashboard.
 
 on:
   schedule:
     # GitHub cron is UTC. Tehran = UTC+3:30
-    # 08:45–18:00 Tehran ≈ 05:15–14:30 UTC
-    - cron: '*/5 5-14 * * 0-3,6'
+    # 08:45–17:00 Tehran ≈ 05:15–13:30 UTC
+    - cron: '*/5 5-13 * * 0-3,6'
   workflow_dispatch:
 
 permissions:

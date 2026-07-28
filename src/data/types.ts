@@ -118,6 +118,9 @@ export interface StockRow {
   /** بازدهی از قیمت تعدیل‌شده (افزایش سرمایه / سود تقسیمی) */
   returnsAdjusted?: boolean
   returnsSource?: string
+  /** خالص خرید حقیقی امروز — میلیارد تومان (بورس‌ویو) */
+  netIndividualBt?: number
+  halted?: boolean
 }
 
 export interface PortfolioHolding {

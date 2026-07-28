@@ -499,6 +499,18 @@ def scrape_mineral_stock_symbol(symbol: str, *, adjusted_enabled: bool = False) 
     }
 
 
+def _bv_detail_value(item: dict | None, code: str) -> float | None:
+    if not isinstance(item, dict):
+        return None
+    details = item.get("detail")
+    if not isinstance(details, list):
+        return None
+    for d in details:
+        if isinstance(d, dict) and d.get("code") == code:
+            return _sa_num(d.get("value"))
+    return None
+
+
 def scrape_mineral_stock_bourseview(row: dict, cookie: str) -> dict:
     """BourseView: پایانی=vwap, تعدیلی=close*coef, calendar week/month/ytd anchors."""
     exchange = row["exchange"]
@@ -506,7 +518,7 @@ def scrape_mineral_stock_bourseview(row: dict, cookie: str) -> dict:
     symbol = row["symbol"]
     url = (
         f"{BV_BASE}/api/v2/exchanges/{exchange}/stocks/{isin}/quotes"
-        f"?timeFrame=daily&lastN={BV_HISTORY_N}&expand=shamsiDate"
+        f"?timeFrame=daily&lastN={BV_HISTORY_N}&expand=shamsiDate,individual-detail"
     )
     raw = fetch(
         url,
@@ -550,6 +562,11 @@ def scrape_mineral_stock_bourseview(row: dict, cookie: str) -> dict:
     head = items[0] if isinstance(items[0], dict) else {}
     halted = not ((_sa_num(head.get("close")) or 0) > 0)
     last_trade = traded[0]
+    # find raw item matching last trade for detail
+    last_item = next(
+        (i for i in items if isinstance(i, dict) and (_sa_num(i.get("close")) or 0) > 0),
+        head,
+    )
 
     if halted:
         close_price = last_trade.get("vwap") or last_trade["close"]
@@ -557,6 +574,7 @@ def scrape_mineral_stock_bourseview(row: dict, cookie: str) -> dict:
         volume = 0.0
         trade_value_mr = 0
         mv = last_trade.get("marketCap") or _sa_num(head.get("marketCap"))
+        net_bt = 0.0
     else:
         close_price = _sa_num(head.get("vwap")) or last_trade.get("vwap") or last_trade["close"]
         daily_pct = _pct(_sa_num(head.get("previousVwap")), _sa_num(head.get("vwap")))
@@ -564,6 +582,8 @@ def scrape_mineral_stock_bourseview(row: dict, cookie: str) -> dict:
         tv = _sa_num(head.get("value"))
         trade_value_mr = round(tv / 1e6) if tv else 0
         mv = _sa_num(head.get("marketCap"))
+        net_rial = _bv_detail_value(head, "netIndividual")
+        net_bt = round(net_rial / 1e10, 2) if net_rial is not None else None
 
     # بازدهی روی مقیاس تعدیلی: پایانی×coef آخرین معامله
     last_vwap = last_trade.get("vwap") or last_trade["close"]
@@ -585,6 +605,7 @@ def scrape_mineral_stock_bourseview(row: dict, cookie: str) -> dict:
         "marketValueBr": round(mv / 1e9) if mv else None,
         "volume": volume,
         "tradeValueMr": trade_value_mr,
+        "netIndividualBt": net_bt,
         "returnsAdjusted": True,
         "returnsSource": "bourseview-adjusted",
         "historyCount": len(traded),
@@ -981,7 +1002,11 @@ def scrape_rahavard_tedpix_impacts() -> dict:
 
 
 def compute_impacts_from_board(stocks: list[dict], indices: dict, max_move: float = 0.22) -> dict:
-    """Index impact ≈ index × (mv/total) × (final_change/yesterday)."""
+    """Index impact ≈ index × (mv/total) × (change/yesterday).
+
+    TSE prefers final (پایانی); IFB prefers last trade so the panel stays live
+    mid-session (Rahavard has no IFB effect feed).
+    """
     equities = [s for s in stocks if s.get("marketFa") == "سهام"]
     bourse = [s for s in equities if "فرابورس" not in (s.get("flow") or "")]
     ifb = [s for s in equities if "فرابورس" in (s.get("flow") or "")]
@@ -990,18 +1015,27 @@ def compute_impacts_from_board(stocks: list[dict], indices: dict, max_move: floa
     total_b = sum(s.get("marketValue") or 0 for s in bourse) or 0.0
     total_f = sum(s.get("marketValue") or 0 for s in ifb) or 0.0
 
-    def build(rows: list[dict], index: float, total: float) -> tuple[list[dict], list[dict]]:
+    def build(
+        rows: list[dict], index: float, total: float, *, prefer_last: bool
+    ) -> tuple[list[dict], list[dict]]:
         items: list[dict] = []
         if not index or not total:
             return [], []
         for s in rows:
             mv = float(s.get("marketValue") or 0)
             yest = float(s.get("yesterday") or 0)
-            chg = s.get("finalChg")
-            if chg is None:
-                chg = s.get("closeChg")
-            if chg in (None, 0):
+            if prefer_last:
                 chg = s.get("lastChg")
+                if chg in (None, 0):
+                    chg = s.get("finalChg")
+                if chg in (None, 0):
+                    chg = s.get("closeChg")
+            else:
+                chg = s.get("finalChg")
+                if chg is None:
+                    chg = s.get("closeChg")
+                if chg in (None, 0):
+                    chg = s.get("lastChg")
             if not mv or not yest or chg is None:
                 continue
             move = float(chg) / yest
@@ -1013,8 +1047,8 @@ def compute_impacts_from_board(stocks: list[dict], indices: dict, max_move: floa
         neg = sorted([x for x in items if x["impact"] < 0], key=lambda x: x["impact"])[:5]
         return pos, neg
 
-    b_pos, b_neg = build(bourse, index_b, total_b)
-    f_pos, f_neg = build(ifb, index_f, total_f)
+    b_pos, b_neg = build(bourse, index_b, total_b, prefer_last=False)
+    f_pos, f_neg = build(ifb, index_f, total_f, prefer_last=True)
     return {
         "boursePos": b_pos,
         "bourseNeg": b_neg,
@@ -1206,9 +1240,9 @@ def append_pulse_history(pulse: dict) -> dict:
         store = {"dateJalali": today, "history": []}
     hist = list(store.get("history") or [])
     raw_time = str(pulse.get("time") or "")
-    # Cash board ~12:30; gold ETFs continue until ~18:00 — keep afternoon slots.
-    if raw_time and raw_time > "18:00":
-        slot = "18:00"
+    # Cash board ~12:30; gold ETFs continue until ~17:00 — keep afternoon slots.
+    if raw_time and raw_time > "17:00":
+        slot = "17:00"
     elif raw_time and raw_time < "08:45":
         slot = None
     else:
@@ -1233,7 +1267,7 @@ def append_pulse_history(pulse: dict) -> dict:
     if slot:
         hist = [h for h in hist if h.get("time") != slot]
         hist.append(point)
-    hist = [h for h in hist if str(h.get("time") or "") >= "08:45" and str(h.get("time") or "") <= "18:00"]
+    hist = [h for h in hist if str(h.get("time") or "") >= "08:45" and str(h.get("time") or "") <= "17:00"]
     hist = sorted(hist, key=lambda h: str(h.get("time") or ""))[-720:]
     store = {"dateJalali": today, "history": hist, "current": pulse, "updatedAt": datetime.now(timezone.utc).isoformat()}
     save_pulse_store(store)
@@ -1761,15 +1795,20 @@ def scrape_sourcearena_glance(token: str | None = None) -> dict:
             name = str(row.get("name") or "").strip()
             mv = num(row.get("market_value")) or 0.0
             yesterday = num(row.get("yesterday_price")) or 0.0
-            # قیمت پایانی (final) — نه آخرین معامله — مبنای تاثیر رسمی
-            change = num(row.get("final_price_change"))
-            if change is None:
+            market = str(row.get("market") or "")
+            is_ifb = "فرابورس" in market
+            # IFB: آخرین معامله برای تازگی میاندروز؛ TSE: پایانی (هم‌راستا با رهاورد)
+            if is_ifb:
                 change = num(row.get("close_price_change"))
+                if change in (None, 0):
+                    change = num(row.get("final_price_change"))
+            else:
+                change = num(row.get("final_price_change"))
+                if change is None:
+                    change = num(row.get("close_price_change"))
             trade_value = num(row.get("trade_value")) or 0.0
             if not name or not mv or not yesterday or change is None:
                 continue
-            market = str(row.get("market") or "")
-            is_ifb = "فرابورس" in market
             total = total_f if is_ifb else total_b
             index = index_f if is_ifb else index_b
             if not total or not index:

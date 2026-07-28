@@ -1,4 +1,4 @@
-import type { CandlePoint, CommodityQuote, DashboardData, SourceStatus } from './types'
+import type { CandlePoint, CommodityQuote, DashboardData, SourceStatus, StockRow } from './types'
 import { seedDashboard } from './seed'
 import { MINERAL_SYMBOL_BY_NAME } from './mineralUniverse'
 
@@ -75,9 +75,12 @@ export interface MineralStockSnap {
   marketValueBr?: number
   volume?: number
   tradeValueMr?: number
+  /** خالص خرید حقیقی — میلیارد تومان */
+  netIndividualBt?: number
   returnsAdjusted?: boolean
   returnsSource?: string
   candleCount?: number
+  halted?: boolean
 }
 
 export interface IntradayPoint {
@@ -509,8 +512,8 @@ export const PULSE_REFRESH_MS = 30 * 1000
 export const PULSE_HIST_START = '08:45'
 /** Cash equities / bond / equity-ETF board close. */
 export const PULSE_CASH_END = '12:30'
-/** Gold commodity ETFs keep trading into the afternoon (~18:00). */
-export const PULSE_HIST_END = '18:00'
+/** Gold commodity ETFs keep trading into the afternoon (~17:00). */
+export const PULSE_HIST_END = '17:00'
 
 function clampPulseHistoryTime(hhmm: string | undefined | null): string | null {
   const t = String(hhmm || '')
@@ -936,14 +939,72 @@ async function fetchMineralStocksApi(): Promise<MineralStockSnap[] | null> {
   return null
 }
 
+function weightedPct(members: StockRow[], key: 'dailyPct' | 'weekPct' | 'monthPct' | 'ytdPct'): number {
+  let num = 0
+  let den = 0
+  for (const s of members) {
+    const w = Number(s.marketValueBr) || 0
+    const v = Number(s[key])
+    if (w > 0 && Number.isFinite(v)) {
+      num += w * v
+      den += w
+    }
+  }
+  return den > 0 ? Math.round((num / den) * 100) / 100 : 0
+}
+
+function rebuildIndustryRows(base: DashboardData) {
+  const GROUP_ORDER = ['سرمایه‌گذاری', 'سنگ‌آهن', 'فولادی', 'مس', 'کابل'] as const
+  const equities = base.stocks.filter((s) => !s.isIndustry)
+  const rebuilt: typeof base.stocks = []
+
+  for (const g of GROUP_ORDER) {
+    const members = equities
+      .filter((s) => s.group === g)
+      .sort((a, b) => (b.marketValueBr || 0) - (a.marketValueBr || 0))
+    if (!members.length) continue
+    rebuilt.push(...members)
+
+    const mv = members.reduce((a, s) => a + (s.marketValueBr || 0), 0)
+    const usd = members.reduce((a, s) => a + (s.marketValueUsdM || 0), 0)
+    const vol = members.reduce((a, s) => a + (s.volume || 0), 0)
+    const tv = members.reduce((a, s) => a + (s.tradeValueMr || 0), 0)
+    const net = members.reduce((a, s) => a + (s.netIndividualBt || 0), 0)
+
+    rebuilt.push({
+      group: g,
+      name: `تغییرات صنعت ${g}`,
+      isIndustry: true,
+      marketValueBr: mv,
+      marketValueUsdM: usd,
+      volume: vol,
+      tradeValueMr: tv,
+      closePrice: 0,
+      dailyPct: weightedPct(members, 'dailyPct'),
+      weekPct: weightedPct(members, 'weekPct'),
+      monthPct: weightedPct(members, 'monthPct'),
+      ytdPct: weightedPct(members, 'ytdPct'),
+      netIndividualBt: Math.round(net * 100) / 100,
+      returnsAdjusted: members.some((s) => s.returnsAdjusted),
+      returnsSource: 'industry-weighted',
+    })
+  }
+
+  // keep any leftover equities not in GROUP_ORDER
+  for (const s of equities) {
+    if (!GROUP_ORDER.includes(s.group as (typeof GROUP_ORDER)[number])) rebuilt.push(s)
+  }
+  base.stocks = rebuilt
+}
+
 function applyMineralStockReturns(base: DashboardData, snaps: MineralStockSnap[] | null | undefined) {
   if (!snaps?.length) {
-    // still attach symbols from universe
     for (const s of base.stocks) {
       if (s.isIndustry) continue
       const sym = MINERAL_SYMBOL_BY_NAME[s.name]
       if (sym) s.symbol = sym
     }
+    rebuildIndustryRows(base)
     return
   }
   const bySym = new Map(snaps.map((r) => [r.symbol, r]))
@@ -959,7 +1020,6 @@ function applyMineralStockReturns(base: DashboardData, snaps: MineralStockSnap[]
     if (snap.closePrice != null && snap.closePrice > 0) s.closePrice = snap.closePrice
     else if (snap.lastPrice != null && snap.lastPrice > 0) s.closePrice = snap.lastPrice
     if (snap.dailyPct != null && Number.isFinite(snap.dailyPct)) s.dailyPct = snap.dailyPct
-    // Period returns from BourseView adjusted quotes (fallback: SourceArena)
     if (snap.weekPct != null && Number.isFinite(snap.weekPct)) s.weekPct = snap.weekPct
     if (snap.monthPct != null && Number.isFinite(snap.monthPct)) s.monthPct = snap.monthPct
     if (snap.ytdPct != null && Number.isFinite(snap.ytdPct)) s.ytdPct = snap.ytdPct
@@ -967,14 +1027,18 @@ function applyMineralStockReturns(base: DashboardData, snaps: MineralStockSnap[]
       s.returnsAdjusted = Boolean(snap.returnsAdjusted)
       s.returnsSource = snap.returnsSource
     }
-    if (snap.volume != null && snap.volume > 0) s.volume = snap.volume
-    if (snap.tradeValueMr != null && snap.tradeValueMr > 0) s.tradeValueMr = snap.tradeValueMr
+    if (snap.halted != null) s.halted = snap.halted
+    if (snap.volume != null) s.volume = snap.volume
+    if (snap.tradeValueMr != null) s.tradeValueMr = snap.tradeValueMr
+    if (snap.netIndividualBt != null && Number.isFinite(snap.netIndividualBt)) {
+      s.netIndividualBt = snap.netIndividualBt
+    }
     if (snap.marketValueBr != null && snap.marketValueBr > 0) {
       s.marketValueBr = snap.marketValueBr
-      // ارزش دلاری: میلیارد ریال / نرخ دلار
       s.marketValueUsdM = Math.round((snap.marketValueBr * 1_000_000_000) / usd / 1_000_000)
     }
   }
+  rebuildIndustryRows(base)
 }
 
 export async function loadDashboardBundle(): Promise<LiveBundle> {

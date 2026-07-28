@@ -52,7 +52,7 @@ const MINERAL_STOCKS = [
 ]
 
 const CACHE_TTL_MS = 20 * 60 * 1000
-const CACHE_KEY = 'https://cache.local/mineral-stocks-bv-v2'
+const CACHE_KEY = 'https://cache.local/mineral-stocks-bv-v3'
 
 function num(raw) {
   if (raw == null) return null
@@ -266,7 +266,7 @@ function returnsFromBvItems(items, currentPayani) {
 }
 
 async function bvFetchQuotes(cookie, exchange, isin, attempts = 3) {
-  const url = `${BV_BASE}/api/v2/exchanges/${exchange}/stocks/${isin}/quotes?timeFrame=daily&lastN=${BV_HISTORY_N}&expand=shamsiDate`
+  const url = `${BV_BASE}/api/v2/exchanges/${exchange}/stocks/${isin}/quotes?timeFrame=daily&lastN=${BV_HISTORY_N}&expand=shamsiDate,individual-detail`
   let lastErr
   for (let i = 0; i < attempts; i++) {
     try {
@@ -293,6 +293,13 @@ async function bvFetchQuotes(cookie, exchange, isin, attempts = 3) {
   throw lastErr || new Error('bourseview failed')
 }
 
+function detailValue(item, code) {
+  const details = item?.detail
+  if (!Array.isArray(details)) return null
+  const hit = details.find((d) => d && d.code === code)
+  return num(hit?.value)
+}
+
 function snapFromBv(meta, items) {
   const head = items[0] || {}
   const tradedHead = items.find((r) => num(r?.close) != null && num(r.close) > 0)
@@ -312,6 +319,11 @@ function snapFromBv(meta, items) {
       : closePrice
 
   const rets = returnsFromBvItems(items, currentForReturn)
+
+  // خالص خرید حقیقی (ریال) → میلیارد تومان
+  const netIndRial = detailValue(halted ? tradedHead : head, 'netIndividual')
+  const netIndividualBt =
+    netIndRial != null ? Math.round((netIndRial / 1e10) * 100) / 100 : null
 
   let dailyPct = null
   let volume = 0
@@ -346,6 +358,7 @@ function snapFromBv(meta, items) {
     marketValueBr,
     volume,
     tradeValueMr,
+    netIndividualBt: halted ? 0 : netIndividualBt,
     returnsAdjusted: true,
     returnsSource: 'bourseview-adjusted',
     historyCount: rets.historyCount || 0,

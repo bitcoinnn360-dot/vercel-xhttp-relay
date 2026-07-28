@@ -390,7 +390,7 @@ export function MarketOverview({
                 <span className={`num font-semibold ${changeClass(pulse?.flowGoldFundsBillionToman ?? 0)}`}>
                   {fmtNum(pulse?.flowGoldFundsBillionToman ?? 0, 1)}
                 </span>
-                <span className="opacity-70">(تا ~۱۸:۰۰)</span>
+                <span className="opacity-70">(تا ~۱۷:۰۰)</span>
               </span>
               <span className="opacity-70">میلیارد تومان · TradersArena</span>
             </div>

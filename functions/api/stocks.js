@@ -1,15 +1,21 @@
 /**
- * Cloudflare Pages Function: mineral stock snapshots with adjusted period returns.
+ * Cloudflare Pages Function: mineral stock snapshots + period returns.
  *
- * Source: Shakhesban per-symbol page embeds Highcharts `chart-candle-history`
- * which is an adjusted (افزایش سرمایه / سود) OHLC series. We take field[1] as
- * the usable adjusted close and compute week / month / YTD returns.
+ * Primary source: SourceArena (same token as overview)
+ *   - live: ?token=&name=SYMBOL
+ *   - history: ?token=&name=SYMBOL&days=N
+ *   - adjusted history (if activated): &adjusted=1
  *
- * Cached ~45 minutes to avoid hammering Shakhesban (~1MB HTML per symbol).
+ * Shakhesban is intentionally NOT used (bad/stale chart data).
+ * BourseView needs login — wire via BOURSEVIEW_TOKEN / BOURSEVIEW_COOKIE when available.
+ * Codal corporate-action adjustment can layer on unadjusted history later.
  */
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+
+const SOURCEARENA_API = 'https://apis.sourcearena.ir/api/'
+const DEMO_TOKEN = 'bba6d330a87bac533f18cc245d3baeaa'
 
 const MINERAL_STOCKS = [
   { name: 'توسعه معادن و فلزات', symbol: 'ومعادن' },
@@ -39,30 +45,19 @@ const MINERAL_STOCKS = [
   { name: 'کارخانجات تولیدی شهید قندی', symbol: 'بکام' },
 ]
 
-const CACHE_TTL_MS = 45 * 60 * 1000
-const CACHE_KEY = 'https://cache.local/mineral-stocks-v1'
+const CACHE_TTL_MS = 20 * 60 * 1000
+const CACHE_KEY = 'https://cache.local/mineral-stocks-sa-v2'
+const HISTORY_DAYS = 280 // ~1 trading year — enough for Jalali YTD + month/week
 
 function num(raw) {
   if (raw == null) return null
-  const n = Number(String(raw).replace(/,/g, '').replace(/[^\d.-]/g, ''))
+  const n = Number(String(raw).replace(/,/g, '').replace(/%/g, '').replace(/[^\d.-]/g, ''))
   return Number.isFinite(n) ? n : null
 }
 
-/** Gregorian timestamp (ms) of Jalali YYYY/01/01. */
-function jalaliYearStartMs(jy) {
-  // Known anchors for recent years; fallback ~March 21
-  const known = {
-    1400: Date.UTC(2021, 2, 21),
-    1401: Date.UTC(2022, 2, 21),
-    1402: Date.UTC(2023, 2, 21),
-    1403: Date.UTC(2024, 2, 20),
-    1404: Date.UTC(2025, 2, 21),
-    1405: Date.UTC(2026, 2, 21),
-    1406: Date.UTC(2027, 2, 21),
-  }
-  if (known[jy]) return known[jy]
-  const gy = jy + 621
-  return Date.UTC(gy, 2, 21)
+function pct(from, to) {
+  if (from == null || to == null || !(from > 0)) return null
+  return Math.round((to / from - 1) * 10000) / 100
 }
 
 function jalaliTodayYear() {
@@ -78,111 +73,128 @@ function jalaliTodayYear() {
   }
 }
 
-function pct(from, to) {
-  if (from == null || to == null || !(from > 0)) return null
-  return Math.round(((to / from - 1) * 10000)) / 100
+function sessionPrice(row) {
+  // قیمت پایانی (final) preferred; fall back to last/close
+  return num(row?.final_price) || num(row?.close_price) || num(row?.last_price) || null
 }
 
-function closestAtOrBefore(closes, tsTarget) {
-  let best = null
-  for (const [ts, v] of closes) {
-    if (ts <= tsTarget) best = v
-    else break
-  }
-  return best
+function parsePctField(raw) {
+  return num(raw)
 }
 
-function parseChartCloses(html) {
-  const m = html.match(/\$\("#chart-candle-history"\)\.msHighcharts\(\{\s*chartData:\s*(\[\[.*?\]\])/s)
-  if (!m) return []
-  let data
-  try {
-    data = JSON.parse(m[1])
-  } catch {
-    return []
+async function saFetch(token, params, attempts = 4) {
+  const qs = new URLSearchParams({ token, ...params })
+  let lastErr
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fetch(`${SOURCEARENA_API}?${qs}`, {
+        headers: { Accept: 'application/json', 'User-Agent': UA },
+      })
+      if (!res.ok) throw new Error(`sourcearena ${res.status}`)
+      return await res.json()
+    } catch (e) {
+      lastErr = e
+      await new Promise((r) => setTimeout(r, 400 * (i + 1)))
+    }
   }
-  if (!Array.isArray(data)) return []
-  // Highcharts-ish tuple; field[1] tracks live/last and forms continuous adjusted series
+  throw lastErr || new Error('sourcearena failed')
+}
+
+async function fetchHistory(token, symbol, adjustedEnabled) {
+  if (adjustedEnabled) {
+    try {
+      const adj = await saFetch(token, {
+        name: symbol,
+        days: String(HISTORY_DAYS),
+        adjusted: '1',
+      })
+      if (Array.isArray(adj) && adj.length) {
+        return { rows: adj, adjusted: true, source: 'sourcearena-adjusted' }
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+
+  const raw = await saFetch(token, { name: symbol, days: String(HISTORY_DAYS) })
+  if (!Array.isArray(raw)) throw new Error(raw?.Error || 'history empty')
+  return { rows: raw, adjusted: false, source: 'sourcearena-unadjusted' }
+}
+
+function returnsFromHistory(rows) {
+  // SourceArena returns newest-first
   const closes = []
-  for (const row of data) {
-    if (!Array.isArray(row) || row.length < 2) continue
-    const ts = Number(row[0])
-    const close = Number(row[1])
-    if (!Number.isFinite(ts) || !Number.isFinite(close) || !(close > 0)) continue
-    closes.push([ts, close])
+  for (const row of rows) {
+    const p = sessionPrice(row)
+    const d = String(row.date || '')
+    if (!d || p == null || !(p > 0)) continue
+    closes.push({ date: d, price: p })
   }
-  return closes
-}
-
-function parseBoardFields(html) {
-  const pick = (col) => {
-    const a = html.match(new RegExp(`data-col="${col}"[^>]*data-val="([^"]*)"`, 'i'))
-    if (a) return a[1]
-    const b = html.match(new RegExp(`data-val="([^"]*)"[^>]*data-col="${col}"`, 'i'))
-    return b ? b[1] : null
-  }
-  return {
-    lastPrice: num(pick('info.last_trade.PDrCotVal')),
-    closePrice: num(pick('info.last_price.PClosing')),
-    dailyPct: num(pick('info.last_trade.last_change_percentage')),
-    marketValue: num(pick('trades.arzesh_bazar')),
-    tradeValue: num(pick('trades.QTotCap')),
-    volume: num(pick('trades.QTotTran5J')),
-  }
-}
-
-function returnsFromCloses(closes) {
   if (!closes.length) return {}
-  const lastTs = closes[closes.length - 1][0]
-  const last = closes[closes.length - 1][1]
-  const ageDays = (Date.now() - lastTs) / 86400000
-  const week = closestAtOrBefore(closes, lastTs - 7 * 86400 * 1000)
-  const month = closestAtOrBefore(closes, lastTs - 30 * 86400 * 1000)
-  const ytdAnchor = jalaliYearStartMs(jalaliTodayYear())
-  const ytd = closestAtOrBefore(closes, ytdAnchor) ?? closes.find((c) => c[0] >= ytdAnchor)?.[1]
-  // If chart history is stale (>10 calendar days), skip period returns (keep seed).
-  if (ageDays > 10) {
-    return { adjClose: last, candleCount: closes.length, stale: true }
-  }
+
+  const last = closes[0].price
+  // week ≈ 5 sessions, month ≈ 22 sessions
+  const week = closes[Math.min(5, closes.length - 1)]?.price
+  const month = closes[Math.min(22, closes.length - 1)]?.price
+  const yStart = `${jalaliTodayYear()}/01/01`
+  const ytdRows = closes.filter((c) => c.date >= yStart)
+  const ytdBase = ytdRows.length ? ytdRows[ytdRows.length - 1].price : null
+
   return {
     weekPct: pct(week, last),
     monthPct: pct(month, last),
-    ytdPct: pct(ytd, last),
-    adjClose: last,
-    candleCount: closes.length,
+    ytdPct: pct(ytdBase, last),
+    lastPrice: last,
+    historyCount: closes.length,
   }
 }
 
-async function scrapeSymbol(symbol) {
-  const url = `https://www.shakhesban.com/markets/stock/${encodeURIComponent(symbol)}`
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': UA,
-      Accept: 'text/html,application/xhtml+xml',
-      Referer: 'https://www.shakhesban.com/',
-    },
-  })
-  if (!res.ok) throw new Error(`shakhesban ${symbol} ${res.status}`)
-  const html = await res.text()
-  const closes = parseChartCloses(html)
-  const board = parseBoardFields(html)
-  const rets = returnsFromCloses(closes)
-  const price = board.lastPrice || board.closePrice || rets.adjClose || null
-  const adjusted = Boolean(!rets.stale && (rets.weekPct != null || rets.ytdPct != null))
+async function probeAdjustedEnabled(token) {
+  try {
+    const adj = await saFetch(token, { name: 'کگل', days: '5', adjusted: '1' }, 2)
+    if (Array.isArray(adj) && adj.length) return true
+    if (adj && adj.Error && /adjusted/i.test(String(adj.Error))) return false
+  } catch {
+    /* ignore */
+  }
+  return false
+}
+
+async function scrapeSymbol(token, symbol, adjustedEnabled) {
+  const [live, hist] = await Promise.all([
+    saFetch(token, { name: symbol }),
+    fetchHistory(token, symbol, adjustedEnabled),
+  ])
+
+  if (!live || live.Error || !live.name) {
+    throw new Error(live?.Error || 'live empty')
+  }
+
+  const rets = returnsFromHistory(hist.rows)
+  const closePrice = num(live.final_price) || num(live.close_price) || rets.lastPrice
+  const lastPrice = num(live.close_price) || closePrice
+  const dailyPct =
+    parsePctField(live.final_price_change_percent) ??
+    parsePctField(live.close_price_change_percent)
+  const mv = num(live.market_value)
+  const tv = num(live.trade_value)
+  const vol = num(live.trade_volume)
+
   return {
     symbol,
-    closePrice: board.closePrice || price,
-    lastPrice: board.lastPrice || price,
-    dailyPct: board.dailyPct,
-    weekPct: adjusted ? rets.weekPct : undefined,
-    monthPct: adjusted ? rets.monthPct : undefined,
-    ytdPct: adjusted ? rets.ytdPct : undefined,
-    marketValueBr: board.marketValue != null ? Math.round(board.marketValue / 1e9) : undefined,
-    volume: board.volume ?? undefined,
-    tradeValueMr: board.tradeValue != null ? Math.round(board.tradeValue / 1e6) : undefined,
-    returnsAdjusted: adjusted,
-    returnsSource: rets.stale ? 'shakhesban-stale' : 'shakhesban-adjusted-chart',
-    candleCount: rets.candleCount || 0,
+    closePrice,
+    lastPrice,
+    dailyPct,
+    weekPct: rets.weekPct,
+    monthPct: rets.monthPct,
+    ytdPct: rets.ytdPct,
+    marketValueBr: mv != null ? Math.round(mv / 1e9) : undefined,
+    volume: vol ?? undefined,
+    tradeValueMr: tv != null ? Math.round(tv / 1e6) : undefined,
+    returnsAdjusted: Boolean(hist.adjusted),
+    returnsSource: hist.source,
+    historyCount: rets.historyCount || 0,
+    instanceCode: live.instance_code || null,
   }
 }
 
@@ -198,8 +210,9 @@ async function loadStaticFallback(origin) {
 }
 
 export async function onRequestGet(context) {
-  const { request } = context
+  const { request, env } = context
   const origin = new URL(request.url).origin
+  const token = (env?.SOURCEARENA_TOKEN || DEMO_TOKEN).trim()
   const cache = typeof caches !== 'undefined' ? caches.default : null
 
   if (cache) {
@@ -210,7 +223,7 @@ export async function onRequestGet(context) {
         return new Response(hit.body, {
           headers: {
             'content-type': 'application/json; charset=utf-8',
-            'cache-control': 'public, max-age=120',
+            'cache-control': 'public, max-age=60',
             'x-cache': 'HIT',
           },
         })
@@ -218,12 +231,20 @@ export async function onRequestGet(context) {
     }
   }
 
-  const results = await Promise.allSettled(MINERAL_STOCKS.map((r) => scrapeSymbol(r.symbol)))
+  // Optional: BourseView session for future adjusted charts (not required today)
+  const bourseviewReady = Boolean(env?.BOURSEVIEW_TOKEN || env?.BOURSEVIEW_COOKIE)
+  const adjustedEnabled = await probeAdjustedEnabled(token)
+
+  const results = await Promise.allSettled(
+    MINERAL_STOCKS.map((r) => scrapeSymbol(token, r.symbol, adjustedEnabled)),
+  )
   const stocks = []
   const errors = []
+  let adjustedCount = 0
   results.forEach((r, i) => {
     const meta = MINERAL_STOCKS[i]
     if (r.status === 'fulfilled') {
+      if (r.value.returnsAdjusted) adjustedCount += 1
       stocks.push({ ...r.value, name: meta.name })
     } else {
       errors.push(`${meta.symbol}: ${r.reason}`)
@@ -237,9 +258,15 @@ export async function onRequestGet(context) {
   })
 
   let payload = {
-    ok: stocks.some((s) => s.returnsAdjusted),
+    ok: stocks.some((s) => s.historyCount > 0 || s.closePrice != null),
     updatedAt: new Date().toISOString(),
-    source: 'shakhesban-adjusted-chart',
+    source: adjustedCount
+      ? 'sourcearena-adjusted'
+      : 'sourcearena-unadjusted',
+    note: adjustedCount
+      ? 'بازدهی از قیمت تعدیل‌شده SourceArena'
+      : 'بازدهی از قیمت غیرتعدیل SourceArena (days). برای تعدیل: فعال‌سازی adjusted روی توکن، یا BourseView/کدال.',
+    bourseviewReady,
     stocks,
     errors: errors.slice(0, 8),
   }
@@ -250,7 +277,9 @@ export async function onRequestGet(context) {
       payload = {
         ok: true,
         updatedAt: fallback.updatedAt || payload.updatedAt,
-        source: 'static-mineral_stocks',
+        source: fallback.source || 'static-mineral_stocks',
+        note: 'fallback static',
+        bourseviewReady,
         stocks: fallback.stocks,
         errors: payload.errors,
       }
@@ -261,7 +290,7 @@ export async function onRequestGet(context) {
   const response = new Response(body, {
     headers: {
       'content-type': 'application/json; charset=utf-8',
-      'cache-control': 'public, max-age=120',
+      'cache-control': 'public, max-age=60',
       'x-cached-at': String(Date.now()),
       'x-cache': 'MISS',
     },
@@ -271,7 +300,7 @@ export async function onRequestGet(context) {
     try {
       await cache.put(CACHE_KEY, response.clone())
     } catch {
-      /* ignore cache write */
+      /* ignore */
     }
   }
 

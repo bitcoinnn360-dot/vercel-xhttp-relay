@@ -313,21 +313,7 @@ MINERAL_STOCKS = [
     {"name": "کارخانجات تولیدی شهید قندی", "symbol": "بکام"},
 ]
 
-
-def _jalali_year_start_ms(jy: int) -> int:
-    known = {
-        1400: 1616284800000,  # 2021-03-21
-        1401: 1647820800000,
-        1402: 1679356800000,
-        1403: 1710892800000,  # 2024-03-20
-        1404: 1742515200000,  # 2025-03-21
-        1405: 1774051200000,  # 2026-03-21
-        1406: 1805587200000,
-    }
-    if jy in known:
-        return known[jy]
-    gy = jy + 621
-    return int(datetime(gy, 3, 21, tzinfo=timezone.utc).timestamp() * 1000)
+MINERAL_HISTORY_DAYS = 280
 
 
 def _pct(a: float | None, b: float | None) -> float | None:
@@ -336,114 +322,145 @@ def _pct(a: float | None, b: float | None) -> float | None:
     return round((b / a - 1) * 100, 2)
 
 
-def _closest_before(closes: list[tuple[int, float]], ts_target: int) -> float | None:
-    best = None
-    for ts, v in closes:
-        if ts <= ts_target:
-            best = v
-        else:
-            break
-    return best
+def _sa_num(raw) -> float | None:
+    return num(raw)
 
 
-def scrape_mineral_stock_symbol(symbol: str) -> dict:
-    """Adjusted closes from Shakhesban embedded Highcharts candle history."""
-    url = f"https://www.shakhesban.com/markets/stock/{urllib.parse.quote(symbol)}"
-    html = fetch(
-        url,
-        timeout=90,
-        headers={
-            "Accept": "text/html,application/xhtml+xml",
-            "Referer": "https://www.shakhesban.com/",
-        },
-    ).decode("utf-8", errors="replace")
-    m = re.search(
-        r'\$\("#chart-candle-history"\)\.msHighcharts\(\{\s*chartData:\s*(\[\[.*?\]\])',
-        html,
-        re.S,
-    )
-    closes: list[tuple[int, float]] = []
-    if m:
+def _sa_session_price(row: dict) -> float | None:
+    return _sa_num(row.get("final_price")) or _sa_num(row.get("close_price"))
+
+
+def _sourcearena_json(params: dict, attempts: int = 4) -> object:
+    qs = urllib.parse.urlencode({**params, "token": SOURCEARENA_TOKEN})
+    url = f"{SOURCEARENA_API}?{qs}"
+    last: Exception | None = None
+    for i in range(attempts):
         try:
-            data = json.loads(m.group(1))
-            for row in data:
-                if not isinstance(row, list) or len(row) < 2:
-                    continue
-                ts = int(row[0])
-                close = float(row[1])
-                if close > 0:
-                    closes.append((ts, close))
-        except Exception:  # noqa: BLE001
-            closes = []
+            return json.loads(
+                fetch(
+                    url,
+                    timeout=45,
+                    headers={"Accept": "application/json"},
+                ).decode("utf-8", errors="replace")
+            )
+        except Exception as exc:  # noqa: BLE001
+            last = exc
+            time.sleep(0.6 * (i + 1))
+    raise last or RuntimeError(f"sourcearena failed: {params}")
 
-    def pick(col: str) -> float | None:
-        a = re.search(rf'data-col="{re.escape(col)}"[^>]*data-val="([^"]*)"', html)
-        if a:
-            return num(a.group(1))
-        b = re.search(rf'data-val="([^"]*)"[^>]*data-col="{re.escape(col)}"', html)
-        return num(b.group(1)) if b else None
 
-    last_price = pick("info.last_trade.PDrCotVal")
-    close_price = pick("info.last_price.PClosing")
-    daily_pct = pick("info.last_trade.last_change_percentage")
-    mv = pick("trades.arzesh_bazar")
-    tv = pick("trades.QTotCap")
-    vol = pick("trades.QTotTran5J")
+def scrape_mineral_stock_symbol(symbol: str, *, adjusted_enabled: bool = False) -> dict:
+    """Live + period returns from SourceArena (not Shakhesban).
+
+    Tries adjusted history (&adjusted=1) when the token has it enabled;
+    otherwise uses raw closing history (`days=N`) and marks returns as unadjusted.
+    """
+    live = _sourcearena_json({"name": symbol})
+    if not isinstance(live, dict) or live.get("Error") or not live.get("name"):
+        raise RuntimeError((live or {}).get("Error") if isinstance(live, dict) else "live empty")
+
+    adjusted = False
+    source = "sourcearena-unadjusted"
+    hist: list = []
+    if adjusted_enabled:
+        try:
+            adj = _sourcearena_json({"name": symbol, "days": MINERAL_HISTORY_DAYS, "adjusted": 1})
+            if isinstance(adj, list) and adj:
+                hist = adj
+                adjusted = True
+                source = "sourcearena-adjusted"
+        except Exception as exc:  # noqa: BLE001
+            print(f"  mineral {symbol}: adjusted probe {exc}")
+
+    if not hist:
+        raw = _sourcearena_json({"name": symbol, "days": MINERAL_HISTORY_DAYS})
+        if not isinstance(raw, list):
+            raise RuntimeError((raw or {}).get("Error") if isinstance(raw, dict) else "history empty")
+        hist = raw
+        adjusted = False
+        source = "sourcearena-unadjusted"
+
+    # newest-first
+    closes: list[tuple[str, float]] = []
+    for row in hist:
+        if not isinstance(row, dict):
+            continue
+        d = str(row.get("date") or "")
+        p = _sa_session_price(row)
+        if d and p and p > 0:
+            closes.append((d, p))
 
     week_pct = month_pct = ytd_pct = None
-    adj_close = None
-    stale = False
+    last_px = closes[0][1] if closes else None
     if closes:
-        last_ts, last = closes[-1]
-        adj_close = last
-        age_days = (time.time() * 1000 - last_ts) / 86400000
-        stale = age_days > 10
-        if not stale:
-            week_pct = _pct(_closest_before(closes, last_ts - 7 * 86400 * 1000), last)
-            month_pct = _pct(_closest_before(closes, last_ts - 30 * 86400 * 1000), last)
-            try:
-                import jdatetime  # type: ignore
+        week = closes[min(5, len(closes) - 1)][1]
+        month = closes[min(22, len(closes) - 1)][1]
+        week_pct = _pct(week, last_px)
+        month_pct = _pct(month, last_px)
+        try:
+            import jdatetime  # type: ignore
 
-                jy = jdatetime.datetime.now().year
-            except Exception:
-                jy = 1405
-            ytd_anchor = _jalali_year_start_ms(jy)
-            y0 = _closest_before(closes, ytd_anchor)
-            if y0 is None:
-                for ts, v in closes:
-                    if ts >= ytd_anchor:
-                        y0 = v
-                        break
-            ytd_pct = _pct(y0, last)
+            jy = jdatetime.datetime.now().year
+        except Exception:
+            jy = 1405
+        y_start = f"{jy:04d}/01/01"
+        ytd = [c for c in closes if c[0] >= y_start]
+        if ytd:
+            ytd_pct = _pct(ytd[-1][1], last_px)
 
-    price = last_price or close_price or adj_close
-    adjusted = (not stale) and (week_pct is not None or ytd_pct is not None)
+    close_price = _sa_num(live.get("final_price")) or _sa_num(live.get("close_price")) or last_px
+    last_price = _sa_num(live.get("close_price")) or close_price
+    daily_pct = _sa_num(live.get("final_price_change_percent")) or _sa_num(
+        live.get("close_price_change_percent")
+    )
+    mv = _sa_num(live.get("market_value"))
+    tv = _sa_num(live.get("trade_value"))
+    vol = _sa_num(live.get("trade_volume"))
+
     return {
         "symbol": symbol,
-        "closePrice": close_price or price,
-        "lastPrice": last_price or price,
+        "closePrice": close_price,
+        "lastPrice": last_price,
         "dailyPct": daily_pct,
-        "weekPct": week_pct if adjusted else None,
-        "monthPct": month_pct if adjusted else None,
-        "ytdPct": ytd_pct if adjusted else None,
+        "weekPct": week_pct,
+        "monthPct": month_pct,
+        "ytdPct": ytd_pct,
         "marketValueBr": round(mv / 1e9) if mv else None,
         "volume": vol,
         "tradeValueMr": round(tv / 1e6) if tv else None,
         "returnsAdjusted": adjusted,
-        "returnsSource": "shakhesban-stale" if stale else "shakhesban-adjusted-chart",
-        "candleCount": len(closes),
+        "returnsSource": source,
+        "historyCount": len(closes),
+        "instanceCode": live.get("instance_code"),
     }
+
+
+def _probe_adjusted_enabled() -> bool:
+    try:
+        adj = _sourcearena_json({"name": "کگل", "days": 5, "adjusted": 1}, attempts=2)
+        if isinstance(adj, list) and adj:
+            return True
+        if isinstance(adj, dict) and "adjusted" in str(adj.get("Error") or "").lower():
+            return False
+    except Exception:
+        return False
+    return False
 
 
 def scrape_mineral_stocks() -> list[dict]:
     out: list[dict] = []
+    adjusted_enabled = _probe_adjusted_enabled()
+    print(f"  sourcearena adjusted enabled={adjusted_enabled}")
     for row in MINERAL_STOCKS:
         sym = row["symbol"]
         try:
-            snap = scrape_mineral_stock_symbol(sym)
+            snap = scrape_mineral_stock_symbol(sym, adjusted_enabled=adjusted_enabled)
             snap["name"] = row["name"]
             out.append(snap)
-            print(f"  mineral {sym}: ytd={snap.get('ytdPct')} week={snap.get('weekPct')} candles={snap.get('candleCount')}")
+            print(
+                f"  mineral {sym}: ytd={snap.get('ytdPct')} week={snap.get('weekPct')} "
+                f"src={snap.get('returnsSource')} n={snap.get('historyCount')}"
+            )
         except Exception as exc:  # noqa: BLE001
             print(f"  mineral {sym}: FAIL {exc}")
             out.append(
@@ -455,7 +472,7 @@ def scrape_mineral_stocks() -> list[dict]:
                     "error": str(exc),
                 }
             )
-        time.sleep(0.15)
+        time.sleep(0.12)
     return out
 
 
@@ -1918,9 +1935,12 @@ def main() -> int:
         ]
     print(f"candles1401={len(candles)}")
 
-    print("mineral stocks (adjusted returns from Shakhesban)…")
+    print("mineral stocks (SourceArena live + history)…")
     mineral_stocks = scrape_mineral_stocks()
-    print(f"mineralStocks={sum(1 for s in mineral_stocks if s.get('returnsAdjusted'))}/{len(mineral_stocks)}")
+    print(
+        f"mineralStocks ok={sum(1 for s in mineral_stocks if s.get('historyCount'))}/{len(mineral_stocks)} "
+        f"adjusted={sum(1 for s in mineral_stocks if s.get('returnsAdjusted'))}"
+    )
 
     print("parsistahlil market status…")
     pars = scrape_parsistahlil_market_status()
@@ -2057,7 +2077,7 @@ def main() -> int:
             "ime": "usually needs Iran IP",
             "custeel": "paid; interim uses TGJU iron-ore/steel-coil + FRED",
             "fred": "scripts/fetch_fred.py",
-            "shakhesbanCharts": "قیمت تعدیل‌شده سهام معدنی (هفته/ماه/سال جاری)",
+            "sourcearenaHistory": "live + days history for mineral returns (adjusted if token allows)",
         },
         "tgju": tgju,
         "histories": {k: v for k, v in histories.items() if v},
@@ -2118,7 +2138,11 @@ def main() -> int:
         json.dumps(
             {
                 "updatedAt": market["updatedAt"],
-                "source": "shakhesban-adjusted-chart",
+                "source": (
+                    "sourcearena-adjusted"
+                    if any(s.get("returnsAdjusted") for s in mineral_stocks)
+                    else "sourcearena-unadjusted"
+                ),
                 "stocks": mineral_stocks,
             },
             ensure_ascii=False,

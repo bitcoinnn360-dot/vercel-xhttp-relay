@@ -959,13 +959,13 @@ function applyMineralStockReturns(base: DashboardData, snaps: MineralStockSnap[]
     if (snap.closePrice != null && snap.closePrice > 0) s.closePrice = snap.closePrice
     else if (snap.lastPrice != null && snap.lastPrice > 0) s.closePrice = snap.lastPrice
     if (snap.dailyPct != null && Number.isFinite(snap.dailyPct)) s.dailyPct = snap.dailyPct
-    // Only overwrite period returns when adjusted series is fresh
-    if (snap.returnsAdjusted) {
-      if (snap.weekPct != null && Number.isFinite(snap.weekPct)) s.weekPct = snap.weekPct
-      if (snap.monthPct != null && Number.isFinite(snap.monthPct)) s.monthPct = snap.monthPct
-      if (snap.ytdPct != null && Number.isFinite(snap.ytdPct)) s.ytdPct = snap.ytdPct
-      s.returnsAdjusted = true
-      s.returnsSource = snap.returnsSource || 'shakhesban-adjusted-chart'
+    // Period returns from SourceArena history (adjusted when token allows)
+    if (snap.weekPct != null && Number.isFinite(snap.weekPct)) s.weekPct = snap.weekPct
+    if (snap.monthPct != null && Number.isFinite(snap.monthPct)) s.monthPct = snap.monthPct
+    if (snap.ytdPct != null && Number.isFinite(snap.ytdPct)) s.ytdPct = snap.ytdPct
+    if (snap.returnsSource) {
+      s.returnsAdjusted = Boolean(snap.returnsAdjusted)
+      s.returnsSource = snap.returnsSource
     }
     if (snap.volume != null && snap.volume > 0) s.volume = snap.volume
     if (snap.tradeValueMr != null && snap.tradeValueMr > 0) s.tradeValueMr = snap.tradeValueMr

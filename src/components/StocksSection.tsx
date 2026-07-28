@@ -14,6 +14,7 @@ export function StocksSection({ data }: { data: DashboardData }) {
     return data.stocks.filter((s) => s.group === group)
   }, [data.stocks, group])
 
+  const liveCount = rows.filter((s) => s.returnsSource && !s.isIndustry).length
   const adjustedCount = rows.filter((s) => s.returnsAdjusted && !s.isIndustry).length
 
   return (
@@ -22,10 +23,12 @@ export function StocksSection({ data }: { data: DashboardData }) {
         <div>
           <h2 className="section-title">وضعیت معاملات سهام شرکت‌های معدنی و فلزی</h2>
           <p className="section-sub">
-            ارزش بازار، حجم، بازدهی روزانه تا سال جاری
-            {adjustedCount
-              ? ` · بازدهی هفته/ماه/سال از قیمت تعدیل‌شده شاخص‌بان (${adjustedCount} نماد)`
-              : ' · بازدهی دوره‌ای پس از بارگذاری نمودار تعدیل‌شده'}
+            ارزش بازار و بازدهی از SourceArena
+            {liveCount
+              ? adjustedCount
+                ? ` · ${adjustedCount} نماد با قیمت تعدیل‌شده`
+                : ` · ${liveCount} نماد · تاریخچه غیرتعدیل (تا فعال‌سازی adjusted یا کدال/بورس‌ویو)`
+              : ' · در حال دریافت…'}
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -86,6 +89,10 @@ function StockTr({ s }: { s: StockRow }) {
         {s.returnsAdjusted ? (
           <span className="mr-1 text-[9px] font-semibold text-emerald-700" title={s.returnsSource || 'تعدیل‌شده'}>
             تعدیل‌شده
+          </span>
+        ) : s.returnsSource?.includes('unadjusted') ? (
+          <span className="mr-1 text-[9px] font-normal text-[var(--color-muted)]" title={s.returnsSource}>
+            غیرتعدیل
           </span>
         ) : null}
       </td>

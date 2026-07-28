@@ -52,7 +52,7 @@ const MINERAL_STOCKS = [
 ]
 
 const CACHE_TTL_MS = 20 * 60 * 1000
-const CACHE_KEY = 'https://cache.local/mineral-stocks-bv-v3'
+const CACHE_KEY = 'https://cache.local/mineral-stocks-bv-v4'
 
 function num(raw) {
   if (raw == null) return null
@@ -531,7 +531,7 @@ export async function onRequestGet(context) {
 
   // Keep universe order
   const bySym = new Map(stocks.map((s) => [s.symbol, s]))
-  const ordered = MINERAL_STOCKS.map(
+  let ordered = MINERAL_STOCKS.map(
     (m) =>
       bySym.get(m.symbol) || {
         symbol: m.symbol,
@@ -553,8 +553,35 @@ export async function onRequestGet(context) {
     note = 'بازدهی از قیمت تعدیل‌شده SourceArena'
   }
 
-  let payload = {
-    ok: ordered.some((s) => s.historyCount > 0 || s.closePrice != null),
+  // Per-symbol / full static fill when BV cookie is dead (403: logged in elsewhere).
+  const usableLive = ordered.filter(
+    (s) => s.returnsSource !== 'error' && (s.ytdPct != null || s.closePrice != null || s.historyCount > 0),
+  )
+  if (usableLive.length < Math.max(8, Math.floor(MINERAL_STOCKS.length * 0.5))) {
+    const fallback = await loadStaticFallback(origin)
+    if (fallback?.stocks?.length) {
+      const fbBy = new Map(fallback.stocks.map((s) => [s.symbol, s]))
+      ordered = ordered.map((s) => {
+        if (s.returnsSource !== 'error' && (s.historyCount > 0 || s.closePrice != null || s.ytdPct != null)) {
+          return s
+        }
+        const fb = fbBy.get(s.symbol)
+        return fb ? { ...fb, name: s.name || fb.name } : s
+      })
+      // If still mostly empty, take the whole static snapshot.
+      const usable = ordered.filter(
+        (s) => s.returnsSource !== 'error' && (s.ytdPct != null || s.closePrice != null),
+      )
+      if (usable.length < Math.max(8, Math.floor(MINERAL_STOCKS.length * 0.5))) {
+        ordered = fallback.stocks
+      }
+      source = fallback.source || 'static-mineral_stocks'
+      note = 'fallback static — کوکی بورس‌ویو منقضی یا از دستگاه دیگر لاگین شده'
+    }
+  }
+
+  const payload = {
+    ok: ordered.some((s) => s.historyCount > 0 || s.closePrice != null || s.ytdPct != null),
     updatedAt: new Date().toISOString(),
     source,
     note,
@@ -562,22 +589,6 @@ export async function onRequestGet(context) {
     bourseviewOk: bvOk,
     stocks: ordered,
     errors: errors.slice(0, 12),
-  }
-
-  if (!payload.ok) {
-    const fallback = await loadStaticFallback(origin)
-    if (fallback?.stocks?.length) {
-      payload = {
-        ok: true,
-        updatedAt: fallback.updatedAt || payload.updatedAt,
-        source: fallback.source || 'static-mineral_stocks',
-        note: 'fallback static',
-        bourseviewReady: Boolean(bvCookie),
-        bourseviewOk: bvOk,
-        stocks: fallback.stocks,
-        errors: payload.errors,
-      }
-    }
   }
 
   const body = JSON.stringify(payload)

@@ -1068,18 +1068,37 @@ function applySteelChain(base: DashboardData, bundle: SteelChainBundle | null | 
 
 async function fetchMineralStocksApi(): Promise<MineralStockSnap[] | null> {
   const endpoints = ['/api/stocks', '/data/mineral_stocks.json']
+  let best: MineralStockSnap[] | null = null
+  let bestScore = -1
+
+  const score = (stocks: MineralStockSnap[]) => {
+    let n = 0
+    for (const s of stocks) {
+      if (s.returnsSource === 'error') continue
+      if (s.ytdPct != null || s.weekPct != null || s.closePrice != null || s.candleCount) n += 1
+    }
+    return n
+  }
+
   for (const endpoint of endpoints) {
     try {
       const res = await fetch(endpoint, { cache: 'no-store' })
       if (!res.ok) continue
       const json = (await res.json()) as { ok?: boolean; stocks?: MineralStockSnap[] } | MineralStockSnap[]
-      if (Array.isArray(json)) return json.length ? json : null
-      if (json.stocks?.length) return json.stocks
+      const stocks = Array.isArray(json) ? json : json.stocks
+      if (!stocks?.length) continue
+      const sc = score(stocks)
+      if (sc > bestScore) {
+        best = stocks
+        bestScore = sc
+      }
+      // Prefer a healthy live/static payload; keep scanning if this one is mostly errors.
+      if (sc >= Math.max(8, Math.floor(stocks.length * 0.5))) break
     } catch {
       // try next
     }
   }
-  return null
+  return best
 }
 
 function weightedPct(members: StockRow[], key: 'dailyPct' | 'weekPct' | 'monthPct' | 'ytdPct'): number {
@@ -1166,6 +1185,8 @@ function applyMineralStockReturns(base: DashboardData, snaps: MineralStockSnap[]
     if (sym) s.symbol = sym
     const snap = sym ? bySym.get(sym) : undefined
     if (!snap) continue
+    // Skip dead API stubs (expired BourseView cookie etc.) so seed/static stay visible.
+    if (snap.returnsSource === 'error' && snap.closePrice == null && snap.ytdPct == null) continue
 
     if (snap.closePrice != null && snap.closePrice > 0) s.closePrice = snap.closePrice
     else if (snap.lastPrice != null && snap.lastPrice > 0) s.closePrice = snap.lastPrice

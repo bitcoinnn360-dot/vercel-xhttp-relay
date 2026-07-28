@@ -1,0 +1,2019 @@
+//@version=5
+// این اسکریپت ترکیبی از چند بخش است:
+//   ۱) سیستم معاملاتی بر اساس سشن‌های نیویورک (PDH/PDL sweep، LQR، BSG breakout) - عیناً و بدون
+//      هیچ تغییری در منطق خودش (طبق درخواست: «کاری به سیستم معاملات بر اساس سشن نداشته باشه»).
+//   ۲) اردربلاک‌ها/بریکرها + لیکوییدیتی (BSL/SSL/EQH/EQL) - که اینجا صرفاً در حد یک لایه‌ی
+//      هشدار/تایید عمل می‌کند، نه یک سیستم معاملاتی مستقل.
+//   ۲ب) اردربلاک‌های تایم‌فریمِ بالاتر (پیش‌فرض H1) - با request.security روی دیتای H1 محاسبه و با
+//      مبنای زمانی روی همین چارت (مثلاً ۵ دقیقه) رسم می‌شوند؛ بدون بریکر، فقط با برچسبِ "H1".
+// علاوه بر این‌ها، یک «موتور تایید/رد» جدید اضافه شده که سیگنال‌های خرید/فروش سیستم سشن را،
+// بر اساس تعامل بعدیِ قیمت با اردربلاک‌ها/BSL/SSL/EQH/EQL، تایید یا رد می‌کند:
+//   - شکست (Breakthrough): وقتی کلوز بیش از X درصد (پیش‌فرض ۶۰٪) از ارتفاع ناحیه را رد کرده و
+//     پایین‌تر/بالاتر از آن بسته شده باشد.
+//   - ریجکشن (Rejection): وقتی قیمت فقط با فتیله وارد ناحیه شده ولی کلوز دوباره بیرون از ناحیه
+//     (در جهت مخالف نفوذ) بسته شده باشد.
+// هر دو حالت، جهت‌دار هستند: شکستِ مقاومت/ریجکشنِ حمایت = رویداد صعودی، شکستِ حمایت/ریجکشنِ
+// مقاومت = رویداد نزولی. رویداد صعودی، سیگنال‌های Buy در انتظار را تایید و سیگنال‌های Sell در
+// انتظار را رد می‌کند (و برعکس برای رویداد نزولی). خودِ باکسِ BSG هم به همین شکل در این تایید/رد
+// لحاظ می‌شود، و اردربلاک‌هایی که «بریکر» شده‌اند با نقشِ برعکس‌شده‌ی خودشان بررسی می‌شوند (نه با
+// جهتِ اصلیِ قبل از شکستن) - چون تایید/رد باید به کلِ تاریخچه‌ی فعالِ نواحی نگاه کند، نه فقط
+// نواحیِ تازه‌ساخته‌شده‌ی بعد از خودِ سیگنال.
+//   ۴) ماژولِ اختیاریِ استراتژیِ «NY 9:30 ORB + FVG» - با یک تیک قابل‌فعال‌سازی؛ چون این اسکریپت
+//      indicator است، سیگنال‌هایش به‌صورتِ لیبل (با Entry/SL/TP) نمایش داده می‌شوند و به همان صفِ
+//      تایید/رد اضافه می‌شوند، نه strategy.entry/exit واقعی.
+indicator('CVD ICT Breakout + OB/Liquidity Confirmation Engine', shorttitle='CVD_BSG_OB_Confirm', max_boxes_count=500, max_lines_count=500, max_labels_count=500, overlay=true, max_bars_back=1000)
+
+//#############################################################################
+// بخش ۱: سیستم معاملاتی بر اساس سشن (بدون تغییر نسبت به نسخه‌ی اصلی شما)
+//#############################################################################
+
+//=============================================================================
+// ۱. تنظیمات ورودی استراتژی شکست با FVG (BSG ستاپ)
+//=============================================================================
+pivot_len = input.int(10, title="Swing Length (پریود پیوت ماژور)", minval=2, group="تنظیمات سوئینگ بازار")
+col_bull_fvg = input.color(color.new(#00e676, 90), title="رنگ FVG صعودی", group="تنظیمات بصری FVG")
+col_bear_fvg = input.color(color.new(#ff5252, 90), title="رنگ FVG نزولی", group="تنظیمات بصری FVG")
+
+//=============================================================================
+// ۲. تنظیمات سشن‌های چهارگانه معاملاتی نیویورک
+//=============================================================================
+show_sessions = input.bool(true, title="نمایش سشن‌های معاملاتی نیویورک", group="تنظیمات سشن‌ها")
+col_sess1 = input.color(color.new(#2196f3, 95), title="رنگ سشن ۱ (00:00 - 06:00)", group="تنظیمات سشن‌ها")
+col_sess2 = input.color(color.new(#9c27b0, 95), title="رنگ سشن ۲ (06:00 - 12:00)", group="تنظیمات سشن‌ها")
+col_sess3 = input.color(color.new(#ff9800, 95), title="رنگ سشن ۳ (12:00 - 18:00)", group="تنظیمات سشن‌ها")
+col_sess4 = input.color(color.new(#10b981, 95), title="رنگ سشن ۴ (آسیا 18:00 - 00:00)", group="تنظیمات سشن‌ها")
+
+//=============================================================================
+// ۳. تنظیمات سقف و کف روز قبل (PDH / PDL)
+//=============================================================================
+show_pdh_pdl = input.bool(true, title="نمایش سقف و کف روز قبل (PDH/PDL)", group="تنظیمات PDH/PDL")
+col_pdh = input.color(color.red, title="رنگ خط PDH", group="تنظیمات PDH/PDL")
+col_pdl = input.color(color.green, title="رنگ خط PDL", group="تنظیمات PDH/PDL")
+
+//=============================================================================
+// ۴. تنظیمات استراتژی نقدینگی پیشرفته و ران (ICT Sweep & Liquidity Run)
+//=============================================================================
+show_sweep_strat = input.bool(true, title="فعالسازی استراتژی سوییپ نقدینگی سشن‌ها", group="استراتژی سوییپ")
+ifvg_outside_only = input.bool(true, title="iFVG فقط در خارج از باکس سشن تشکیل شود؟", group="استراتژی سوییپ")
+max_sweep_time_mins = input.int(145, title="حداکثر زمان خارج از سشن بودن (دقیقه)", minval=10, group="استراتژی سوییپ")
+show_lqr_strat = input.bool(true, title="فعالسازی استراتژی ران نقدینگی (LQR)", group="استراتژی لکوئیدیتی ران")
+lqr_wait_bars = input.int(3, title="حداکثر تعداد کندل انتظار برای تشکیل FVG", minval=1, maxval=10, group="استراتژی لکوئیدیتی ران")
+fvg_body_pct = input.float(20.0, title="حداقل درصد شکاف به بدنه کندل وسط (%)", minval=0.0, maxval=100.0, group="تنظیمات کیفیت FVG")
+lqr_displacement_mult = input.float(2.0, title="ضریب قدرت دیسپلیسمنت کندل وسط (برابر)", minval=1.0, group="تنظیمات کیفیت FVG")
+
+// پایش داینامیک زمان‌بندی (تعریف در بخش بالا جهت حل قطعی ارورهای allowed_bars در بخش‌های دیگر چارت)
+tf_mins = timeframe.isminutes ? timeframe.multiplier : timeframe.isdaily ? 1440 : 240
+allowed_bars = math.max(1, math.round(max_sweep_time_mins / tf_mins))
+
+//=============================================================================
+// ۵. تعریف تمامی توابع پایش و ردیابی (انتقال به ابتدای کد جهت حل قطعی خطای کامپایلر)
+//=============================================================================
+// الف) توابع اسکن گپ‌های بکر درون موج (سند بیس شما)
+has_active_bull_fvg_below(float low_level, float high_level) =>
+    bool found = false
+    if not na(low_level) and not na(high_level)
+        for i = 0 to 100 
+            if low[i] > high[i+2] 
+                fvg_top = low[i]
+                fvg_bottom = high[i+2]
+                body_2 = math.abs(close[i+1] - open[i+1])
+                gap = fvg_top - fvg_bottom
+                
+                // بررسی قدرت دیسپلیسمنت کندل وسط نسبت به میانگین کندل اول و سوم
+                size_2 = high[i+1] - low[i+1]
+                size_1 = high[i+2] - low[i+2]
+                size_3 = high[i] - low[i]
+                avg_1_3 = (size_1 + size_3) / 2.0
+                is_displaced = size_2 >= (avg_1_3 * lqr_displacement_mult)
+                
+                // فیلتر هم‌رنگ بودن کندل دوم و سوم (بای پس در صورت دیسپلیسمنت بسیار قوی)
+                bool color_ok = close[i+1] > open[i+1] and (is_displaced or close[i] > open[i])
+                
+                if fvg_top < high_level and fvg_bottom > low_level and color_ok and gap >= (body_2 * (fvg_body_pct / 100.0))
+                    bool unmitigated = true
+                    if i > 0
+                        for k = 0 to i - 1
+                            if low[k] <= fvg_bottom
+                                unmitigated := false
+                                break
+                    if unmitigated
+                        found := true
+                        break
+    found
+
+has_active_bear_fvg_above(float low_level, float high_level) =>
+    bool found = false
+    if not na(low_level) and not na(high_level)
+        for i = 0 to 100 
+            if high[i] < low[i+2] 
+                fvg_top = low[i+2]
+                fvg_bottom = high[i]
+                body_2 = math.abs(close[i+1] - open[i+1])
+                gap = fvg_top - fvg_bottom
+                
+                size_2 = high[i+1] - low[i+1]
+                size_1 = high[i+2] - low[i+2]
+                size_3 = high[i] - low[i]
+                avg_1_3 = (size_1 + size_3) / 2.0
+                is_displaced = size_2 >= (avg_1_3 * lqr_displacement_mult)
+                
+                bool color_ok = close[i+1] < open[i+1] and (is_displaced or close[i] < open[i])
+                
+                if fvg_bottom > low_level and fvg_top < high_level and color_ok and gap >= (body_2 * (fvg_body_pct / 100.0))
+                    bool unmitigated = true
+                    if i > 0
+                        for k = 0 to i - 1
+                            if high[k] >= fvg_top
+                                unmitigated := false
+                                break
+                    if unmitigated
+                        found := true
+                        break
+    found
+
+// ب) توابع شناسایی FVG و iFVG های اخیر جهت تایید برگشت سوییپ
+detect_recent_bear_fvg() =>
+    bool found = false
+    for i = 0 to 5
+        if high[i] < low[i+2]
+            body_2 = math.abs(close[i+1] - open[i+1])
+            gap = low[i+2] - high[i]
+            
+            size_2 = high[i+1] - low[i+1]
+            size_1 = high[i+2] - low[i+2]
+            size_3 = high[i] - low[i]
+            avg_1_3 = (size_1 + size_3) / 2.0
+            is_displaced = size_2 >= (avg_1_3 * lqr_displacement_mult)
+            
+            bool color_ok = close[i+1] < open[i+1] and (is_displaced or close[i] < open[i])
+            
+            if color_ok and gap >= (body_2 * (fvg_body_pct / 100.0))
+                found := true
+                break
+    found
+
+detect_recent_bull_fvg() =>
+    bool found = false
+    for i = 0 to 5
+        if low[i] > high[i+2]
+            body_2 = math.abs(close[i+1] - open[i+1])
+            gap = low[i] - high[i+2]
+            
+            size_2 = high[i+1] - low[i+1]
+            size_1 = high[i+2] - low[i+2]
+            size_3 = high[i] - low[i]
+            avg_1_3 = (size_1 + size_3) / 2.0
+            is_displaced = size_2 >= (avg_1_3 * lqr_displacement_mult)
+            
+            bool color_ok = close[i+1] > open[i+1] and (is_displaced or close[i] > open[i])
+            
+            if color_ok and gap >= (body_2 * (fvg_body_pct / 100.0))
+                found := true
+                break
+    found
+
+detect_recent_bear_ifvg() =>
+    bool found = false
+    for i = 0 to 10
+        if low[i] > high[i+2]
+            body_2 = math.abs(close[i+1] - open[i+1])
+            gap = low[i] - high[i+2]
+            
+            size_2 = high[i+1] - low[i+1]
+            size_1 = high[i+2] - low[i+2]
+            size_3 = high[i] - low[i]
+            avg_1_3 = (size_1 + size_3) / 2.0
+            is_displaced = size_2 >= (avg_1_3 * lqr_displacement_mult)
+            
+            bool color_ok = close[i+1] > open[i+1] and (is_displaced or close[i] > open[i])
+            
+            if color_ok and gap >= (body_2 * (fvg_body_pct / 100.0))
+                if close < high[i+2]
+                    found := true
+                    break
+    found
+
+detect_recent_bull_ifvg() =>
+    bool found = false
+    for i = 0 to 10
+        if high[i] < low[i+2]
+            body_2 = math.abs(close[i+1] - open[i+1])
+            gap = low[i+2] - high[i]
+            
+            size_2 = high[i+1] - low[i+1]
+            size_1 = high[i+2] - low[i+2]
+            size_3 = high[i] - low[i]
+            avg_1_3 = (size_1 + size_3) / 2.0
+            is_displaced = size_2 >= (avg_1_3 * lqr_displacement_mult)
+            
+            bool color_ok = close[i+1] < open[i+1] and (is_displaced or close[i] < open[i])
+            
+            if color_ok and gap >= (body_2 * (fvg_body_pct / 100.0))
+                if close > low[i+2]
+                    found := true
+                    break
+    found
+
+// ج) توابع جدید پایش سوییپ‌های هوشمند (iFVG خارج از باکس و FVG بازگشتی)
+detect_bear_ifvg_outside(float sess_high, int sweep_start_bar) =>
+    bool found = false
+    lookback = bar_index - sweep_start_bar
+    if lookback > 0
+        lookback_capped = math.min(100, lookback)
+        for i = 0 to lookback_capped
+            if low[i] > high[i+2] and low[i] > sess_high
+                body_2 = math.abs(close[i+1] - open[i+1])
+                gap = low[i] - high[i+2]
+                
+                size_2 = high[i+1] - low[i+1]
+                size_1 = high[i+2] - low[i+2]
+                size_3 = high[i] - low[i]
+                avg_1_3 = (size_1 + size_3) / 2.0
+                is_displaced = size_2 >= (avg_1_3 * lqr_displacement_mult)
+                
+                bool color_ok = close[i+1] > open[i+1] and (is_displaced or close[i] > open[i])
+                
+                if color_ok and gap >= (body_2 * (fvg_body_pct / 100.0))
+                    if close < high[i+2]
+                        found := true
+                        break
+        found
+
+detect_bull_ifvg_outside(float sess_low, int sweep_start_bar) =>
+    bool found = false
+    lookback = bar_index - sweep_start_bar
+    if lookback > 0
+        lookback_capped = math.min(100, lookback)
+        for i = 0 to lookback_capped
+            if high[i] < low[i+2] and high[i] < sess_low
+                body_2 = math.abs(close[i+1] - open[i+1])
+                gap = low[i+2] - high[i]
+                
+                size_2 = high[i+1] - low[i+1]
+                size_1 = high[i+2] - low[i+2]
+                size_3 = high[i] - low[i]
+                avg_1_3 = (size_1 + size_3) / 2.0
+                is_displaced = size_2 >= (avg_1_3 * lqr_displacement_mult)
+                
+                bool color_ok = close[i+1] < open[i+1] and (is_displaced or close[i] < open[i])
+                
+                if color_ok and gap >= (body_2 * (fvg_body_pct / 100.0))
+                    if close > low[i+2]
+                        found := true
+                        break
+        found
+
+detect_bear_fvg_returning(float sess_high, int sweep_start_bar) =>
+    bool found = false
+    lookback = bar_index - sweep_start_bar
+    if lookback > 0
+        lookback_capped = math.min(100, lookback)
+        for i = 0 to lookback_capped
+            if high[i] < low[i+2] and close < sess_high
+                body_2 = math.abs(close[i+1] - open[i+1])
+                gap = low[i+2] - high[i]
+                
+                size_2 = high[i+1] - low[i+1]
+                size_1 = high[i+2] - low[i+2]
+                size_3 = high[i] - low[i]
+                avg_1_3 = (size_1 + size_3) / 2.0
+                is_displaced = size_2 >= (avg_1_3 * lqr_displacement_mult)
+                
+                bool color_ok = close[i+1] < open[i+1] and (is_displaced or close[i] > open[i])
+                
+                if color_ok and gap >= (body_2 * (fvg_body_pct / 100.0))
+                    found := true
+                    break
+        found
+
+detect_bull_fvg_returning(float sess_low, int sweep_start_bar) =>
+    bool found = false
+    lookback = bar_index - sweep_start_bar
+    if lookback > 0
+        lookback_capped = math.min(100, lookback)
+        for i = 0 to lookback_capped
+            if low[i] > high[i+2] and close > sess_low
+                body_2 = math.abs(close[i+1] - open[i+1])
+                gap = low[i] - high[i+2]
+                
+                size_2 = high[i+1] - low[i+1]
+                size_1 = high[i+2] - low[i+2]
+                size_3 = high[i] - low[i]
+                avg_1_3 = (size_1 + size_3) / 2.0
+                is_displaced = size_2 >= (avg_1_3 * lqr_displacement_mult)
+                
+                bool color_ok = close[i+1] > open[i+1] and (is_displaced or close[i] > open[i])
+                
+                if color_ok and gap >= (body_2 * (fvg_body_pct / 100.0))
+                    found := true
+                    break
+        found
+
+//=============================================================================
+// ۶. ردیابی پیوت‌های ساختاری سقف و کف (Swing High/Low)
+//=============================================================================
+float sw_high = ta.pivothigh(high, pivot_len, pivot_len)
+float sw_low = ta.pivotlow(low, pivot_len, pivot_len)
+var float last_sw_high = na
+var float last_sw_low = na
+
+if not na(sw_high)
+    last_sw_high := sw_high
+
+if not na(sw_low)
+    last_sw_low := sw_low
+
+// رسم خطوط سوئینگ‌های اصلی فعال روی چارت
+plot(last_sw_high, color=color.new(color.red, 75), style=plot.style_linebr, title="سوئینگ سقف اصلی")
+plot(last_sw_low, color=color.new(color.green, 75), style=plot.style_linebr, title="سوئینگ کف اصلی")
+
+//=============================================================================
+// ۷. پایش داینامیک ۲۴ ساعته PDH/PDL بر اساس چرخه اختصاصی (۸ شب الی ۸ شب روز بعد نیویورک)
+//=============================================================================
+ny_hour = hour(time, "America/New_York")
+ny_minute = minute(time, "America/New_York")
+ny_time_mins = ny_hour * 60 + ny_minute
+
+// مرز ساعت ۲۰:۰۰ نیویورک (معادل ساعت ۳:۳۰ صبح تهران) جهت بازنشانی چرخه ۲۴ ساعته روز قبل
+is_custom_day_reset = (ny_time_mins >= 1200 and ny_time_mins[1] < 1200) or (ny_time_mins >= 1200 and ny_time_mins < ny_time_mins[1])
+
+var float custom_day_high = na
+var float custom_day_low = na
+var float pdh = na
+var float pdl = na
+
+if is_custom_day_reset
+    pdh := custom_day_high
+    pdl := custom_day_low
+    custom_day_high := high
+    custom_day_low := low
+else
+    custom_day_high := math.max(nz(custom_day_high, high), high)
+    custom_day_low := math.min(nz(custom_day_low, low), low)
+
+plot(show_pdh_pdl ? pdh : na, color=col_pdh, style=plot.style_stepline, linewidth=1, title="PDH")
+plot(show_pdh_pdl ? pdl : na, color=col_pdl, style=plot.style_stepline, linewidth=1, title="PDL")
+
+var bool pdh_swept_today = false
+var bool pdl_swept_today = false
+
+if is_custom_day_reset
+    pdh_swept_today := false
+    pdl_swept_today := false
+
+bool pdh_sweep_trigger = false
+bool pdl_sweep_trigger = false
+
+// متغیرهای ردیابی سوییپ نقدینگی PDH/PDL به صورت اولویت اول
+var int pdh_sweep_bar = na, var bool pdh_sweep_active = false
+var int pdl_sweep_bar = na, var bool pdl_sweep_active = false
+bool pdh_sweep_sell = false, bool pdl_sweep_buy = false
+
+if show_pdh_pdl and not na(pdh) and not na(pdl)
+    if not pdh_swept_today and high > pdh
+        pdh_swept_today := true
+        pdh_sweep_active := true
+        pdh_sweep_bar := bar_index
+        
+    if not pdl_swept_today and low < pdl
+        pdl_swept_today := true
+        pdl_sweep_active := true
+        pdl_sweep_bar := bar_index
+
+// پایش سوییپ تأیید شده PDH و PDL
+if pdh_sweep_active and show_sweep_strat
+    if (bar_index - pdh_sweep_bar) > allowed_bars
+        pdh_sweep_active := false
+    else if close < pdh
+        bool is_ifvg_detected = ifvg_outside_only ? detect_bear_ifvg_outside(pdh, pdh_sweep_bar) : detect_recent_bear_ifvg()
+        if is_ifvg_detected or detect_bear_fvg_returning(pdh, pdh_sweep_bar)
+            pdh_sweep_sell := true
+            pdh_sweep_active := false
+            label.new(x=bar_index, y=high, text="PDH Sweep Sell 🔴", color=color.red, textcolor=color.white, style=label.style_label_down, size=size.small)
+
+if pdl_sweep_active and show_sweep_strat
+    if (bar_index - pdl_sweep_bar) > allowed_bars
+        pdl_sweep_active := false
+    else if close > pdl
+        bool is_ifvg_detected = ifvg_outside_only ? detect_bull_ifvg_outside(pdl, pdl_sweep_bar) : detect_recent_bull_ifvg()
+        if is_ifvg_detected or detect_bull_fvg_returning(pdl, pdl_sweep_bar)
+            pdl_sweep_buy := true
+            pdl_sweep_active := false
+            label.new(x=bar_index, y=low, text="PDL Sweep Buy 🟢", color=color.green, textcolor=color.white, style=label.style_label_up, size=size.small)
+
+// رسم برچسب های PDH و PDL در انتهای خطوط جهت راهنمایی بصری تریدر
+var label pdh_lbl = na
+var label pdl_lbl = na
+if show_pdh_pdl and barstate.islast
+    label.delete(pdh_lbl)
+    label.delete(pdl_lbl)
+    pdh_lbl := label.new(x=bar_index, y=pdh, text="PDH", color=color.new(color.red, 100), textcolor=col_pdh, style=label.style_label_left, size=size.small)
+    pdl_lbl := label.new(x=bar_index, y=pdl, text="PDL", color=color.new(color.green, 100), textcolor=col_pdl, style=label.style_label_left, size=size.small)
+
+//=============================================================================
+// ۸. مدیریت سشن‌های چهارگانه نیویورک و پایش زمانمند سوییپ‌ها
+//=============================================================================
+in_session(sess_str) =>
+    not na(time(timeframe.period, sess_str, "America/New_York"))
+
+in_s1 = in_session("0000-0600")
+in_s2 = in_session("0600-1200")
+in_s3 = in_session("1200-1800")
+in_s4 = in_session("1800-0000")
+
+var int s1_start = na, var float s1_high = na, var float s1_low = na, var box s1_box = na, var bool s1_active = false
+var int s2_start = na, var float s2_high = na, var float s2_low = na, var box s2_box = na, var bool s2_active = false
+var int s3_start = na, var float s3_high = na, var float s3_low = na, var box s3_box = na, var bool s3_active = false
+var int s4_start = na, var float s4_high = na, var float s4_low = na, var box s4_box = na, var bool s4_active = false
+
+// متغیرهای ردیابی سوییپ نقدینگی سشن‌ها
+var int s1_sweep_high_bar = na, var bool s1_sweep_high_active = false
+var int s1_sweep_low_bar = na, var bool s1_sweep_low_active = false
+var int s2_sweep_high_bar = na, var bool s2_sweep_high_active = false
+var int s2_sweep_low_bar = na, var bool s2_sweep_low_active = false
+var int s3_sweep_high_bar = na, var bool s3_sweep_high_active = false
+var int s3_sweep_low_bar = na, var bool s3_sweep_low_active = false
+var int s4_sweep_high_bar = na, var bool s4_sweep_high_active = false
+var int s4_sweep_low_bar = na, var bool s4_sweep_low_active = false
+
+// تعریف استاندارد متغیرهای تریگر سوییپ (به صورت جداگانه در خطوط مجزا)
+s1_h_swept = false
+s1_l_swept = false
+s2_h_swept = false
+s2_l_swept = false
+s3_h_swept = false
+s3_l_swept = false
+s4_h_swept = false
+s4_l_swept = false
+
+s1_sweep_buy = false
+s1_sweep_sell = false
+s2_sweep_buy = false
+s2_sweep_sell = false
+s3_sweep_buy = false
+s3_sweep_sell = false
+s4_sweep_buy = false
+s4_sweep_sell = false
+
+// متغیرهای استراتژی ران نقدینگی (LQR)
+var int s1_lqr_high_trigger_bar = na, var bool s1_lqr_high_active = false, var float s1_lqr_high_fvg_top = na, var float s1_lqr_high_fvg_bottom = na, var bool s1_lqr_high_fvg_active = false, var bool s1_lqr_high_triggered = false, var bool s1_lqr_high_executed = false
+var int s1_lqr_low_trigger_bar = na, var bool s1_lqr_low_active = false, var float s1_lqr_low_fvg_top = na, var float s1_lqr_low_fvg_bottom = na, var bool s1_lqr_low_fvg_active = false, var bool s1_lqr_low_triggered = false, var bool s1_lqr_low_executed = false
+
+var int s2_lqr_high_trigger_bar = na, var bool s2_lqr_high_active = false, var float s2_lqr_high_fvg_top = na, var float s2_lqr_high_fvg_bottom = na, var bool s2_lqr_high_fvg_active = false, var bool s2_lqr_high_triggered = false, var bool s2_lqr_high_executed = false
+var int s2_lqr_low_trigger_bar = na, var bool s2_lqr_low_active = false, var float s2_lqr_low_fvg_top = na, var float s2_lqr_low_fvg_bottom = na, var bool s2_lqr_low_fvg_active = false, var bool s2_lqr_low_triggered = false, var bool s2_lqr_low_executed = false
+
+var int s3_lqr_high_trigger_bar = na, var bool s3_lqr_high_active = false, var float s3_lqr_high_fvg_top = na, var float s3_lqr_high_fvg_bottom = na, var bool s3_lqr_high_fvg_active = false, var bool s3_lqr_high_triggered = false, var bool s3_lqr_high_executed = false
+var int s3_lqr_low_trigger_bar = na, var bool s3_lqr_low_active = false, var float s3_lqr_low_fvg_top = na, var float s3_lqr_low_fvg_bottom = na, var bool s3_lqr_low_fvg_active = false, var bool s3_lqr_low_triggered = false, var bool s3_lqr_low_executed = false
+
+var int s4_lqr_high_trigger_bar = na, var bool s4_lqr_high_active = false, var float s4_lqr_high_fvg_top = na, var float s4_lqr_high_fvg_bottom = na, var bool s4_lqr_high_fvg_active = false, var bool s4_lqr_high_triggered = false, var bool s4_lqr_high_executed = false
+var int s4_lqr_low_trigger_bar = na, var bool s4_lqr_low_active = false, var float s4_lqr_low_fvg_top = na, var float s4_lqr_low_fvg_bottom = na, var bool s4_lqr_low_fvg_active = false, var bool s4_lqr_low_triggered = false, var bool s4_lqr_low_executed = false
+
+bool s1_lqr_buy_sig = false, bool s1_lqr_sell_sig = false, bool s1_lqr_rev_buy_sig = false, bool s1_lqr_rev_sell_sig = false
+bool s2_lqr_buy_sig = false, bool s2_lqr_sell_sig = false, bool s2_lqr_rev_buy_sig = false, bool s2_lqr_rev_sell_sig = false
+bool s3_lqr_buy_sig = false, bool s3_lqr_sell_sig = false, bool s3_lqr_rev_buy_sig = false, bool s3_lqr_rev_sell_sig = false
+bool s4_lqr_buy_sig = false, bool s4_lqr_sell_sig = false, bool s4_lqr_rev_buy_sig = false, bool s4_lqr_rev_sell_sig = false
+
+// سشن ۱ (00:00 - 06:00)
+is_s1_start = in_s1 and (not in_s1[1] or na(in_s1[1]))
+is_s1_end = not in_s1 and in_s1[1]
+
+if is_s1_start
+    s1_start := bar_index
+    s1_high := high
+    s1_low := low
+    s1_active := false
+    s1_sweep_high_active := false
+    s1_sweep_low_active := false
+    s1_lqr_high_active := false
+    s1_lqr_high_fvg_active := false
+    s1_lqr_low_active := false
+    s1_lqr_low_fvg_active := false
+    s1_lqr_high_triggered := false
+    s1_lqr_low_triggered := false
+    s1_lqr_high_executed := false
+    s1_lqr_low_executed := false
+    if show_sessions
+        s1_box := box.new(left=s1_start, top=s1_high, right=bar_index, bottom=s1_low, bgcolor=col_sess1, border_color=color.new(col_sess1, 10), border_width=1, text="S1 (00-06)", text_color=color.white, text_size=size.small, text_valign=text.align_top, text_halign=text.align_left)
+
+if in_s1
+    s1_high := math.max(s1_high, high)
+    s1_low := math.min(s1_low, low)
+    if show_sessions
+        box.set_top(s1_box, s1_high)
+        box.set_bottom(s1_box, s1_low)
+        box.set_right(s1_box, bar_index)
+
+if is_s1_end
+    s1_active := true
+
+if s1_active and show_sessions
+    box.set_right(s1_box, bar_index)
+    if high > s1_high
+        s1_active := false
+        s1_sweep_high_active := true
+        s1_sweep_high_bar := bar_index
+        s1_h_swept := true
+        box.set_border_style(s1_box, line.style_dashed)
+        box.set_bgcolor(s1_box, color.new(color.gray, 95))
+ 
+    else if low < s1_low
+        s1_active := false
+        s1_sweep_low_active := true
+        s1_sweep_low_bar := bar_index
+        s1_l_swept := true
+        box.set_border_style(s1_box, line.style_dashed)
+        box.set_bgcolor(s1_box, color.new(color.gray, 95))
+        
+
+if s1_sweep_high_active and show_sweep_strat
+    if (bar_index - s1_sweep_high_bar) > allowed_bars
+        s1_sweep_high_active := false
+    else if close < s1_high
+        bool is_ifvg_detected = ifvg_outside_only ? detect_bear_ifvg_outside(s1_high, s1_sweep_high_bar) : detect_recent_bear_ifvg()
+        if is_ifvg_detected or detect_bear_fvg_returning(s1_high, s1_sweep_high_bar)
+            s1_sweep_sell := true
+            s1_sweep_high_active := false
+            label.new(x=bar_index, y=high, text="S1 SW 🔴", color=color.red, textcolor=color.white, style=label.style_label_down, size=size.tiny)
+
+if s1_sweep_low_active and show_sweep_strat
+    if (bar_index - s1_sweep_low_bar) > allowed_bars
+        s1_sweep_low_active := false
+    else if close > s1_low
+        bool is_ifvg_detected = ifvg_outside_only ? detect_bull_ifvg_outside(s1_low, s1_sweep_low_bar) : detect_recent_bull_ifvg()
+        if is_ifvg_detected or detect_bull_fvg_returning(s1_low, s1_sweep_low_bar)
+            s1_sweep_buy := true
+            s1_sweep_low_active := false
+            label.new(x=bar_index, y=low, text="S1 SW 🟢", color=color.green, textcolor=color.white, style=label.style_label_up, size=size.tiny)
+
+// پایش ران نقدینگی سشن ۱ (با اعمال قفل تریگر جهت جلوگیری از اسپم سیگنال)
+if not in_s1 and not na(s1_high) and not s1_lqr_high_triggered and not s1_lqr_high_executed
+    if close > s1_high and close > open
+        s1_lqr_high_active := true
+        s1_lqr_high_triggered := true
+        s1_lqr_high_trigger_bar := bar_index
+
+if s1_lqr_high_active and show_lqr_strat
+    if (bar_index - s1_lqr_high_trigger_bar) > lqr_wait_bars
+        s1_lqr_high_active := false
+        s1_lqr_high_triggered := false // منقضی شدن ستاپ بدون ورود ➔ آزادسازی تریگر برای ستاپ‌های بعدی
+    else
+        lqr_gap_s1 = low - high[2]
+        lqr_body_s1 = math.abs(close[1] - open[1])
+        lqr_size_2 = high[1] - low[1]
+        lqr_size_1 = high[2] - low[2]
+        lqr_size_3 = high - low
+        lqr_avg_1_3 = (lqr_size_1 + lqr_size_3) / 2.0
+        lqr_is_displaced = lqr_size_2 >= (lqr_avg_1_3 * lqr_displacement_mult)
+        lqr_color_ok = close[1] > open[1] and (lqr_is_displaced or close > open)
+        
+        if low > high[2] and low > s1_high and lqr_color_ok and lqr_gap_s1 >= (lqr_body_s1 * (fvg_body_pct / 100.0))
+            s1_lqr_high_active := false
+            s1_lqr_high_fvg_active := true
+            s1_lqr_high_fvg_top := low
+            s1_lqr_high_fvg_bottom := high[2]
+
+if s1_lqr_high_fvg_active and show_lqr_strat
+    if low <= s1_lqr_high_fvg_top and close >= s1_lqr_high_fvg_bottom
+        s1_lqr_buy_sig := true
+        s1_lqr_high_fvg_active := false
+        s1_lqr_high_executed := true // قفل دائم کل سشن جهت جلوگیری از سیگنال دوم
+        label.new(x=bar_index, y=low, text="S1 LQR 🔵", color=color.blue, textcolor=color.white, style=label.style_label_up, size=size.tiny)
+    else if close < s1_lqr_high_fvg_bottom
+        s1_lqr_rev_sell_sig := true
+        s1_lqr_high_fvg_active := false
+        s1_lqr_high_executed := true // قفل دائم کل سشن جهت جلوگیری از سیگنال دوم
+        label.new(x=bar_index, y=high, text="S1 LQR- 🔴", color=color.red, textcolor=color.white, style=label.style_label_down, size=size.tiny)
+
+if not in_s1 and not na(s1_low) and not s1_lqr_low_triggered and not s1_lqr_low_executed
+    if close < s1_low and close < open
+        s1_lqr_low_active := true
+        s1_lqr_low_triggered := true
+        s1_lqr_low_trigger_bar := bar_index
+
+if s1_lqr_low_active and show_lqr_strat
+    if (bar_index - s1_lqr_low_trigger_bar) > lqr_wait_bars
+        s1_lqr_low_active := false
+        s1_lqr_low_triggered := false // منقضی شدن ستاپ بدون ورود ➔ آزادسازی تریگر برای ستاپ‌های بعدی
+    else
+        lqr_gap_s1_low = high < low[2] ? low[2] - high : 0.0
+        lqr_body_s1_low = math.abs(close[1] - open[1])
+        lqr_size_2_low = high[1] - low[1]
+        lqr_size_1_low = high[2] - low[2]
+        lqr_size_3_low = high - low
+        lqr_avg_1_3_low = (lqr_size_1_low + lqr_size_3_low) / 2.0
+        lqr_is_displaced_low = lqr_size_2_low >= (lqr_avg_1_3_low * lqr_displacement_mult)
+        lqr_color_ok_low = close[1] < open[1] and (lqr_is_displaced_low or close < open)
+        
+        if high < low[2] and high < s1_low and lqr_color_ok_low and lqr_gap_s1_low >= (lqr_body_s1_low * (fvg_body_pct / 100.0))
+            s1_lqr_low_active := false
+            s1_lqr_low_fvg_active := true
+            s1_lqr_low_fvg_top := low[2]
+            s1_lqr_low_fvg_bottom := high
+
+if s1_lqr_low_fvg_active and show_lqr_strat
+    if high >= s1_lqr_low_fvg_bottom and close <= s1_lqr_low_fvg_top
+        s1_lqr_sell_sig := true
+        s1_lqr_low_fvg_active := false
+        s1_lqr_low_executed := true // قفل دائم کل سشن جهت جلوگیری از سیگنال دوم
+        label.new(x=bar_index, y=high, text="S1 LQR 🔴", color=color.red, textcolor=color.white, style=label.style_label_down, size=size.tiny)
+    else if close > s1_lqr_low_fvg_top
+        s1_lqr_rev_buy_sig := true
+        s1_lqr_low_fvg_active := false
+        s1_lqr_low_executed := true // قفل دائم کل سشن جهت جلوگیری از سیگنال دوم
+        label.new(x=bar_index, y=low, text="S1 LQR- 🟢", color=color.green, textcolor=color.white, style=label.style_label_up, size=size.tiny)
+
+// سشن ۲ (06:00 - 12:00)
+is_s2_start = in_s2 and (not in_s2[1] or na(in_s2[1]))
+is_s2_end = not in_s2 and in_s2[1]
+
+if is_s2_start
+    s2_start := bar_index
+    s2_high := high
+    s2_low := low
+    s2_active := false
+    s2_sweep_high_active := false
+    s2_sweep_low_active := false
+    s2_lqr_high_active := false
+    s2_lqr_high_fvg_active := false
+    s2_lqr_low_active := false
+    s2_lqr_low_fvg_active := false
+    s2_lqr_high_triggered := false
+    s2_lqr_low_triggered := false
+    s2_lqr_high_executed := false
+    s2_lqr_low_executed := false
+    if show_sessions
+        s2_box := box.new(left=s2_start, top=s2_high, right=bar_index, bottom=s2_low, bgcolor=col_sess2, border_color=color.new(col_sess2, 10), border_width=1, text="S2 (06-12)", text_color=color.white, text_size=size.small, text_valign=text.align_top, text_halign=text.align_left)
+
+if in_s2
+    s2_high := math.max(s2_high, high)
+    s2_low := math.min(s2_low, low)
+    if show_sessions
+        box.set_top(s2_box, s2_high)
+        box.set_bottom(s2_box, s2_low)
+        box.set_right(s2_box, bar_index)
+
+if is_s2_end
+    s2_active := true
+
+if s2_active and show_sessions
+    box.set_right(s2_box, bar_index)
+    if high > s2_high
+        s2_active := false
+        s2_sweep_high_active := true
+        s2_sweep_high_bar := bar_index
+        s2_h_swept := true
+        box.set_border_style(s2_box, line.style_dashed)
+        box.set_bgcolor(s2_box, color.new(color.gray, 95))
+     
+    else if low < s2_low
+        s2_active := false
+        s2_sweep_low_active := true
+        s2_sweep_low_bar := bar_index
+        s2_l_swept := true
+        box.set_border_style(s2_box, line.style_dashed)
+        box.set_bgcolor(s2_box, color.new(color.gray, 95))
+       
+if s2_sweep_high_active and show_sweep_strat
+    if (bar_index - s2_sweep_high_bar) > allowed_bars
+        s2_sweep_high_active := false
+    else if close < s2_high
+        bool is_ifvg_detected = ifvg_outside_only ? detect_bear_ifvg_outside(s2_high, s2_sweep_high_bar) : detect_recent_bear_ifvg()
+        if is_ifvg_detected or detect_bear_fvg_returning(s2_high, s2_sweep_high_bar)
+            s2_sweep_sell := true
+            s2_sweep_high_active := false
+            label.new(x=bar_index, y=high, text="S2 SW 🔴", color=color.red, textcolor=color.white, style=label.style_label_down, size=size.tiny)
+
+if s2_sweep_low_active and show_sweep_strat
+    if (bar_index - s2_sweep_low_bar) > allowed_bars
+        s2_sweep_low_active := false
+    else if close > s2_low
+        bool is_ifvg_detected = ifvg_outside_only ? detect_bull_ifvg_outside(s2_low, s2_sweep_low_bar) : detect_recent_bull_ifvg()
+        if is_ifvg_detected or detect_bull_fvg_returning(s2_low, s2_sweep_low_bar)
+            s2_sweep_buy := true
+            s2_sweep_low_active := false
+            label.new(x=bar_index, y=low, text="S2 SW 🟢", color=color.green, textcolor=color.white, style=label.style_label_up, size=size.tiny)
+
+// پایش ران نقدینگی سشن ۲
+if not in_s2 and not na(s2_high) and not s2_lqr_high_triggered and not s2_lqr_high_executed
+    if close > s2_high and close > open
+        s2_lqr_high_active := true
+        s2_lqr_high_triggered := true
+        s2_lqr_high_trigger_bar := bar_index
+
+if s2_lqr_high_active and show_lqr_strat
+    if (bar_index - s2_lqr_high_trigger_bar) > lqr_wait_bars
+        s2_lqr_high_active := false
+        s2_lqr_high_triggered := false
+    else
+        lqr_gap_s2 = low - high[2]
+        lqr_body_s2 = math.abs(close[1] - open[1])
+        lqr_size_2_s2 = high[1] - low[1]
+        lqr_size_1_s2 = high[2] - low[2]
+        lqr_size_3_s2 = high - low
+        lqr_avg_1_3_s2 = (lqr_size_1_s2 + lqr_size_3_s2) / 2.0
+        lqr_is_displaced_s2 = lqr_size_2_s2 >= (lqr_avg_1_3_s2 * lqr_displacement_mult)
+        lqr_color_ok_s2 = close[1] > open[1] and (lqr_is_displaced_s2 or close > open)
+        
+        if low > high[2] and low > s2_high and lqr_color_ok_s2 and lqr_gap_s2 >= (lqr_body_s2 * (fvg_body_pct / 100.0))
+            s2_lqr_high_active := false
+            s2_lqr_high_fvg_active := true
+            s2_lqr_high_fvg_top := low
+            s2_lqr_high_fvg_bottom := high[2]
+
+if s2_lqr_high_fvg_active and show_lqr_strat
+    if low <= s2_lqr_high_fvg_top and close >= s2_lqr_high_fvg_bottom
+        s2_lqr_buy_sig := true
+        s2_lqr_high_fvg_active := false
+        s2_lqr_high_executed := true
+        label.new(x=bar_index, y=low, text="S2 LQR 🔵", color=color.blue, textcolor=color.white, style=label.style_label_up, size=size.tiny)
+    else if close < s2_lqr_high_fvg_bottom
+        s2_lqr_rev_sell_sig := true
+        s2_lqr_high_fvg_active := false
+        s2_lqr_high_executed := true
+        label.new(x=bar_index, y=high, text="S2 LQR- 🔴", color=color.red, textcolor=color.white, style=label.style_label_down, size=size.tiny)
+
+if not in_s2 and not na(s2_low) and not s2_lqr_low_triggered and not s2_lqr_low_executed
+    if close < s2_low and close < open
+        s2_lqr_low_active := true
+        s2_lqr_low_triggered := true
+        s2_lqr_low_trigger_bar := bar_index
+
+if s2_lqr_low_active and show_lqr_strat
+    if (bar_index - s2_lqr_low_trigger_bar) > lqr_wait_bars
+        s2_lqr_low_active := false
+        s2_lqr_low_triggered := false
+    else
+        lqr_gap_s2_low = high < low[2] ? low[2] - high : 0.0
+        lqr_body_s2_low = math.abs(close[1] - open[1])
+        lqr_size_2_s2_low = high[1] - low[1]
+        lqr_size_1_s2_low = high[2] - low[2]
+        lqr_size_3_s2_low = high - low
+        lqr_avg_1_3_s2_low = (lqr_size_1_s2_low + lqr_size_3_s2_low) / 2.0
+        lqr_is_displaced_s2_low = lqr_size_2_s2_low >= (lqr_avg_1_3_s2_low * lqr_displacement_mult)
+        lqr_color_ok_s2_low = close[1] < open[1] and (lqr_is_displaced_s2_low or close < open)
+        
+        if high < low[2] and high < s2_low and lqr_color_ok_s2_low and lqr_gap_s2_low >= (lqr_body_s2_low * (fvg_body_pct / 100.0))
+            s2_lqr_low_active := false
+            s2_lqr_low_fvg_active := true
+            s2_lqr_low_fvg_top := low[2]
+            s2_lqr_low_fvg_bottom := high
+
+if s2_lqr_low_fvg_active and show_lqr_strat
+    if high >= s2_lqr_low_fvg_bottom and close <= s2_lqr_low_fvg_top
+        s2_lqr_sell_sig := true
+        s2_lqr_low_fvg_active := false
+        s2_lqr_low_executed := true
+        label.new(x=bar_index, y=high, text="S2 LQR 🔴", color=color.red, textcolor=color.white, style=label.style_label_down, size=size.tiny)
+    else if close > s2_lqr_low_fvg_top
+        s2_lqr_rev_buy_sig := true
+        s2_lqr_low_fvg_active := false
+        s2_lqr_low_executed := true
+        label.new(x=bar_index, y=low, text="S2 LQR- 🟢", color=color.green, textcolor=color.white, style=label.style_label_up, size=size.tiny)
+
+// سشن ۳ (12:00 - 18:00)
+is_s3_start = in_s3 and (not in_s3[1] or na(in_s3[1]))
+is_s3_end = not in_s3 and in_s3[1]
+
+if is_s3_start
+    s3_start := bar_index
+    s3_high := high
+    s3_low := low
+    s3_active := false
+    s3_sweep_high_active := false
+    s3_sweep_low_active := false
+    s3_lqr_high_active := false
+    s3_lqr_high_fvg_active := false
+    s3_lqr_low_active := false
+    s3_lqr_low_fvg_active := false
+    s3_lqr_high_triggered := false
+    s3_lqr_low_triggered := false
+    s3_lqr_high_executed := false
+    s3_lqr_low_executed := false
+    if show_sessions
+        s3_box := box.new(left=s3_start, top=s3_high, right=bar_index, bottom=s3_low, bgcolor=col_sess3, border_color=color.new(col_sess3, 10), border_width=1, text="S3 (12-18)", text_color=color.white, text_size=size.small, text_valign=text.align_top, text_halign=text.align_left)
+
+if in_s3
+    s3_high := math.max(s3_high, high)
+    s3_low := math.min(s3_low, low)
+    if show_sessions
+        box.set_top(s3_box, s3_high)
+        box.set_bottom(s3_box, s3_low)
+        box.set_right(s3_box, bar_index)
+
+if is_s3_end
+    s3_active := true
+
+if s3_active and show_sessions
+    box.set_right(s3_box, bar_index)
+    if high > s3_high
+        s3_active := false
+        s3_sweep_high_active := true
+        s3_sweep_high_bar := bar_index
+        s3_h_swept := true
+        box.set_border_style(s3_box, line.style_dashed)
+        box.set_bgcolor(s3_box, color.new(color.gray, 95))
+ 
+    else if low < s3_low
+        s3_active := false
+        s3_sweep_low_active := true
+        s3_sweep_low_bar := bar_index
+        s3_l_swept := true
+        box.set_border_style(s3_box, line.style_dashed)
+        box.set_bgcolor(s3_box, color.new(color.gray, 95))
+
+// پایش سوییپ زمان‌بند سشن ۳
+if s3_sweep_high_active and show_sweep_strat
+    if (bar_index - s3_sweep_high_bar) > allowed_bars
+        s3_sweep_high_active := false
+    else if close < s3_high
+        bool is_ifvg_detected = ifvg_outside_only ? detect_bear_ifvg_outside(s3_high, s3_sweep_high_bar) : detect_recent_bear_ifvg()
+        if is_ifvg_detected or detect_bear_fvg_returning(s3_high, s3_sweep_high_bar)
+            s3_sweep_sell := true
+            s3_sweep_high_active := false
+            label.new(x=bar_index, y=high, text="S3 SW 🔴", color=color.red, textcolor=color.white, style=label.style_label_down, size=size.tiny)
+
+if s3_sweep_low_active and show_sweep_strat
+    if (bar_index - s3_sweep_low_bar) > allowed_bars
+        s3_sweep_low_active := false
+    else if close > s3_low
+        bool is_ifvg_detected = ifvg_outside_only ? detect_bull_ifvg_outside(s3_low, s3_sweep_low_bar) : detect_recent_bull_ifvg()
+        if is_ifvg_detected or detect_bull_fvg_returning(s3_low, s3_sweep_low_bar)
+            s3_sweep_buy := true
+            s3_sweep_low_active := false
+            label.new(x=bar_index, y=low, text="S3 SW 🟢", color=color.green, textcolor=color.white, style=label.style_label_up, size=size.tiny)
+
+// پایش ران نقدینگی سشن ۳
+if not in_s3 and not na(s3_high) and not s3_lqr_high_triggered and not s3_lqr_high_executed
+    if close > s3_high and close > open
+        s3_lqr_high_active := true
+        s3_lqr_high_triggered := true
+        s3_lqr_high_trigger_bar := bar_index
+
+if s3_lqr_high_active and show_lqr_strat
+    if (bar_index - s3_lqr_high_trigger_bar) > lqr_wait_bars
+        s3_lqr_high_active := false
+        s3_lqr_high_triggered := false
+    else
+        lqr_gap_s3 = low - high[2]
+        lqr_body_s3 = math.abs(close[1] - open[1])
+        lqr_size_2_s3 = high[1] - low[1]
+        lqr_size_1_s3 = high[2] - low[2]
+        lqr_size_3_s3 = high - low
+        lqr_avg_1_3_s3 = (lqr_size_1_s3 + lqr_size_3_s3) / 2.0
+        lqr_is_displaced_s3 = lqr_size_2_s3 >= (lqr_avg_1_3_s3 * lqr_displacement_mult)
+        lqr_color_ok_s3 = close[1] > open[1] and (lqr_is_displaced_s3 or close > open)
+        
+        if low > high[2] and low > s3_high and lqr_color_ok_s3 and lqr_gap_s3 >= (lqr_body_s3 * (fvg_body_pct / 100.0))
+            s3_lqr_high_active := false
+            s3_lqr_high_fvg_active := true
+            s3_lqr_high_fvg_top := low
+            s3_lqr_high_fvg_bottom := high[2]
+
+if s3_lqr_high_fvg_active and show_lqr_strat
+    if low <= s3_lqr_high_fvg_top and close >= s3_lqr_high_fvg_bottom
+        s3_lqr_buy_sig := true
+        s3_lqr_high_fvg_active := false
+        s3_lqr_high_executed := true
+        label.new(x=bar_index, y=low, text="S3 LQR 🔵", color=color.blue, textcolor=color.white, style=label.style_label_up, size=size.tiny)
+    else if close < s3_lqr_high_fvg_bottom
+        s3_lqr_rev_sell_sig := true
+        s3_lqr_high_fvg_active := false
+        s3_lqr_high_executed := true
+        label.new(x=bar_index, y=high, text="S3 LQR- 🔴", color=color.red, textcolor=color.white, style=label.style_label_down, size=size.tiny)
+
+if not in_s3 and not na(s3_low) and not s3_lqr_low_triggered and not s3_lqr_low_executed
+    if close < s3_low and close < open
+        s3_lqr_low_active := true
+        s3_lqr_low_triggered := true
+        s3_lqr_low_trigger_bar := bar_index
+
+if s3_lqr_low_active and show_lqr_strat
+    if (bar_index - s3_lqr_low_trigger_bar) > lqr_wait_bars
+        s3_lqr_low_active := false
+        s3_lqr_low_triggered := false
+    else
+        lqr_gap_s3_low = high < low[2] ? low[2] - high : 0.0
+        lqr_body_s3_low = math.abs(close[1] - open[1])
+        lqr_size_2_s3_low = high[1] - low[1]
+        lqr_size_1_s3_low = high[2] - low[2]
+        lqr_size_3_s3_low = high - low
+        lqr_avg_1_3_s3_low = (lqr_size_1_s3_low + lqr_size_3_s3_low) / 2.0
+        lqr_is_displaced_s3_low = lqr_size_2_s3_low >= (lqr_avg_1_3_s3_low * lqr_displacement_mult)
+        lqr_color_ok_s3_low = close[1] < open[1] and (lqr_is_displaced_s3_low or close < open)
+        
+        if high < low[2] and high < s3_low and lqr_color_ok_s3_low and lqr_gap_s3_low >= (lqr_body_s3_low * (fvg_body_pct / 100.0))
+            s3_lqr_low_active := false
+            s3_lqr_low_fvg_active := true
+            s3_lqr_low_fvg_top := low[2]
+            s3_lqr_low_fvg_bottom := high
+
+if s3_lqr_low_fvg_active and show_lqr_strat
+    if high >= s3_lqr_low_fvg_bottom and close <= s3_lqr_low_fvg_top
+        s3_lqr_sell_sig := true
+        s3_lqr_low_fvg_active := false
+        s3_lqr_low_executed := true
+        label.new(x=bar_index, y=high, text="S3 LQR 🔴", color=color.red, textcolor=color.white, style=label.style_label_down, size=size.tiny)
+    else if close > s3_lqr_low_fvg_top
+        s3_lqr_rev_buy_sig := true
+        s3_lqr_low_fvg_active := false
+        s3_lqr_low_executed := true
+        label.new(x=bar_index, y=low, text="S3 LQR- 🟢", color=color.green, textcolor=color.white, style=label.style_label_up, size=size.tiny)
+
+// سشن ۴ (آسیا 18:00 - 00:00)
+is_s4_start = in_s4 and (not in_s4[1] or na(in_s4[1]))
+is_s4_end = not in_s4 and in_s4[1]
+
+if is_s4_start
+    s4_start := bar_index
+    s4_high := high
+    s4_low := low
+    s4_active := false
+    s4_sweep_high_active := false
+    s4_sweep_low_active := false
+    s4_lqr_high_active := false
+    s4_lqr_high_fvg_active := false
+    s4_lqr_low_active := false
+    s4_lqr_low_fvg_active := false
+    s4_lqr_high_triggered := false
+    s4_lqr_low_triggered := false
+    s4_lqr_high_executed := false
+    s4_lqr_low_executed := false
+    if show_sessions
+        s4_box := box.new(left=s4_start, top=s4_high, right=bar_index, bottom=s4_low, bgcolor=col_sess4, border_color=color.new(col_sess4, 10), border_width=1, text="S4 (18-00)", text_color=color.white, text_size=size.small, text_valign=text.align_top, text_halign=text.align_left)
+
+if in_s4
+    s4_high := math.max(s4_high, high)
+    s4_low := math.min(s4_low, low)
+    if show_sessions
+        box.set_top(s4_box, s4_high)
+        box.set_bottom(s4_box, s4_low)
+        box.set_right(s4_box, bar_index)
+
+if is_s4_end
+    s4_active := true
+
+if s4_active and show_sessions
+    box.set_right(s4_box, bar_index)
+    if high > s4_high
+        s4_active := false
+        s4_sweep_high_active := true
+        s4_sweep_high_bar := bar_index
+        s4_h_swept := true
+        box.set_border_style(s4_box, line.style_dashed)
+        box.set_bgcolor(s4_box, color.new(color.gray, 95))
+ 
+    else if low < s4_low
+        s4_active := false
+        s4_sweep_low_active := true
+        s4_sweep_low_bar := bar_index
+        s4_l_swept := true
+        box.set_border_style(s4_box, line.style_dashed)
+        box.set_bgcolor(s4_box, color.new(color.gray, 95))
+ 
+if s4_sweep_high_active and show_sweep_strat
+    if (bar_index - s4_sweep_high_bar) > allowed_bars
+        s4_sweep_high_active := false
+    else if close < s4_high
+        bool is_ifvg_detected = ifvg_outside_only ? detect_bear_ifvg_outside(s4_high, s4_sweep_high_bar) : detect_recent_bear_ifvg()
+        if is_ifvg_detected or detect_bear_fvg_returning(s4_high, s4_sweep_high_bar)
+            s4_sweep_sell := true
+            s4_sweep_high_active := false
+            label.new(x=bar_index, y=high, text="S4 SW 🔴", color=color.red, textcolor=color.white, style=label.style_label_down, size=size.tiny)
+
+if s4_sweep_low_active and show_sweep_strat
+    if (bar_index - s4_sweep_low_bar) > allowed_bars
+        s4_sweep_low_active := false
+    else if close > s4_low
+        bool is_ifvg_detected = ifvg_outside_only ? detect_bull_ifvg_outside(s4_low, s4_sweep_low_bar) : detect_recent_bull_ifvg()
+        if is_ifvg_detected or detect_bull_fvg_returning(s4_low, s4_sweep_low_bar)
+            s4_sweep_buy := true
+            s4_sweep_low_active := false
+            label.new(x=bar_index, y=low, text="S4 SW 🟢", color=color.green, textcolor=color.white, style=label.style_label_up, size=size.tiny)
+
+// پایش ران نقدینگی سشن ۴
+if not in_s4 and not na(s4_high) and not s4_lqr_high_triggered and not s4_lqr_high_executed
+    if close > s4_high and close > open
+        s4_lqr_high_active := true
+        s4_lqr_high_triggered := true
+        s4_lqr_high_trigger_bar := bar_index
+
+if s4_lqr_high_active and show_lqr_strat
+    if (bar_index - s4_lqr_high_trigger_bar) > lqr_wait_bars
+        s4_lqr_high_active := false
+        s4_lqr_high_triggered := false
+    else
+        lqr_gap_s4 = low - high[2]
+        lqr_body_s4 = math.abs(close[1] - open[1])
+        lqr_size_2_s4 = high[1] - low[1]
+        lqr_size_1_s4 = high[2] - low[2]
+        lqr_size_3_s4 = high - low
+        lqr_avg_1_3_s4 = (lqr_size_1_s4 + lqr_size_3_s4) / 2.0
+        lqr_is_displaced_s4 = lqr_size_2_s4 >= (lqr_avg_1_3_s4 * lqr_displacement_mult)
+        lqr_color_ok_s4 = close[1] > open[1] and (lqr_is_displaced_s4 or close > open)
+        
+        if low > high[2] and low > s4_high and lqr_color_ok_s4 and lqr_gap_s4 >= (lqr_body_s4 * (fvg_body_pct / 100.0))
+            s4_lqr_high_active := false
+            s4_lqr_high_fvg_active := true
+            s4_lqr_high_fvg_top := low
+            s4_lqr_high_fvg_bottom := high[2]
+
+if s4_lqr_high_fvg_active and show_lqr_strat
+    if low <= s4_lqr_high_fvg_top and close >= s4_lqr_high_fvg_bottom
+        s4_lqr_buy_sig := true
+        s4_lqr_high_fvg_active := false
+        s4_lqr_high_executed := true
+        label.new(x=bar_index, y=low, text="S4 LQR 🔵", color=color.blue, textcolor=color.white, style=label.style_label_up, size=size.tiny)
+    else if close < s4_lqr_high_fvg_bottom
+        s4_lqr_rev_sell_sig := true
+        s4_lqr_high_fvg_active := false
+        s4_lqr_high_executed := true
+        label.new(x=bar_index, y=high, text="S4 LQR- 🔴", color=color.red, textcolor=color.white, style=label.style_label_down, size=size.tiny)
+
+if not in_s4 and not na(s4_low) and not s4_lqr_low_triggered and not s4_lqr_low_executed
+    if close < s4_low and close < open
+        s4_lqr_low_active := true
+        s4_lqr_low_triggered := true
+        s4_lqr_low_trigger_bar := bar_index
+
+if s4_lqr_low_active and show_lqr_strat
+    if (bar_index - s4_lqr_low_trigger_bar) > lqr_wait_bars
+        s4_lqr_low_active := false
+        s4_lqr_low_triggered := false
+    else
+        lqr_gap_s4_low = high < low[2] ? low[2] - high : 0.0
+        lqr_body_s4_low = math.abs(close[1] - open[1])
+        lqr_size_2_s4_low = high[1] - low[1]
+        lqr_size_1_s4_low = high[2] - low[2]
+        lqr_size_3_s4_low = high - low
+        lqr_avg_1_3_s4_low = (lqr_size_1_s4_low + lqr_size_3_s4_low) / 2.0
+        lqr_is_displaced_s4_low = lqr_size_2_s4_low >= (lqr_avg_1_3_s4_low * lqr_displacement_mult)
+        lqr_color_ok_s4_low = close[1] < open[1] and (lqr_is_displaced_s4_low or close < open)
+        
+        if high < low[2] and high < s4_low and lqr_color_ok_s4_low and lqr_gap_s4_low >= (lqr_body_s4_low * (fvg_body_pct / 100.0))
+            s4_lqr_low_active := false
+            s4_lqr_low_fvg_active := true
+            s4_lqr_low_fvg_top := low[2]
+            s4_lqr_low_fvg_bottom := high
+
+if s4_lqr_low_fvg_active and show_lqr_strat
+    if high >= s4_lqr_low_fvg_bottom and close <= s4_lqr_low_fvg_top
+        s4_lqr_sell_sig := true
+        s4_lqr_low_fvg_active := false
+        s4_lqr_low_executed := true
+        label.new(x=bar_index, y=high, text="S4 LQR 🔴", color=color.red, textcolor=color.white, style=label.style_label_down, size=size.tiny)
+    else if close > s4_lqr_low_fvg_top
+        s4_lqr_rev_buy_sig := true
+        s4_lqr_low_fvg_active := false
+        s4_lqr_low_executed := true
+        label.new(x=bar_index, y=low, text="S4 LQR- 🟢", color=color.green, textcolor=color.white, style=label.style_label_up, size=size.tiny)
+
+//=============================================================================
+// ۱۰. شکست FVG متغیرهای ثبت پویا و رسم باکس‌های کامل (نسخه اصلی درخواست شما)
+//=============================================================================
+var box bull_fvg_box = na
+var float bull_fvg_top = na
+var float bull_fvg_bottom = na
+var bool bull_fvg_active = false
+
+var box bear_fvg_box = na
+var float bear_fvg_top = na
+var float bear_fvg_bottom = na
+var bool bear_fvg_active = false
+
+//=============================================================================
+// ۱۱. منطق شکست سقف با FVG (Bullish BOS + FVG)
+//=============================================================================
+bool bull_fvg_detected = low > high[2]
+
+// شرط قرارگیری سوئینگ سقف در دل FVG + بررسی وجود FVG صعودی کاملاً بکر در محدوده قیمتی موج صعودی ساخته شده
+bool has_target_fvg_bull = has_active_bull_fvg_below(last_sw_low, last_sw_high)
+bool bull_bsg_breakout = bull_fvg_detected and (last_sw_high > high[2] and last_sw_high < low) and has_target_fvg_bull
+
+if bull_bsg_breakout
+    bull_fvg_top := low
+    bull_fvg_bottom := high[2]
+    bull_fvg_active := true
+    // ترسیم مجدد باکس کامل نسخه اول (درخواست شما)
+    bull_fvg_box := box.new(left=bar_index - 2, top=bull_fvg_top, right=bar_index, bottom=bull_fvg_bottom, bgcolor=col_bull_fvg, border_color=color.new(color.green, 50))
+    label.new(x=bar_index, y=high, text="BSG", style=label.style_label_down, color=color.green, textcolor=color.white, size=size.tiny)
+
+// پایش صعودی باکس جهت REVERSAL
+if bull_fvg_active
+    box.set_right(bull_fvg_box, bar_index)
+    if close < bull_fvg_bottom
+        bull_fvg_active := false
+        box.set_bgcolor(bull_fvg_box, color.new(color.red, 95))
+        box.set_border_style(bull_fvg_box, line.style_dashed)
+        label.new(x=bar_index, y=low, text="REV", style=label.style_label_up, color=color.red, textcolor=color.white, size=size.tiny)
+
+//=============================================================================
+// ۱۲. منطق شکست کف با FVG (Bearish BOS + FVG)
+//=============================================================================
+bool bear_fvg_detected = high < low[2]
+
+// شرط سوئینگ کف در دل FVG + بررسی وجود FVG نزولی کاملاً بکر در طول همان موج نزولی ساخته شده
+bool has_target_fvg_bear = has_active_bear_fvg_above(last_sw_low, last_sw_high)
+bool bear_bsg_breakout = bear_fvg_detected and (last_sw_low < low[2] and last_sw_low > high) and has_target_fvg_bear
+
+if bear_bsg_breakout
+    bear_fvg_top := low[2]
+    bear_fvg_bottom := high
+    bear_fvg_active := true
+    // ترسیم مجدد باکس کامل نسخه اول (درخواست شما)
+    bear_fvg_box := box.new(left=bar_index - 2, top=bear_fvg_top, right=bar_index, bottom=bear_fvg_bottom, bgcolor=col_bear_fvg, border_color=color.new(color.red, 50))
+    label.new(x=bar_index, y=low, text="BSG", style=label.style_label_up, color=color.red, textcolor=color.white, size=size.tiny)
+
+// پایش نزولی باکس جهت REVERSAL
+if bear_fvg_active
+    box.set_right(bear_fvg_box, bar_index)
+    if close > bear_fvg_top
+        bear_fvg_active := false
+        box.set_bgcolor(bear_fvg_box, color.new(color.green, 95))
+        box.set_border_style(bear_fvg_box, line.style_dashed)
+        label.new(x=bar_index, y=high, text="REV", style=label.style_label_down, color=color.green, textcolor=color.white, size=size.tiny)
+
+//=============================================================================
+// ۱۳. ثبت هشدارهای معاملاتی استراتژی شکست و سوییپ و ران نقدینگی
+//=============================================================================
+bool any_sweep_buy = s1_sweep_buy or s2_sweep_buy or s3_sweep_buy or s4_sweep_buy or pdl_sweep_trigger or pdl_sweep_buy
+bool any_sweep_sell = s1_sweep_sell or s2_sweep_sell or s3_sweep_sell or s4_sweep_sell or pdh_sweep_trigger or pdh_sweep_sell
+bool any_lqr_buy = s1_lqr_buy_sig or s1_lqr_rev_buy_sig or s2_lqr_buy_sig or s2_lqr_rev_buy_sig or s3_lqr_buy_sig or s3_lqr_rev_buy_sig or s4_lqr_buy_sig or s4_lqr_rev_buy_sig
+bool any_lqr_sell = s1_lqr_sell_sig or s1_lqr_rev_sell_sig or s2_lqr_sell_sig or s2_lqr_rev_sell_sig or s3_lqr_sell_sig or s3_lqr_rev_sell_sig or s4_lqr_sell_sig or s4_lqr_rev_sell_sig
+
+alertcondition(bull_bsg_breakout, title="BOS Bullish with FVG", message="شکست سقف ساختاری با جابجایی تایید شد.")
+alertcondition(bear_bsg_breakout, title="BOS Bearish with FVG", message="شکست کف ساختاری با جابجایی تایید شد.")
+alertcondition(any_sweep_buy, title="ICT Sweep Buy Signal", message="نقدینگی کف شکار شد و برگشت خرید تایید گردید.")
+alertcondition(any_sweep_sell, title="ICT Sweep Sell Signal", message="نقدینگی سقف شکار شد و برگشت فروش تایید گردید.")
+alertcondition(any_lqr_buy, title="ICT LQR Buy Signal", message="سیگنال صعودی لکوئیدیتی ران صادر شد.")
+alertcondition(any_lqr_sell, title="ICT LQR Sell Signal", message="سیگنال نزولی لکوئیدیتی ران صادر شد.")
+
+//#############################################################################
+// بخش ۲: اردربلاک‌ها/بریکرها + لیکوییدیتی (BSL/SSL/EQH/EQL) - فقط لایه‌ی تشخیص/هشدار
+// همه‌ی شناسه‌ها با پیشوند obl_ نام‌گذاری شده‌اند تا با متغیرهای سیستم سشن (بخش ۱) تصادم نکنند.
+// این بخش هیچ ورودی مستقیمی به سیستم معاملاتیِ سشن ندارد؛ فقط نواحی/سطوحی می‌سازد که در «بخش ۳»
+// برای تایید/رد سیگنال‌های سشن استفاده می‌شوند.
+//#############################################################################
+obl_pivot_len         = input.int(5, "Structure Period (Pivot Length)", minval=2, tooltip="تعداد کندل‌ها برای تشخیص سقف و کف‌های سوئینگ (مستقل از Swing Length سشن)", group="اردربلاک/لیکوییدیتی")
+obl_show_breakers     = input.bool(true, "Show Breaker Blocks", group="اردربلاک/لیکوییدیتی")
+obl_max_ob_count      = input.int(60, "Max Order Blocks Tracked", minval=5, group="اردربلاک/لیکوییدیتی")
+obl_engulf_lookback   = input.int(20, "OB Engulf Search Depth (bars)", minval=1, tooltip="تا چند کندل به عقب دنبال اردربلاکِ اصلی/پوشش‌دهنده بگردیم", group="اردربلاک/لیکوییدیتی")
+
+obl_show_liquidity      = input.bool(true, "Show Buy-Side / Sell-Side Liquidity (Swing)", group="اردربلاک/لیکوییدیتی")
+obl_show_equal_hl       = input.bool(true, "Show Equal Highs / Equal Lows (EQH/EQL)", group="اردربلاک/لیکوییدیتی")
+obl_eq_tolerance_ticks  = input.float(10, "Equal High/Low Tolerance (ticks)", minval=0, group="اردربلاک/لیکوییدیتی")
+obl_eq_zone_multiplier  = input.float(2.0, "Equal Zone Thickness (× Tolerance)", minval=0.1, group="اردربلاک/لیکوییدیتی")
+obl_max_liq_count       = input.int(60, "Max Liquidity Levels Tracked", minval=5, group="اردربلاک/لیکوییدیتی")
+
+obl_bull_ob_col    = input.color(color.new(color.green, 88), "Bullish OB Fill", group="اردربلاک/لیکوییدیتی")
+obl_bull_ob_border = input.color(color.new(color.green, 50), "Bullish OB Border", group="اردربلاک/لیکوییدیتی")
+obl_bear_ob_col    = input.color(color.new(color.red, 88), "Bearish OB Fill", group="اردربلاک/لیکوییدیتی")
+obl_bear_ob_border = input.color(color.new(color.red, 50), "Bearish OB Border", group="اردربلاک/لیکوییدیتی")
+
+obl_bull_bb_col    = input.color(color.new(color.teal, 88), "Bullish Breaker Fill", group="اردربلاک/لیکوییدیتی")
+obl_bull_bb_border = input.color(color.new(color.teal, 50), "Bullish Breaker Border", group="اردربلاک/لیکوییدیتی")
+obl_bear_bb_col    = input.color(color.new(color.maroon, 88), "Bearish Breaker Fill", group="اردربلاک/لیکوییدیتی")
+obl_bear_bb_border = input.color(color.new(color.maroon, 50), "Bearish Breaker Border", group="اردربلاک/لیکوییدیتی")
+
+obl_bsl_color   = input.color(color.new(color.orange, 30), "Buy-Side Liquidity (BSL) Color", group="اردربلاک/لیکوییدیتی")
+obl_ssl_color   = input.color(color.new(color.blue, 30), "Sell-Side Liquidity (SSL) Color", group="اردربلاک/لیکوییدیتی")
+obl_eqh_color   = input.color(color.new(color.orange, 0), "Equal Highs (EQH) Color", group="اردربلاک/لیکوییدیتی")
+obl_eql_color   = input.color(color.new(color.blue, 0), "Equal Lows (EQL) Color", group="اردربلاک/لیکوییدیتی")
+obl_swept_color = input.color(color.new(color.gray, 60), "Swept Liquidity Color", group="اردربلاک/لیکوییدیتی")
+
+float obl_ph = ta.pivothigh(high, obl_pivot_len, obl_pivot_len)
+float obl_pl = ta.pivotlow(low, obl_pivot_len, obl_pivot_len)
+
+var float obl_last_ph = na
+var float obl_last_pl = na
+var int obl_last_ph_idx = na
+var int obl_last_pl_idx = na
+
+if not na(obl_ph)
+    obl_last_ph := obl_ph
+    obl_last_ph_idx := bar_index - obl_pivot_len
+
+if not na(obl_pl)
+    obl_last_pl := obl_pl
+    obl_last_pl_idx := bar_index - obl_pivot_len
+
+bool obl_bullish_bos = false
+bool obl_bearish_bos = false
+
+if not na(obl_last_ph) and ta.crossover(close, obl_last_ph)
+    obl_bullish_bos := true
+    obl_last_ph := na // ریست کردن برای جلوگیری از تکرار روی یک سطح
+
+if not na(obl_last_pl) and ta.crossunder(close, obl_last_pl)
+    obl_bearish_bos := true
+    obl_last_pl := na
+
+type OrderBlock
+    box zone_box
+    line mid_line
+    float top
+    float bottom
+    float mid
+    bool is_bullish
+    bool active
+    bool is_breaker
+
+var OrderBlock[] obl_ob_array = array.new<OrderBlock>()
+
+obl_create_ob(int start_idx, float top_val, float bot_val, bool is_bull) =>
+    float mid_val = (top_val + bot_val) / 2
+    color fill_col = is_bull ? obl_bull_ob_col : obl_bear_ob_col
+    color border_col = is_bull ? obl_bull_ob_border : obl_bear_ob_border
+    color line_col = is_bull ? color.green : color.red
+
+    box b = box.new(left=start_idx, top=top_val, right=bar_index, bottom=bot_val, bgcolor=fill_col, border_color=border_col, border_style=line.style_solid)
+    line l = line.new(x1=start_idx, y1=mid_val, x2=bar_index, y2=mid_val, color=line_col, style=line.style_dashed)
+
+    OrderBlock.new(b, l, top_val, bot_val, mid_val, is_bull, true, false)
+
+if obl_bullish_bos
+    int ob_idx = na
+    float ob_high = na
+    float ob_low = na
+
+    int search_depth = math.min(100, bar_index - (na(obl_last_pl_idx) ? 0 : obl_last_pl_idx))
+    for i = 1 to search_depth
+        if close[i] < open[i]
+            ob_idx  := bar_index - i
+            ob_high := high[i]
+            ob_low  := low[i]
+            break
+
+    if not na(ob_idx)
+        int inner_i = bar_index - ob_idx
+        int search_start = inner_i + 1
+        int engulf_search_end = math.min(search_depth, inner_i + obl_engulf_lookback)
+        if search_start <= engulf_search_end
+            for j = search_start to engulf_search_end
+                if close[j] < open[j] and high[j] >= ob_high and low[j] <= ob_low
+                    ob_idx  := bar_index - j
+                    ob_high := high[j]
+                    ob_low  := low[j]
+
+    if not na(ob_idx)
+        array.push(obl_ob_array, obl_create_ob(ob_idx, ob_high, ob_low, true))
+
+if obl_bearish_bos
+    int ob_idx = na
+    float ob_high = na
+    float ob_low = na
+
+    int search_depth = math.min(100, bar_index - (na(obl_last_ph_idx) ? 0 : obl_last_ph_idx))
+    for i = 1 to search_depth
+        if close[i] > open[i]
+            ob_idx  := bar_index - i
+            ob_high := high[i]
+            ob_low  := low[i]
+            break
+
+    if not na(ob_idx)
+        int inner_i = bar_index - ob_idx
+        int search_start = inner_i + 1
+        int engulf_search_end = math.min(search_depth, inner_i + obl_engulf_lookback)
+        if search_start <= engulf_search_end
+            for j = search_start to engulf_search_end
+                if close[j] > open[j] and high[j] >= ob_high and low[j] <= ob_low
+                    ob_idx  := bar_index - j
+                    ob_high := high[j]
+                    ob_low  := low[j]
+
+    if not na(ob_idx)
+        array.push(obl_ob_array, obl_create_ob(ob_idx, ob_high, ob_low, false))
+
+if array.size(obl_ob_array) > 0
+    for i = array.size(obl_ob_array) - 1 to 0
+        OrderBlock ob = array.get(obl_ob_array, i)
+
+        if ob.active
+            box.set_right(ob.zone_box, bar_index)
+            line.set_x2(ob.mid_line, bar_index)
+
+            if ob.is_bullish
+                if not ob.is_breaker
+                    if close < ob.bottom
+                        if obl_show_breakers
+                            ob.is_breaker := true
+                            box.set_bgcolor(ob.zone_box, obl_bear_bb_col)
+                            box.set_border_color(ob.zone_box, obl_bear_bb_border)
+                            line.set_color(ob.mid_line, obl_bear_bb_border)
+                        else
+                            ob.active := false
+                            box.delete(ob.zone_box)
+                            line.delete(ob.mid_line)
+                else
+                    if close > ob.top
+                        ob.active := false
+            else
+                if not ob.is_breaker
+                    if close > ob.top
+                        if obl_show_breakers
+                            ob.is_breaker := true
+                            box.set_bgcolor(ob.zone_box, obl_bull_bb_col)
+                            box.set_border_color(ob.zone_box, obl_bull_bb_border)
+                            line.set_color(ob.mid_line, obl_bull_bb_border)
+                        else
+                            ob.active := false
+                            box.delete(ob.zone_box)
+                            line.delete(ob.mid_line)
+                else
+                    if close < ob.bottom
+                        ob.active := false
+
+if array.size(obl_ob_array) > obl_max_ob_count
+    OrderBlock obl_old_ob = array.shift(obl_ob_array)
+    box.delete(obl_old_ob.zone_box)
+    line.delete(obl_old_ob.mid_line)
+
+type LiquidityLevel
+    line lvl_line
+    box zone_box
+    int start_idx
+    float price
+    float zone_top
+    float zone_bottom
+    bool is_high
+    bool swept
+    bool is_equal
+
+var LiquidityLevel[] obl_liq_array = array.new<LiquidityLevel>()
+
+obl_register_liquidity(int pivot_idx, float pivot_price, bool is_high) =>
+    float tolerance = obl_eq_tolerance_ticks * syminfo.mintick
+    float zone_pad = tolerance * obl_eq_zone_multiplier
+    bool matched = false
+    if obl_show_equal_hl and array.size(obl_liq_array) > 0
+        for i = 0 to array.size(obl_liq_array) - 1
+            LiquidityLevel existing = array.get(obl_liq_array, i)
+            if not matched and existing.is_high == is_high and not existing.swept and math.abs(existing.price - pivot_price) <= tolerance
+                matched := true
+                existing.is_equal := true
+                float cur_top = na(existing.zone_top) ? existing.price : existing.zone_top
+                float cur_bottom = na(existing.zone_bottom) ? existing.price : existing.zone_bottom
+                existing.zone_top := math.max(cur_top, pivot_price) + zone_pad
+                existing.zone_bottom := math.min(cur_bottom, pivot_price) - zone_pad
+                color zone_col = is_high ? obl_eqh_color : obl_eql_color
+                if na(existing.zone_box)
+                    if not na(existing.lvl_line)
+                        line.delete(existing.lvl_line)
+                        existing.lvl_line := na
+                    existing.zone_box := box.new(existing.start_idx, existing.zone_top, bar_index, existing.zone_bottom, bgcolor=color.new(zone_col, 85), border_color=color.new(zone_col, 70), border_style=line.style_dotted)
+                else
+                    box.set_top(existing.zone_box, existing.zone_top)
+                    box.set_bottom(existing.zone_box, existing.zone_bottom)
+                    box.set_right(existing.zone_box, bar_index)
+
+    if not matched
+        color lvl_color = is_high ? obl_bsl_color : obl_ssl_color
+        line new_line = line.new(pivot_idx, pivot_price, bar_index, pivot_price, extend=extend.right, color=lvl_color, style=line.style_dotted)
+        array.push(obl_liq_array, LiquidityLevel.new(new_line, na, pivot_idx, pivot_price, na, na, is_high, false, false))
+
+if obl_show_liquidity and not na(obl_ph)
+    obl_register_liquidity(bar_index - obl_pivot_len, obl_ph, true)
+
+if obl_show_liquidity and not na(obl_pl)
+    obl_register_liquidity(bar_index - obl_pivot_len, obl_pl, false)
+
+if obl_show_liquidity and array.size(obl_liq_array) > 0
+    for i = array.size(obl_liq_array) - 1 to 0
+        LiquidityLevel lvl = array.get(obl_liq_array, i)
+        if not lvl.swept
+            if not na(lvl.zone_box)
+                box.set_right(lvl.zone_box, bar_index)
+                bool zone_swept_now = lvl.is_high ? close > lvl.zone_top : close < lvl.zone_bottom
+                if zone_swept_now
+                    lvl.swept := true
+                    box.set_bgcolor(lvl.zone_box, color.new(obl_swept_color, 85))
+                    box.set_border_color(lvl.zone_box, obl_swept_color)
+            else
+                bool lvl_swept_now = lvl.is_high ? close > lvl.price : close < lvl.price
+                if lvl_swept_now
+                    lvl.swept := true
+                    line.set_extend(lvl.lvl_line, extend.none)
+                    line.set_x2(lvl.lvl_line, bar_index)
+                    line.set_color(lvl.lvl_line, obl_swept_color)
+
+if array.size(obl_liq_array) > obl_max_liq_count
+    LiquidityLevel obl_old_lvl = array.shift(obl_liq_array)
+    if not na(obl_old_lvl.lvl_line)
+        line.delete(obl_old_lvl.lvl_line)
+    if not na(obl_old_lvl.zone_box)
+        box.delete(obl_old_lvl.zone_box)
+
+//#############################################################################
+// بخش ۲ب: اردربلاک‌های تایم‌فریمِ بالاتر (پیش‌فرض H1) روی تایم‌فریم فعلی - بدون بریکر، فقط باکس با
+// برچسبِ "H1" روی خودش. با request.security دقیقاً همان الگوریتم تشخیص اردربلاکِ بخش ۲ (پیدا کردن
+// نزدیک‌ترین کندلِ مخالف + جستجوی کندلِ اصلی/پوشش‌دهنده) را روی دیتای H1 اجرا می‌کنیم و ۳ اردربلاکِ
+// فعال/لمس‌نشده‌ی آخر هر جهت را با مبنای زمانی (xloc.bar_time) روی همین چارت (۵ دقیقه یا هر تایم‌فریمِ
+// پایین‌تر از H1) رسم می‌کنیم.
+//#############################################################################
+show_h1_ob         = input.bool(true, "Show Higher-Timeframe Order Blocks", group="اردربلاک تایم‌فریم بالاتر")
+h1_ob_timeframe    = input.timeframe("60", "Higher Timeframe (پیش‌فرض H1)", group="اردربلاک تایم‌فریم بالاتر")
+h1_ob_pivot_len    = input.int(5, "H1 Pivot Length", minval=2, group="اردربلاک تایم‌فریم بالاتر")
+h1_ob_engulf_lookback = input.int(20, "H1 OB Engulf Search Depth (H1 bars)", minval=1, group="اردربلاک تایم‌فریم بالاتر")
+h1_bull_ob_col     = input.color(color.new(color.aqua, 82), "H1 Bullish OB Fill", group="اردربلاک تایم‌فریم بالاتر")
+h1_bull_ob_border  = input.color(color.new(color.aqua, 20), "H1 Bullish OB Border", group="اردربلاک تایم‌فریم بالاتر")
+h1_bear_ob_col     = input.color(color.new(color.fuchsia, 82), "H1 Bearish OB Fill", group="اردربلاک تایم‌فریم بالاتر")
+h1_bear_ob_border  = input.color(color.new(color.fuchsia, 20), "H1 Bearish OB Border", group="اردربلاک تایم‌فریم بالاتر")
+
+//@function این تابع، از طریق request.security، روی دیتای تایم‌فریمِ بالاتر اجرا می‌شود: همان منطقِ
+//تشخیصِ اردربلاکِ بخش ۲ (بدون بریکر/بدون لیکوییدیتی) را پیاده می‌کند و بالاترین ۳ اردربلاکِ صعودی و
+//۳ اردربلاکِ نزولیِ فعال/لمس‌نشده را به‌صورت (top, bottom, زمانِ شروعِ کندلِ اول) برمی‌گرداند.
+h1_ob_calc() =>
+    var float[] h1b_tops = array.new_float()
+    var float[] h1b_bots = array.new_float()
+    var int[] h1b_times = array.new_int()
+    var float[] h1r_tops = array.new_float()
+    var float[] h1r_bots = array.new_float()
+    var int[] h1r_times = array.new_int()
+
+    float h1_ph = ta.pivothigh(high, h1_ob_pivot_len, h1_ob_pivot_len)
+    float h1_pl = ta.pivotlow(low, h1_ob_pivot_len, h1_ob_pivot_len)
+    var float h1_last_ph = na
+    var float h1_last_pl = na
+    var int h1_last_ph_idx = na
+    var int h1_last_pl_idx = na
+
+    if not na(h1_ph)
+        h1_last_ph := h1_ph
+        h1_last_ph_idx := bar_index - h1_ob_pivot_len
+    if not na(h1_pl)
+        h1_last_pl := h1_pl
+        h1_last_pl_idx := bar_index - h1_ob_pivot_len
+
+    bool h1_bull_bos = false
+    bool h1_bear_bos = false
+    if not na(h1_last_ph) and ta.crossover(close, h1_last_ph)
+        h1_bull_bos := true
+        h1_last_ph := na
+    if not na(h1_last_pl) and ta.crossunder(close, h1_last_pl)
+        h1_bear_bos := true
+        h1_last_pl := na
+
+    if h1_bull_bos
+        int ob_idx = na
+        float ob_high = na
+        float ob_low = na
+        int search_depth = math.min(100, bar_index - (na(h1_last_pl_idx) ? 0 : h1_last_pl_idx))
+        for i = 1 to search_depth
+            if close[i] < open[i]
+                ob_idx := bar_index - i
+                ob_high := high[i]
+                ob_low := low[i]
+                break
+        if not na(ob_idx)
+            int inner_i = bar_index - ob_idx
+            int search_start = inner_i + 1
+            int engulf_end = math.min(search_depth, inner_i + h1_ob_engulf_lookback)
+            if search_start <= engulf_end
+                for j = search_start to engulf_end
+                    if close[j] < open[j] and high[j] >= ob_high and low[j] <= ob_low
+                        ob_idx := bar_index - j
+                        ob_high := high[j]
+                        ob_low := low[j]
+        if not na(ob_idx)
+            int found_offset = bar_index - ob_idx
+            array.unshift(h1b_tops, ob_high)
+            array.unshift(h1b_bots, ob_low)
+            array.unshift(h1b_times, time[found_offset])
+            if array.size(h1b_tops) > 3
+                array.pop(h1b_tops)
+                array.pop(h1b_bots)
+                array.pop(h1b_times)
+
+    if h1_bear_bos
+        int ob_idx = na
+        float ob_high = na
+        float ob_low = na
+        int search_depth = math.min(100, bar_index - (na(h1_last_ph_idx) ? 0 : h1_last_ph_idx))
+        for i = 1 to search_depth
+            if close[i] > open[i]
+                ob_idx := bar_index - i
+                ob_high := high[i]
+                ob_low := low[i]
+                break
+        if not na(ob_idx)
+            int inner_i = bar_index - ob_idx
+            int search_start = inner_i + 1
+            int engulf_end = math.min(search_depth, inner_i + h1_ob_engulf_lookback)
+            if search_start <= engulf_end
+                for j = search_start to engulf_end
+                    if close[j] > open[j] and high[j] >= ob_high and low[j] <= ob_low
+                        ob_idx := bar_index - j
+                        ob_high := high[j]
+                        ob_low := low[j]
+        if not na(ob_idx)
+            int found_offset = bar_index - ob_idx
+            array.unshift(h1r_tops, ob_high)
+            array.unshift(h1r_bots, ob_low)
+            array.unshift(h1r_times, time[found_offset])
+            if array.size(h1r_tops) > 3
+                array.pop(h1r_tops)
+                array.pop(h1r_bots)
+                array.pop(h1r_times)
+
+    // حذف اردربلاک‌هایی که با کلوز رد شده‌اند (لمس/بی‌اعتبار شده) - بدون تبدیل به بریکر
+    if array.size(h1b_tops) > 0
+        for k = array.size(h1b_tops) - 1 to 0
+            if close < array.get(h1b_bots, k)
+                array.remove(h1b_tops, k)
+                array.remove(h1b_bots, k)
+                array.remove(h1b_times, k)
+    if array.size(h1r_tops) > 0
+        for k = array.size(h1r_tops) - 1 to 0
+            if close > array.get(h1r_tops, k)
+                array.remove(h1r_tops, k)
+                array.remove(h1r_bots, k)
+                array.remove(h1r_times, k)
+
+    float bt1 = array.size(h1b_tops) > 0 ? array.get(h1b_tops, 0) : na
+    float bb1 = array.size(h1b_bots) > 0 ? array.get(h1b_bots, 0) : na
+    int   btm1 = array.size(h1b_times) > 0 ? array.get(h1b_times, 0) : na
+    float bt2 = array.size(h1b_tops) > 1 ? array.get(h1b_tops, 1) : na
+    float bb2 = array.size(h1b_bots) > 1 ? array.get(h1b_bots, 1) : na
+    int   btm2 = array.size(h1b_times) > 1 ? array.get(h1b_times, 1) : na
+    float bt3 = array.size(h1b_tops) > 2 ? array.get(h1b_tops, 2) : na
+    float bb3 = array.size(h1b_bots) > 2 ? array.get(h1b_bots, 2) : na
+    int   btm3 = array.size(h1b_times) > 2 ? array.get(h1b_times, 2) : na
+
+    float rt1 = array.size(h1r_tops) > 0 ? array.get(h1r_tops, 0) : na
+    float rb1 = array.size(h1r_bots) > 0 ? array.get(h1r_bots, 0) : na
+    int   rtm1 = array.size(h1r_times) > 0 ? array.get(h1r_times, 0) : na
+    float rt2 = array.size(h1r_tops) > 1 ? array.get(h1r_tops, 1) : na
+    float rb2 = array.size(h1r_bots) > 1 ? array.get(h1r_bots, 1) : na
+    int   rtm2 = array.size(h1r_times) > 1 ? array.get(h1r_times, 1) : na
+    float rt3 = array.size(h1r_tops) > 2 ? array.get(h1r_tops, 2) : na
+    float rb3 = array.size(h1r_bots) > 2 ? array.get(h1r_bots, 2) : na
+    int   rtm3 = array.size(h1r_times) > 2 ? array.get(h1r_times, 2) : na
+
+    [bt1, bb1, btm1, bt2, bb2, btm2, bt3, bb3, btm3, rt1, rb1, rtm1, rt2, rb2, rtm2, rt3, rb3, rtm3]
+
+[h1_bt1, h1_bb1, h1_btm1, h1_bt2, h1_bb2, h1_btm2, h1_bt3, h1_bb3, h1_btm3, h1_rt1, h1_rb1, h1_rtm1, h1_rt2, h1_rb2, h1_rtm2, h1_rt3, h1_rb3, h1_rtm3] = request.security(syminfo.tickerid, h1_ob_timeframe, h1_ob_calc(), lookahead=barmerge.lookahead_off)
+
+var box[] h1_bull_boxes = array.new_box(3, na)
+var int[] h1_bull_times = array.new_int(3, na)
+var box[] h1_bear_boxes = array.new_box(3, na)
+var int[] h1_bear_times = array.new_int(3, na)
+
+//@function اردربلاک‌های تایم‌فریمِ بالاترِ دریافت‌شده (تا ۳ مورد) را با باکس‌های موجود - بر اساس
+//زمانِ یکتای شروعِ هرکدام، نه موقعیتِ اسلات - هماهنگ می‌کند: باکسِ همان اردربلاکِ قبلی فقط امتداد
+//می‌یابد، باکسِ اردربلاکی که دیگر در لیست نیست (لمس شده) حذف می‌شود، و اردربلاکِ واقعاً تازه در یک
+//جای خالی ساخته می‌شود - این‌طوری باکس‌ها حتی اگر بین ۳ اسلات جابه‌جا شوند، بی‌دلیل بازسازی نمی‌شوند.
+sync_h1_obs(box[] boxes, int[] times, float[] newTops, float[] newBottoms, int[] newTimes, color fillCol, color borderCol) =>
+    int slotCount = array.size(boxes)
+    for s = 0 to slotCount - 1
+        int existingTime = array.get(times, s)
+        if not na(existingTime)
+            bool stillPresent = false
+            for k = 0 to array.size(newTimes) - 1
+                int candidateTime = array.get(newTimes, k)
+                if not na(candidateTime) and candidateTime == existingTime
+                    stillPresent := true
+            if not stillPresent
+                box existingBox = array.get(boxes, s)
+                if not na(existingBox)
+                    box.delete(existingBox)
+                array.set(boxes, s, na)
+                array.set(times, s, na)
+
+    for k = 0 to array.size(newTimes) - 1
+        int t = array.get(newTimes, k)
+        if not na(t)
+            bool matched = false
+            for s = 0 to slotCount - 1
+                int slotTime = array.get(times, s)
+                if not na(slotTime) and slotTime == t
+                    matched := true
+                    box.set_right(array.get(boxes, s), time)
+            if not matched
+                for s = 0 to slotCount - 1
+                    if na(array.get(times, s))
+                        box newBox = box.new(t, array.get(newTops, k), time, array.get(newBottoms, k), xloc=xloc.bar_time, bgcolor=fillCol, border_color=borderCol, border_style=line.style_dashed, text="H1 OB", text_color=borderCol, text_size=size.small, text_valign=text.align_top, text_halign=text.align_left)
+                        array.set(boxes, s, newBox)
+                        array.set(times, s, t)
+                        break
+
+if show_h1_ob
+    sync_h1_obs(h1_bull_boxes, h1_bull_times, array.from(h1_bt1, h1_bt2, h1_bt3), array.from(h1_bb1, h1_bb2, h1_bb3), array.from(h1_btm1, h1_btm2, h1_btm3), h1_bull_ob_col, h1_bull_ob_border)
+    sync_h1_obs(h1_bear_boxes, h1_bear_times, array.from(h1_rt1, h1_rt2, h1_rt3), array.from(h1_rb1, h1_rb2, h1_rb3), array.from(h1_rtm1, h1_rtm2, h1_rtm3), h1_bear_ob_col, h1_bear_ob_border)
+
+//#############################################################################
+// بخش ۳: موتور تایید/رد سیگنال - سیگنال‌های سشن را بر اساس تعامل بعدیِ قیمت با اردربلاک/BSL/
+// SSL/EQH/EQL تایید یا رد می‌کند. این بخش هیچ سفارش/معامله‌ای صادر نمی‌کند، فقط لیبل/هشدار می‌دهد.
+//#############################################################################
+confirm_breakthrough_pct = input.float(60.0, "OB/Liquidity Breakthrough % (برای تایید/رد)", minval=1.0, maxval=99.0, group="تایید/رد سیگنال سشن")
+confirm_expiry_bars      = input.int(30, "انقضای سیگنالِ در انتظار تایید (تعداد کندل)", minval=1, group="تایید/رد سیگنال سشن")
+show_confirm_labels      = input.bool(true, "نمایش لیبل تایید/رد", group="تایید/رد سیگنال سشن")
+
+type PendingSignal
+    string tag
+    bool is_buy
+    int created_bar
+
+var PendingSignal[] pending_array = array.new<PendingSignal>()
+
+//@function یک سیگنال خرید/فروشِ صادرشده توسط سیستم سشن (بخش ۱) را به صف «در انتظار تایید» اضافه می‌کند.
+queue_signal(string tag, bool is_buy) =>
+    array.push(pending_array, PendingSignal.new(tag, is_buy, bar_index))
+
+if any_sweep_buy
+    queue_signal("Sweep Buy", true)
+if any_sweep_sell
+    queue_signal("Sweep Sell", false)
+if any_lqr_buy
+    queue_signal("LQR Buy", true)
+if any_lqr_sell
+    queue_signal("LQR Sell", false)
+if bull_bsg_breakout
+    queue_signal("BSG Buy", true)
+if bear_bsg_breakout
+    queue_signal("BSG Sell", false)
+
+// --- تشخیص رخداد صعودی/نزولی این کندل، بر اساس اردربلاک‌ها، خودِ باکسِ BSG، و نقدینگی (بخش ۲) ---
+// رخداد صعودی = شکستِ یک مقاومت (اردربلاک نزولی/BSL/EQH/باکسِ BSG نزولی) به میزان بیش از
+// confirm_breakthrough_pct از ارتفاعِ آن ناحیه، یا ریجکشن از یک حمایت (اردربلاک صعودی/SSL/EQL/
+// باکسِ BSG صعودی). رخداد نزولی = حالت قرینه.
+//
+// نکته‌ی مهم درباره‌ی «بریکر بلاک»: وقتی یک اردربلاک شکسته می‌شود (ob.is_breaker = true)، نقشش
+// برعکس می‌شود - یک اردربلاکِ صعودی که شکسته شده از این به بعد به‌عنوانِ یک ناحیه‌ی نزولی/مقاومت
+// عمل می‌کند (دقیقاً همان‌طور که در بخشِ ۲ با تغییرِ رنگ به بریکرِ نزولی و شرطِ close > ob.top برای
+// بی‌اعتبار شدنش مشخص شده)، و برعکس. اگر این چرخشِ نقش را در نظر نگیریم، یک اردربلاکِ شکسته‌شده از
+// چند سشنِ قبل که واقعاً یک BOS/CHoCH ساخته، در تایید/ردِ سیگنال‌های بعدی (مثلاً LQR) درست تفسیر
+// نمی‌شود - چون فرمولِ نفوذ/ریجکشن هنوز جهتِ قبل از شکستن را فرض می‌کند.
+bool obl_bull_event = false
+bool obl_bear_event = false
+
+if array.size(obl_ob_array) > 0
+    for i = 0 to array.size(obl_ob_array) - 1
+        OrderBlock ob = array.get(obl_ob_array, i)
+        if ob.active
+            float ob_height = ob.top - ob.bottom
+            if ob_height > 0
+                // نقشِ فعلیِ ناحیه: اگر بریکر شده، برعکسِ is_bullish اصلی‌اش عمل می‌کند.
+                bool actingAsBullish = ob.is_breaker ? not ob.is_bullish : ob.is_bullish
+                if actingAsBullish
+                    float penetration = (ob.top - close) / ob_height
+                    if penetration >= confirm_breakthrough_pct / 100.0
+                        obl_bear_event := true
+                    else if low <= ob.top and close > ob.top
+                        obl_bull_event := true
+                else
+                    float penetration = (close - ob.bottom) / ob_height
+                    if penetration >= confirm_breakthrough_pct / 100.0
+                        obl_bull_event := true
+                    else if high >= ob.bottom and close < ob.bottom
+                        obl_bear_event := true
+
+// خودِ باکسِ BSG (بخشِ ۱) هم دقیقاً به همین شکل یک ناحیه‌ی حمایت/مقاومت است و باید در تایید/ردِ
+// سیگنال‌ها (از جمله سیگنالِ خودِ BSG که در ادامه‌ی همین کندل یا کندل‌های بعدی به این باکس برمی‌گردد)
+// لحاظ شود - این دقیقاً همان چیزی است که «بررسیِ برگشت به BSG: ریجکشن یا شکستِ بیش از ۶۰٪» می‌خواهد.
+if bull_fvg_active
+    float bsg_bull_height = bull_fvg_top - bull_fvg_bottom
+    if bsg_bull_height > 0
+        float penetration = (bull_fvg_top - close) / bsg_bull_height
+        if penetration >= confirm_breakthrough_pct / 100.0
+            obl_bear_event := true
+        else if low <= bull_fvg_top and close > bull_fvg_top
+            obl_bull_event := true
+
+if bear_fvg_active
+    float bsg_bear_height = bear_fvg_top - bear_fvg_bottom
+    if bsg_bear_height > 0
+        float penetration = (close - bear_fvg_bottom) / bsg_bear_height
+        if penetration >= confirm_breakthrough_pct / 100.0
+            obl_bull_event := true
+        else if high >= bear_fvg_bottom and close < bear_fvg_bottom
+            obl_bear_event := true
+
+if array.size(obl_liq_array) > 0
+    for i = 0 to array.size(obl_liq_array) - 1
+        LiquidityLevel lvl = array.get(obl_liq_array, i)
+        if not lvl.swept
+            if not na(lvl.zone_box)
+                float zone_height = lvl.zone_top - lvl.zone_bottom
+                if zone_height > 0
+                    if lvl.is_high
+                        float penetration = (close - lvl.zone_bottom) / zone_height
+                        if penetration >= confirm_breakthrough_pct / 100.0
+                            obl_bull_event := true
+                        else if high >= lvl.zone_bottom and close < lvl.zone_bottom
+                            obl_bear_event := true
+                    else
+                        float penetration = (lvl.zone_top - close) / zone_height
+                        if penetration >= confirm_breakthrough_pct / 100.0
+                            obl_bear_event := true
+                        else if low <= lvl.zone_top and close > lvl.zone_top
+                            obl_bull_event := true
+            else
+                if lvl.is_high
+                    if close > lvl.price
+                        obl_bull_event := true
+                    else if high >= lvl.price and close < lvl.price
+                        obl_bear_event := true
+                else
+                    if close < lvl.price
+                        obl_bear_event := true
+                    else if low <= lvl.price and close > lvl.price
+                        obl_bull_event := true
+
+// --- حل‌وفصل سیگنال‌های در انتظار بر اساس رخداد این کندل ---
+bool confirmed_this_bar = false
+bool rejected_this_bar = false
+
+if (obl_bull_event or obl_bear_event) and array.size(pending_array) > 0
+    for i = array.size(pending_array) - 1 to 0
+        PendingSignal sig = array.get(pending_array, i)
+        if obl_bull_event
+            if sig.is_buy
+                if show_confirm_labels
+                    label.new(bar_index, low, "✅ " + sig.tag, style=label.style_label_up, color=color.new(color.green, 20), textcolor=color.white, size=size.tiny)
+                confirmed_this_bar := true
+                array.remove(pending_array, i)
+            else
+                if show_confirm_labels
+                    label.new(bar_index, high, "❌ " + sig.tag, style=label.style_label_down, color=color.new(color.gray, 20), textcolor=color.white, size=size.tiny)
+                rejected_this_bar := true
+                array.remove(pending_array, i)
+        else if obl_bear_event
+            if not sig.is_buy
+                if show_confirm_labels
+                    label.new(bar_index, high, "✅ " + sig.tag, style=label.style_label_down, color=color.new(color.red, 20), textcolor=color.white, size=size.tiny)
+                confirmed_this_bar := true
+                array.remove(pending_array, i)
+            else
+                if show_confirm_labels
+                    label.new(bar_index, low, "❌ " + sig.tag, style=label.style_label_up, color=color.new(color.gray, 20), textcolor=color.white, size=size.tiny)
+                rejected_this_bar := true
+                array.remove(pending_array, i)
+
+// --- انقضای سیگنال‌های در انتظار که هیچ رخدادی برایشان تایید/رد ثبت نشده ---
+if array.size(pending_array) > 0
+    for i = array.size(pending_array) - 1 to 0
+        PendingSignal sig = array.get(pending_array, i)
+        if (bar_index - sig.created_bar) > confirm_expiry_bars
+            array.remove(pending_array, i)
+
+alertcondition(confirmed_this_bar, title="Session Signal Confirmed by OB/Liquidity", message="سیگنال قبلیِ سیستم سشن توسط اردربلاک/لیکوییدیتی تایید شد.")
+alertcondition(rejected_this_bar, title="Session Signal Rejected by OB/Liquidity", message="سیگنال قبلیِ سیستم سشن توسط اردربلاک/لیکوییدیتی رد شد.")
+
+//#############################################################################
+// بخش ۴: استراتژیِ NY ORB + FVG (سشنِ ۹:۳۰ نیویورک) - ماژولِ اختیاری، با یک تیک قابل‌فعال‌سازی
+// این دقیقاً آخرین نسخه‌ی استراتژیِ جداگانه‌ی «NY ORB + FVG» است (رنج ۱۵ دقیقه‌ای، flip شدنِ جهتِ
+// بریک‌اوت، اردربلاکِ گپ با پوشش‌دهنده، بافرِ SL، جداسازیِ TP از بافر، ورودِ فوری + ریتست). چون این
+// اسکریپت indicator است نه strategy، به‌جای strategy.entry/strategy.exit واقعی، فقط لیبل (با مقادیرِ
+// Entry/SL/TP روی خودش) رسم می‌شود و هر سیگنال به همان صفِ تایید/ردِ بخشِ ۳ اضافه می‌شود - یعنی
+// سیگنال‌های این استراتژی هم مثلِ Sweep/LQR/BSG با اردربلاک/لیکوییدیتی تایید یا رد می‌شوند.
+//#############################################################################
+show_ny_orb           = input.bool(false, "فعال‌سازی ماژولِ NY 9:30 ORB + FVG", group="NY ORB+FVG (9:30)")
+orb_startHour         = input.int(9, "NY Session Start Hour", minval=0, maxval=23, group="NY ORB+FVG (9:30)")
+orb_startMinute       = input.int(30, "NY Session Start Minute", minval=0, maxval=59, group="NY ORB+FVG (9:30)")
+orb_rangeMinutes      = input.int(15, "Opening Range Minutes", minval=1, maxval=240, group="NY ORB+FVG (9:30)")
+orb_endHour           = input.int(16, "NY Session End Hour", minval=0, maxval=23, group="NY ORB+FVG (9:30)")
+orb_endMinute         = input.int(0, "NY Session End Minute", minval=0, maxval=59, group="NY ORB+FVG (9:30)")
+orb_minFvgSizeTicks   = input.int(5, "Min FVG Size (ticks)", minval=1, group="NY ORB+FVG (9:30)")
+orb_slBufferPercent   = input.float(40.0, "SL Extra Buffer (% of 1st FVG Candle Range)", minval=0.0, step=5.0, group="NY ORB+FVG (9:30)")
+orb_tpMultiplier      = input.float(1.5, "TP Multiplier", minval=0.1, step=0.1, group="NY ORB+FVG (9:30)")
+orb_showRangeBox      = input.bool(true, "Show Range Box", group="NY ORB+FVG (9:30)")
+orb_showFvg           = input.bool(true, "Show FVG", group="NY ORB+FVG (9:30)")
+orb_maxOneTradePerDay = input.bool(true, "Max One Trade Per Day", group="NY ORB+FVG (9:30)")
+
+//@function مثلِ in_session بخشِ ۱، ولی کاملاً مستقل تعریف شده تا این ماژول به هیچ تابعی از بخش‌های
+//دیگر وابسته نباشد.
+orb_inSession(string sessionString) =>
+    not na(time(timeframe.period, sessionString, "America/New_York"))
+
+orb_getDateKey() =>
+    year(time, "America/New_York") * 10000 + month(time, "America/New_York") * 100 + dayofmonth(time, "America/New_York")
+
+orb_tradeSession = str.format("{0,number,00}{1,number,00}-{2,number,00}{3,number,00}", orb_startHour, orb_startMinute, orb_endHour, orb_endMinute)
+orb_rangeSession = str.format("{0,number,00}{1,number,00}-{2,number,00}{3,number,00}", orb_startHour, orb_startMinute, orb_startHour + int(math.floor((orb_startMinute + orb_rangeMinutes) / 60)), (orb_startMinute + orb_rangeMinutes) % 60)
+
+orb_inRange = show_ny_orb and orb_inSession(orb_rangeSession)
+orb_inTradeSession = show_ny_orb and orb_inSession(orb_tradeSession)
+orb_rangeEndReached = not orb_inRange and orb_inRange[1]
+orb_currentDateKey = orb_getDateKey()
+orb_newDay = na(orb_currentDateKey[1]) or orb_currentDateKey != orb_currentDateKey[1]
+
+var float orb_rangeHigh = na
+var float orb_rangeLow = na
+var int orb_rangeLeftBar = na
+var int orb_rangeRightBar = na
+var bool orb_rangeFinalized = false
+var bool orb_tradedToday = false
+var bool orb_breakoutBull = false
+var bool orb_breakoutBear = false
+var bool orb_fvgFound = false
+var bool orb_fvgIsBull = false
+var bool orb_immediateEntryTaken = false
+var bool orb_mitigationDone = false
+var float orb_fvgTop = na
+var float orb_fvgBottom = na
+var float orb_fvgStopLevel = na
+var float orb_fvgFirstCandleRange = na
+var box orb_rangeBox = na
+var box orb_fvgBox = na
+var line orb_rangeHighLine = na
+var line orb_rangeLowLine = na
+
+if show_ny_orb and orb_newDay
+    orb_rangeHigh := na
+    orb_rangeLow := na
+    orb_rangeLeftBar := na
+    orb_rangeRightBar := na
+    orb_rangeFinalized := false
+    orb_tradedToday := false
+    orb_breakoutBull := false
+    orb_breakoutBear := false
+    orb_fvgFound := false
+    orb_fvgIsBull := false
+    orb_immediateEntryTaken := false
+    orb_mitigationDone := false
+    orb_fvgTop := na
+    orb_fvgBottom := na
+    orb_fvgStopLevel := na
+    orb_fvgFirstCandleRange := na
+    if not na(orb_rangeBox)
+        box.delete(orb_rangeBox)
+        orb_rangeBox := na
+    if not na(orb_fvgBox)
+        box.delete(orb_fvgBox)
+        orb_fvgBox := na
+    if not na(orb_rangeHighLine)
+        line.delete(orb_rangeHighLine)
+        orb_rangeHighLine := na
+    if not na(orb_rangeLowLine)
+        line.delete(orb_rangeLowLine)
+        orb_rangeLowLine := na
+
+if show_ny_orb and orb_inRange
+    if na(orb_rangeHigh)
+        orb_rangeHigh := high
+        orb_rangeLow := low
+        orb_rangeLeftBar := bar_index
+    else
+        orb_rangeHigh := math.max(orb_rangeHigh, high)
+        orb_rangeLow := math.min(orb_rangeLow, low)
+    orb_rangeRightBar := bar_index
+
+if show_ny_orb and orb_rangeEndReached and not orb_rangeFinalized and not na(orb_rangeHigh) and not na(orb_rangeLow)
+    orb_rangeFinalized := true
+    if orb_showRangeBox
+        if not na(orb_rangeBox)
+            box.delete(orb_rangeBox)
+        orb_rangeBox := box.new(orb_rangeLeftBar, orb_rangeHigh, orb_rangeRightBar, orb_rangeLow, xloc=xloc.bar_index, border_color=color.blue, bgcolor=color.new(color.blue, 85))
+    if not na(orb_rangeHighLine)
+        line.delete(orb_rangeHighLine)
+    if not na(orb_rangeLowLine)
+        line.delete(orb_rangeLowLine)
+    orb_rangeHighLine := line.new(orb_rangeLeftBar, orb_rangeHigh, bar_index, orb_rangeHigh, xloc=xloc.bar_index, extend=extend.right, color=color.blue, width=2)
+    orb_rangeLowLine := line.new(orb_rangeLeftBar, orb_rangeLow, bar_index, orb_rangeLow, xloc=xloc.bar_index, extend=extend.right, color=color.blue, width=2)
+
+if show_ny_orb and orb_rangeFinalized and orb_showRangeBox and not na(orb_rangeBox)
+    box.set_right(orb_rangeBox, bar_index)
+    box.set_top(orb_rangeBox, orb_rangeHigh)
+    box.set_bottom(orb_rangeBox, orb_rangeLow)
+
+if show_ny_orb and orb_rangeFinalized and not na(orb_rangeHighLine)
+    line.set_x2(orb_rangeHighLine, bar_index)
+    line.set_y2(orb_rangeHighLine, orb_rangeHigh)
+if show_ny_orb and orb_rangeFinalized and not na(orb_rangeLowLine)
+    line.set_x2(orb_rangeLowLine, bar_index)
+    line.set_y2(orb_rangeLowLine, orb_rangeLow)
+
+// NOTE: جهتِ بریک‌اوت می‌تواند در طول روز flip شود (مثلاً سوییپِ زیرِ رنج، بعد بازگشت و بستن بالای
+// رنج) - به همین دلیل روی اولین سمتی که شکسته قفل نمی‌کنیم.
+orb_bullishBreakout = show_ny_orb and orb_rangeFinalized and not orb_breakoutBull and close > orb_rangeHigh and close[1] <= orb_rangeHigh and not orb_inRange
+orb_bearishBreakout = show_ny_orb and orb_rangeFinalized and not orb_breakoutBear and close < orb_rangeLow and close[1] >= orb_rangeLow and not orb_inRange
+
+if orb_bullishBreakout
+    orb_breakoutBull := true
+    orb_breakoutBear := false
+    if orb_fvgFound and not orb_fvgIsBull
+        orb_fvgFound := false
+        orb_fvgIsBull := false
+        orb_immediateEntryTaken := false
+        orb_mitigationDone := false
+        orb_fvgTop := na
+        orb_fvgBottom := na
+        orb_fvgStopLevel := na
+        orb_fvgFirstCandleRange := na
+        if not na(orb_fvgBox)
+            box.delete(orb_fvgBox)
+            orb_fvgBox := na
+
+if orb_bearishBreakout
+    orb_breakoutBear := true
+    orb_breakoutBull := false
+    if orb_fvgFound and orb_fvgIsBull
+        orb_fvgFound := false
+        orb_fvgIsBull := false
+        orb_immediateEntryTaken := false
+        orb_mitigationDone := false
+        orb_fvgTop := na
+        orb_fvgBottom := na
+        orb_fvgStopLevel := na
+        orb_fvgFirstCandleRange := na
+        if not na(orb_fvgBox)
+            box.delete(orb_fvgBox)
+            orb_fvgBox := na
+
+orb_bullFvg = bar_index >= 2 and high[2] < low
+orb_bearFvg = bar_index >= 2 and low[2] > high
+orb_minFvgSize = orb_minFvgSizeTicks * syminfo.mintick
+orb_bullFvgSize = bar_index >= 2 ? low - high[2] : na
+orb_bearFvgSize = bar_index >= 2 ? low[2] - high : na
+
+// گپی حساب می‌شود که حداقل بخشی از آن بیرون از رنج افتاده باشد (نه لزوماً کاملِ آن).
+orb_bullFvgValid = show_ny_orb and orb_breakoutBull and orb_bullFvg and orb_bullFvgSize >= orb_minFvgSize and low > orb_rangeHigh
+orb_bearFvgValid = show_ny_orb and orb_breakoutBear and orb_bearFvg and orb_bearFvgSize >= orb_minFvgSize and low[2] < orb_rangeLow
+
+orb_canTradeNewSignal = show_ny_orb and (not orb_maxOneTradePerDay or not orb_tradedToday) and not orb_inRange and orb_inTradeSession
+
+if orb_bullFvgValid and not orb_fvgFound
+    orb_fvgFound := true
+    orb_fvgIsBull := true
+    orb_fvgTop := low
+    orb_fvgBottom := high[2]
+    orb_fvgStopLevel := low[2]
+    orb_fvgFirstCandleRange := high[2] - low[2]
+    orb_immediateEntryTaken := false
+    orb_mitigationDone := false
+    if orb_showFvg
+        if not na(orb_fvgBox)
+            box.delete(orb_fvgBox)
+        orb_fvgBox := box.new(bar_index - 2, orb_fvgTop, bar_index, orb_fvgBottom, xloc=xloc.bar_index, border_color=color.lime, bgcolor=color.new(color.lime, 85))
+    // ورودِ اول: بلافاصله روی کندلِ خودِ FVG، بدون صبر برای برگشت (ریتست).
+    if orb_canTradeNewSignal
+        orb_candidateEntry = close
+        orb_riskBasis = orb_candidateEntry - orb_fvgStopLevel
+        if orb_riskBasis > 0
+            orb_immediateEntryTaken := true
+            orb_slBuffer = orb_fvgFirstCandleRange * (orb_slBufferPercent / 100)
+            orb_stop = orb_fvgStopLevel - orb_slBuffer - syminfo.mintick
+            orb_tp = orb_candidateEntry + orb_tpMultiplier * orb_riskBasis
+            orb_tradedToday := true
+            queue_signal("ORB Long (Immediate)", true)
+            label.new(bar_index, low, "ORB Long (Immediate)\nEntry " + str.tostring(orb_candidateEntry, format.mintick) + "  SL " + str.tostring(orb_stop, format.mintick) + "  TP " + str.tostring(orb_tp, format.mintick), style=label.style_label_up, textcolor=color.white, color=color.green, size=size.tiny)
+
+if orb_bearFvgValid and not orb_fvgFound
+    orb_fvgFound := true
+    orb_fvgIsBull := false
+    orb_fvgTop := high
+    orb_fvgBottom := low[2]
+    orb_fvgStopLevel := high[2]
+    orb_fvgFirstCandleRange := high[2] - low[2]
+    orb_immediateEntryTaken := false
+    orb_mitigationDone := false
+    if orb_showFvg
+        if not na(orb_fvgBox)
+            box.delete(orb_fvgBox)
+        orb_fvgBox := box.new(bar_index - 2, orb_fvgBottom, bar_index, orb_fvgTop, xloc=xloc.bar_index, border_color=color.red, bgcolor=color.new(color.red, 85))
+    if orb_canTradeNewSignal
+        orb_candidateEntry = close
+        orb_riskBasis = orb_fvgStopLevel - orb_candidateEntry
+        if orb_riskBasis > 0
+            orb_immediateEntryTaken := true
+            orb_slBuffer = orb_fvgFirstCandleRange * (orb_slBufferPercent / 100)
+            orb_stop = orb_fvgStopLevel + orb_slBuffer + syminfo.mintick
+            orb_tp = orb_candidateEntry - orb_tpMultiplier * orb_riskBasis
+            orb_tradedToday := true
+            queue_signal("ORB Short (Immediate)", false)
+            label.new(bar_index, high, "ORB Short (Immediate)\nEntry " + str.tostring(orb_candidateEntry, format.mintick) + "  SL " + str.tostring(orb_stop, format.mintick) + "  TP " + str.tostring(orb_tp, format.mintick), style=label.style_label_down, textcolor=color.white, color=color.red, size=size.tiny)
+
+if not na(orb_fvgBox)
+    box.set_right(orb_fvgBox, bar_index)
+
+// ورودِ دوم: مستقل از ورودِ اول، اگر قیمت بعداً به داخلِ همان FVG برگردد (ریتست/میتیگیشن).
+orb_longMitigation = orb_fvgFound and orb_fvgIsBull and not orb_mitigationDone and low < orb_fvgTop and low[1] >= orb_fvgTop
+orb_shortMitigation = orb_fvgFound and not orb_fvgIsBull and not orb_mitigationDone and high > orb_fvgBottom and high[1] <= orb_fvgBottom
+orb_canTradeRetest = show_ny_orb and not orb_inRange and orb_inTradeSession
+
+if orb_longMitigation and orb_canTradeRetest
+    orb_candidateEntry = close
+    orb_riskBasis = orb_candidateEntry - orb_fvgStopLevel
+    if orb_riskBasis > 0
+        orb_mitigationDone := true
+        orb_slBuffer = orb_fvgFirstCandleRange * (orb_slBufferPercent / 100)
+        orb_stop = orb_fvgStopLevel - orb_slBuffer - syminfo.mintick
+        orb_tp = orb_candidateEntry + orb_tpMultiplier * orb_riskBasis
+        orb_tradedToday := true
+        queue_signal("ORB Long (Retest)", true)
+        label.new(bar_index, low, "ORB Long (Retest)\nEntry " + str.tostring(orb_candidateEntry, format.mintick) + "  SL " + str.tostring(orb_stop, format.mintick) + "  TP " + str.tostring(orb_tp, format.mintick), style=label.style_label_up, textcolor=color.white, color=color.green, size=size.tiny)
+
+if orb_shortMitigation and orb_canTradeRetest
+    orb_candidateEntry = close
+    orb_riskBasis = orb_fvgStopLevel - orb_candidateEntry
+    if orb_riskBasis > 0
+        orb_mitigationDone := true
+        orb_slBuffer = orb_fvgFirstCandleRange * (orb_slBufferPercent / 100)
+        orb_stop = orb_fvgStopLevel + orb_slBuffer + syminfo.mintick
+        orb_tp = orb_candidateEntry - orb_tpMultiplier * orb_riskBasis
+        orb_tradedToday := true
+        queue_signal("ORB Short (Retest)", false)
+        label.new(bar_index, high, "ORB Short (Retest)\nEntry " + str.tostring(orb_candidateEntry, format.mintick) + "  SL " + str.tostring(orb_stop, format.mintick) + "  TP " + str.tostring(orb_tp, format.mintick), style=label.style_label_down, textcolor=color.white, color=color.red, size=size.tiny)
+
+plot(show_ny_orb ? orb_rangeHigh : na, "ORB Range High", color=color.blue, linewidth=2, style=plot.style_linebr)
+plot(show_ny_orb ? orb_rangeLow : na, "ORB Range Low", color=color.blue, linewidth=2, style=plot.style_linebr)

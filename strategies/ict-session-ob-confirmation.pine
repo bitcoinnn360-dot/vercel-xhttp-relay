@@ -1761,8 +1761,9 @@ alertcondition(rejected_this_bar, title="Session Signal Rejected by OB/Liquidity
 //#############################################################################
 // بخش ۴: NY 9:30 — Volume Profile روی ۱۵ دقیقه‌ی اول (۹:۳۰–۹:۴۵ NY = ۱۷:۰۰–۱۷:۱۵ تهران)
 // روی چارت ۵دقیقه = دقیقاً ۳ کندل. row=100 ، VA=70%
-// POC داخل VAL↔VAH: نیمه‌ی پایین (<50%) → Buy ، نیمه‌ی بالا (≥50%) → Sell
-// سپس تأیید با جمع نقدینگی هم‌جهت؛ wrong-side اول → صبر؛ نیامد → Cancel
+// POC داخل Value Area (بین VAL و VAH):
+//   نیمه‌ی بالای VA (≥ mid) → Sell اولیه | نیمه‌ی پایین VA → Buy اولیه
+// خط POC کشیده/امتداد داده نمی‌شود؛ فقط VAH / VAL / midِ VA نمایش داده می‌شود
 //#############################################################################
 show_ny_orb           = input.bool(false, "فعال‌سازی NY 9:30 VP + Liquidity", group="NY Open VP (9:30)")
 orb_startHour         = input.int(9, "NY Start Hour", minval=0, maxval=23, group="NY Open VP (9:30)")
@@ -1874,8 +1875,8 @@ orb_vp_compute(float[] opens, float[] his, float[] los, float[] closes, float[] 
                         break
             val := pLo + lo_i * rowH
             vah := pLo + (hi_i + 1) * rowH
+            // موقعیت POC داخل Value Area: 0=VAL ، 1=VAH
             float va_span = vah - val
-            // ۰ = روی VAL ، ۱ = روی VAH ؛ ≥۰.۵ = نیمه‌ی بالایی → Sell
             poc_pct := va_span > 0 ? (poc - val) / va_span : 0.5
     [poc, vah, val, poc_pct]
 
@@ -1919,7 +1920,6 @@ var int orb_wrong_side_bar = na
 var bool orb_canceled = false
 var bool orb_signaled = false
 var box orb_rangeBox = na
-var line orb_pocLine = na
 var line orb_vahLine = na
 var line orb_valLine = na
 var line orb_rangeHighLine = na
@@ -1961,9 +1961,6 @@ if show_ny_orb and orb_newDay
     if not na(orb_rangeBox)
         box.delete(orb_rangeBox)
         orb_rangeBox := na
-    if not na(orb_pocLine)
-        line.delete(orb_pocLine)
-        orb_pocLine := na
     if not na(orb_vahLine)
         line.delete(orb_vahLine)
         orb_vahLine := na
@@ -2020,15 +2017,15 @@ if orb_ready_finalize
     orb_vah := vh
     orb_val := vl
     orb_poc_pct := pct
-    // نیمه‌ی بالایی VA (≥50%) → Sell ، نیمه‌ی پایینی → Buy
-    if not na(pct)
-        orb_bias := pct >= 0.5 ? -1 : 1
+    // بایاس اولیه فقط نسبت به Value Area (بین VAL و VAH):
+    // POC در ۵۰٪ بالای VA → Sell | POC در ۵۰٪ پایین VA → Buy
+    if not na(orb_poc) and not na(orb_vah) and not na(orb_val)
+        float va_mid = (orb_val + orb_vah) * 0.5
+        orb_bias := orb_poc >= va_mid ? -1 : 1
     if orb_showRangeBox and not na(orb_rangeHigh) and not na(orb_rangeLow)
         if not na(orb_rangeBox)
             box.delete(orb_rangeBox)
         orb_rangeBox := box.new(orb_rangeLeftBar, orb_rangeHigh, orb_rangeRightBar, orb_rangeLow, xloc=xloc.bar_index, border_color=color.blue, bgcolor=color.new(color.blue, 88))
-        if not na(orb_pocLine)
-            line.delete(orb_pocLine)
         if not na(orb_vahLine)
             line.delete(orb_vahLine)
         if not na(orb_valLine)
@@ -2039,17 +2036,17 @@ if orb_ready_finalize
             line.delete(orb_rangeHighLine)
         if not na(orb_rangeLowLine)
             line.delete(orb_rangeLowLine)
-        orb_rangeHighLine := line.new(orb_rangeLeftBar, orb_rangeHigh, bar_index, orb_rangeHigh, xloc=xloc.bar_index, extend=extend.right, color=color.blue, width=1)
-        orb_rangeLowLine := line.new(orb_rangeLeftBar, orb_rangeLow, bar_index, orb_rangeLow, xloc=xloc.bar_index, extend=extend.right, color=color.blue, width=1)
-        if not na(orb_poc)
-            orb_pocLine := line.new(orb_rangeLeftBar, orb_poc, bar_index, orb_poc, xloc=xloc.bar_index, extend=extend.right, color=color.orange, width=2)
+        // رنج و VA بدون امتدادِ POC (POC خط کشیده نمی‌شود)
+        orb_rangeHighLine := line.new(orb_rangeLeftBar, orb_rangeHigh, orb_rangeRightBar, orb_rangeHigh, xloc=xloc.bar_index, extend=extend.right, color=color.blue, width=1)
+        orb_rangeLowLine := line.new(orb_rangeLeftBar, orb_rangeLow, orb_rangeRightBar, orb_rangeLow, xloc=xloc.bar_index, extend=extend.right, color=color.blue, width=1)
         if not na(orb_vah)
-            orb_vahLine := line.new(orb_rangeLeftBar, orb_vah, bar_index, orb_vah, xloc=xloc.bar_index, extend=extend.right, color=color.new(color.teal, 0), width=1)
+            orb_vahLine := line.new(orb_rangeLeftBar, orb_vah, orb_rangeRightBar, orb_vah, xloc=xloc.bar_index, extend=extend.right, color=color.new(color.teal, 0), width=1)
         if not na(orb_val)
-            orb_valLine := line.new(orb_rangeLeftBar, orb_val, bar_index, orb_val, xloc=xloc.bar_index, extend=extend.right, color=color.new(color.teal, 0), width=1)
+            orb_valLine := line.new(orb_rangeLeftBar, orb_val, orb_rangeRightBar, orb_val, xloc=xloc.bar_index, extend=extend.right, color=color.new(color.teal, 0), width=1)
         if not na(orb_vah) and not na(orb_val)
             float vaMid = (orb_vah + orb_val) * 0.5
-            orb_vaMidLine := line.new(orb_rangeLeftBar, vaMid, bar_index, vaMid, xloc=xloc.bar_index, extend=extend.right, color=color.new(color.gray, 30), width=1, style=line.style_dotted)
+            // خط ۵۰٪ Value Area — فقط روی باکسِ ۳ کندل، بدون امتداد
+            orb_vaMidLine := line.new(orb_rangeLeftBar, vaMid, orb_rangeRightBar, vaMid, xloc=xloc.bar_index, extend=extend.none, color=color.new(color.gray, 20), width=1, style=line.style_dotted)
         if orb_bias == 1
             label.new(bar_index, orb_rangeLow, "VP↑", style=label.style_label_up, color=color.new(color.green, 30), textcolor=color.white, size=size.tiny)
         else if orb_bias == -1
@@ -2062,14 +2059,11 @@ if show_ny_orb and orb_rangeFinalized and orb_showRangeBox
         line.set_x2(orb_rangeHighLine, bar_index)
     if not na(orb_rangeLowLine)
         line.set_x2(orb_rangeLowLine, bar_index)
-    if not na(orb_pocLine)
-        line.set_x2(orb_pocLine, bar_index)
     if not na(orb_vahLine)
         line.set_x2(orb_vahLine, bar_index)
     if not na(orb_valLine)
         line.set_x2(orb_valLine, bar_index)
-    if not na(orb_vaMidLine)
-        line.set_x2(orb_vaMidLine, bar_index)
+    // midِ VA و POC امتداد داده نمی‌شوند
 
 // ---------- تشخیص جمع نقدینگی ----------
 bool orb_active = show_ny_orb and orb_rangeFinalized and not orb_signaled and not orb_canceled and orb_bias != 0 and orb_inTradeSession and (not orb_maxOneTradePerDay or not orb_tradedToday)
@@ -2152,6 +2146,6 @@ if orb_sell_fire and not orb_signaled and not orb_canceled
 
 plot(show_ny_orb and orb_rangeFinalized ? orb_rangeHigh : na, "NY Range High", color=color.blue, linewidth=1, style=plot.style_linebr)
 plot(show_ny_orb and orb_rangeFinalized ? orb_rangeLow : na, "NY Range Low", color=color.blue, linewidth=1, style=plot.style_linebr)
-plot(show_ny_orb and orb_rangeFinalized ? orb_poc : na, "NY POC", color=color.orange, linewidth=2, style=plot.style_linebr)
 plot(show_ny_orb and orb_rangeFinalized ? orb_vah : na, "NY VAH", color=color.teal, linewidth=1, style=plot.style_linebr)
 plot(show_ny_orb and orb_rangeFinalized ? orb_val : na, "NY VAL", color=color.teal, linewidth=1, style=plot.style_linebr)
+plot(show_ny_orb and orb_rangeFinalized and not na(orb_vah) and not na(orb_val) ? (orb_vah + orb_val) * 0.5 : na, "NY VA Mid 50%", color=color.new(color.gray, 40), linewidth=1, style=plot.style_linebr)

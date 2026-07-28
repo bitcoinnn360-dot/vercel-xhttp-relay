@@ -253,7 +253,9 @@ def main() -> int:
     pulse = parse_pulse(market, industries)
     store = merge(load_store(), pulse)
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(store, ensure_ascii=False, indent=2), encoding="utf-8")
+    payload = json.dumps(store, ensure_ascii=False, indent=2)
+    OUT.write_text(payload, encoding="utf-8")
+    (ROOT / "market_pulse.json").write_text(payload, encoding="utf-8")
 
     DAYS_DIR.mkdir(parents=True, exist_ok=True)
     day_path = DAYS_DIR / f"{str(store['dateJalali']).replace('/', '-')}.json"

@@ -138,9 +138,10 @@ def parse_pulse(market: dict, industries) -> dict:
     ind = parse_industries(industries)
     positive = int(pp or 0)
     negative = int(pm or 0)
+    raw_t = now.strftime("%H:%M")
     return {
         "asOf": datetime.now(timezone.utc).isoformat(),
-        "time": now.strftime("%H:%M"),
+        "time": clamp_time(raw_t) or (PULSE_END if raw_t > PULSE_END else raw_t),
         "dateJalali": market.get("j") or jalali_today(now),
         "source": "tradersarena",
         "breadth": {

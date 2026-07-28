@@ -124,7 +124,7 @@ function clampPulseHistoryTime(hhmm) {
 
 export function pulsePointFromSnapshot(pulse) {
   if (!pulse) return null
-  const time = clampPulseHistoryTime(pulse.time) || pulse.time
+  const time = clampPulseHistoryTime(pulse.time) || PULSE_HIST_END
   return {
     time,
     positive: pulse.breadth?.positive,
@@ -171,7 +171,7 @@ export function parseTradersArenaMarket(data, industryFlows = null) {
 
   return {
     asOf: new Date().toISOString(),
-    time: today.time,
+    time: clampPulseHistoryTime(today.time) || (today.time > PULSE_HIST_END ? PULSE_HIST_END : today.time),
     dateJalali: data.j || today.dateJalali,
     source: 'tradersarena',
     breadth: {

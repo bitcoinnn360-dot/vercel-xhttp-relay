@@ -507,7 +507,7 @@ async function fetchOverviewApi(): Promise<OverviewApi | null> {
   }
 }
 
-const PULSE_SESSION_KEY = 'midco-pulse-history-v5'
+const PULSE_SESSION_KEY = 'midco-pulse-history-v6'
 export const PULSE_REFRESH_MS = 30 * 1000
 export const PULSE_HIST_START = '08:45'
 /** Cash equities / bond / equity-ETF board close. */
@@ -515,7 +515,7 @@ export const PULSE_CASH_END = '12:30'
 /** Gold commodity ETFs keep trading into the afternoon (~17:00). */
 export const PULSE_HIST_END = '17:00'
 
-function clampPulseHistoryTime(hhmm: string | undefined | null): string | null {
+export function clampPulseHistoryTime(hhmm: string | undefined | null): string | null {
   const t = String(hhmm || '')
   if (!/^\d{2}:\d{2}$/.test(t)) return null
   if (t < PULSE_HIST_START) return null
@@ -588,17 +588,37 @@ function mergePulsePoints(
   return [...byTime.values()].sort((a, b) => String(a.time).localeCompare(String(b.time))).slice(-720)
 }
 
-/** Forward-fill series values. Optional endLabel draws a flat tail to that time. */
+/** Forward-fill series values. Optional endLabel draws a flat tail and drops later points. */
 export function densifyFlowSeries(
   points: Record<string, string | number | null | undefined>[],
   keys: string[],
   endLabel?: string,
 ): Record<string, string | number>[] {
   if (!points.length) return []
-  const sorted = [...points].sort((a, b) => String(a.label).localeCompare(String(b.label)))
+  const end = endLabel ? String(endLabel) : undefined
+  const sorted = [...points]
+    .map((p) => {
+      const label = String(p.label || '')
+      const clamped = clampPulseHistoryTime(label) || (end && label > end ? end : label)
+      return { ...p, label: clamped }
+    })
+    .filter((p) => {
+      const label = String(p.label || '')
+      if (!/^\d{2}:\d{2}$/.test(label)) return false
+      if (label < PULSE_HIST_START) return false
+      if (end && label > end) return false
+      return true
+    })
+    .sort((a, b) => String(a.label).localeCompare(String(b.label)))
+
+  // collapse duplicate labels after clamp (e.g. 17:05+17:20 → 17:00)
+  const byLabel = new Map<string, Record<string, string | number | null | undefined>>()
+  for (const p of sorted) byLabel.set(String(p.label), p)
+  const unique = [...byLabel.values()].sort((a, b) => String(a.label).localeCompare(String(b.label)))
+
   const last: Record<string, number> = {}
   const out: Record<string, string | number>[] = []
-  for (const p of sorted) {
+  for (const p of unique) {
     const next: Record<string, string | number> = { label: String(p.label) }
     for (const k of keys) {
       const raw = p[k]
@@ -607,10 +627,10 @@ export function densifyFlowSeries(
     }
     out.push(next)
   }
-  if (endLabel) {
+  if (end) {
     const lastPoint = out[out.length - 1]
-    if (lastPoint && String(lastPoint.label) < endLabel) {
-      const tail: Record<string, string | number> = { label: endLabel }
+    if (lastPoint && String(lastPoint.label) < end) {
+      const tail: Record<string, string | number> = { label: end }
       for (const k of keys) tail[k] = lastPoint[k] ?? 0
       out.push(tail)
     }
@@ -953,12 +973,20 @@ function weightedPct(members: StockRow[], key: 'dailyPct' | 'weekPct' | 'monthPc
   return den > 0 ? Math.round((num / den) * 100) / 100 : 0
 }
 
+/** Display sector: فولادی+مس → فلزات */
+export function displaySector(group: string): string {
+  if (group === 'فولادی' || group === 'مس' || group === 'فلزات') return 'فلزات'
+  return group
+}
+
 function rebuildIndustryRows(base: DashboardData) {
-  const GROUP_ORDER = ['سرمایه‌گذاری', 'سنگ‌آهن', 'فولادی', 'مس', 'کابل'] as const
-  const equities = base.stocks.filter((s) => !s.isIndustry)
+  const SECTOR_ORDER = ['سرمایه‌گذاری', 'سنگ‌آهن', 'فلزات', 'کابل'] as const
+  const equities = base.stocks
+    .filter((s) => !s.isIndustry)
+    .map((s) => ({ ...s, group: displaySector(s.group) }))
   const rebuilt: typeof base.stocks = []
 
-  for (const g of GROUP_ORDER) {
+  for (const g of SECTOR_ORDER) {
     const members = equities
       .filter((s) => s.group === g)
       .sort((a, b) => (b.marketValueBr || 0) - (a.marketValueBr || 0))
@@ -990,9 +1018,8 @@ function rebuildIndustryRows(base: DashboardData) {
     })
   }
 
-  // keep any leftover equities not in GROUP_ORDER
   for (const s of equities) {
-    if (!GROUP_ORDER.includes(s.group as (typeof GROUP_ORDER)[number])) rebuilt.push(s)
+    if (!SECTOR_ORDER.includes(s.group as (typeof SECTOR_ORDER)[number])) rebuilt.push(s)
   }
   base.stocks = rebuilt
 }

@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import type { DashboardData } from '../data/types'
 import type { HistoryPoint } from '../data/fetchers'
 import { changeClass, fmtChange, fmtInt, fmtNum, fmtPct } from '../lib/format'
-import { densifyFlowSeries, PULSE_HIST_END } from '../data/fetchers'
+import { densifyFlowSeries, clampPulseHistoryTime, PULSE_HIST_END } from '../data/fetchers'
 import { BreadthBarChart, CandlestickChart, DualLineChart, FlowBarChart, ImpactDivergingChart, TripleLineChart, PriceAreaChart } from './charts/Charts'
 import { TopTrades } from './StocksSection'
 
@@ -90,9 +90,9 @@ export function MarketOverview({
         goldFunds: p.flowGoldFunds,
       }))
     : []
-  // merge current snapshot onto the series (gold ETFs continue after cash close)
+  // merge current snapshot — clamp to session end so axis never past 17:00
   if (pulse) {
-    const curLabel = pulse.time || 'الان'
+    const curLabel = clampPulseHistoryTime(pulse.time) || PULSE_HIST_END
     const curPoint = {
       label: curLabel,
       stocks: pulse.flowStocksBillionToman,
@@ -106,18 +106,13 @@ export function MarketOverview({
     if (idx >= 0) flowSeriesRaw[idx] = { ...flowSeriesRaw[idx], ...curPoint }
     else flowSeriesRaw.push(curPoint)
   }
-  const wall = String(pulse?.time || '')
-  const flatEnd =
-    wall > PULSE_HIST_END || flowSeriesRaw.length <= 1
-      ? PULSE_HIST_END
-      : wall > String(flowSeriesRaw[flowSeriesRaw.length - 1]?.label || '')
-        ? wall
-        : undefined
   const flowSeriesClean = densifyFlowSeries(
     flowSeriesRaw as Record<string, string | number | null | undefined>[],
     [...flowKeys],
-    flatEnd,
+    PULSE_HIST_END,
   )
+  const pulseSampleLabel = clampPulseHistoryTime(pulse?.time) || pulse?.time
+  const axisEnd = String(flowSeriesClean[flowSeriesClean.length - 1]?.label || PULSE_HIST_END)
   return (
     <section id="overview" className="scroll-mt-8 space-y-4">
       <div>
@@ -299,8 +294,9 @@ export function MarketOverview({
         <h3 className="mb-1 text-sm font-bold">پالس لحظه‌ای بازار (الگوی TradersArena)</h3>
         <p className="mb-3 text-[10px] text-[var(--color-muted)]">
           وضعیت نمادها و ورود پول حقیقی · منبع TradersArena
-          {pulse?.time ? ` · آخرین نمونه ${pulse.time}` : ''}
+          {pulseSampleLabel ? ` · آخرین نمونه ${pulseSampleLabel}` : ''}
           {pulseHist.length > 1 ? ` · ${pulseHist.length} نقطه از ${pulseHist[0]?.time || '۰۸:۴۵'}` : ''}
+          {` · محور تا ${axisEnd}`}
           {' · تاریخچه سرور از ابتدای جلسه'}
         </p>
         <div className="grid gap-3 lg:grid-cols-2">

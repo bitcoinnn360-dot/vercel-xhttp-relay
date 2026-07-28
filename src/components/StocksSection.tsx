@@ -4,46 +4,77 @@ import type { DashboardData, StockRow } from '../data/types'
 import { changeClass, fmtInt, fmtNum, fmtPct } from '../lib/format'
 import { TopTradesBarChart } from './charts/Charts'
 
-const GROUPS = ['همه', 'سرمایه‌گذاری', 'سنگ‌آهن', 'فولادی', 'مس', 'کابل'] as const
+const GROUPS = ['همه', 'سرمایه‌گذاری', 'سنگ‌آهن', 'فلزات', 'کابل'] as const
+
+const SECTOR_TONE: Record<string, { bar: string; soft: string; ink: string }> = {
+  سرمایه‌گذاری: { bar: '#0b3d6e', soft: '#e8eef5', ink: '#0b3d6e' },
+  'سنگ‌آهن': { bar: '#9a3412', soft: '#f5ebe6', ink: '#7c2d12' },
+  فلزات: { bar: '#0f766e', soft: '#e6f3f1', ink: '#115e59' },
+  کابل: { bar: '#a16207', soft: '#f5efe3', ink: '#854d0e' },
+}
 
 type SortKey = 'marketValueBr' | 'dailyPct' | 'weekPct' | 'netIndividualBt'
+
+type DisplayRow =
+  | { kind: 'equity'; s: StockRow; sector: string; rowSpan: number; showSector: boolean }
+  | { kind: 'industry'; s: StockRow; sector: string }
 
 export function StocksSection({ data }: { data: DashboardData }) {
   const [group, setGroup] = useState<(typeof GROUPS)[number]>('همه')
   const [sortKey, setSortKey] = useState<SortKey>('marketValueBr')
 
-  const rows = useMemo(() => {
+  const displayRows = useMemo(() => {
     const filtered =
       group === 'همه' ? data.stocks : data.stocks.filter((s) => s.group === group)
 
-    // Keep industry rows at end of each group; sort equities within group
-    const groups = new Map<string, { eq: StockRow[]; ind?: StockRow }>()
+    const buckets = new Map<string, { eq: StockRow[]; ind?: StockRow }>()
     for (const s of filtered) {
       const g = s.group || '—'
-      if (!groups.has(g)) groups.set(g, { eq: [] })
-      const bucket = groups.get(g)!
-      if (s.isIndustry) bucket.ind = s
-      else bucket.eq.push(s)
+      if (!buckets.has(g)) buckets.set(g, { eq: [] })
+      const b = buckets.get(g)!
+      if (s.isIndustry) b.ind = s
+      else b.eq.push(s)
     }
 
-    const out: StockRow[] = []
-    for (const [, bucket] of groups) {
-      bucket.eq.sort((a, b) => {
-        const av = Number(a[sortKey]) || 0
-        const bv = Number(b[sortKey]) || 0
-        return bv - av
+    const out: DisplayRow[] = []
+    for (const [sector, bucket] of buckets) {
+      bucket.eq.sort((a, b) => (Number(b[sortKey]) || 0) - (Number(a[sortKey]) || 0))
+      const n = bucket.eq.length + (bucket.ind ? 1 : 0)
+      bucket.eq.forEach((s, i) => {
+        out.push({ kind: 'equity', s, sector, rowSpan: n, showSector: i === 0 })
       })
-      out.push(...bucket.eq)
-      if (bucket.ind) out.push(bucket.ind)
+      if (bucket.ind) {
+        out.push({
+          kind: 'industry',
+          s: bucket.ind,
+          sector,
+        })
+      }
     }
     return out
   }, [data.stocks, group, sortKey])
 
-  const liveCount = rows.filter((s) => s.returnsSource && !s.isIndustry).length
-  const adjustedCount = rows.filter((s) => s.returnsAdjusted && !s.isIndustry).length
-  const flowSum = rows
-    .filter((s) => !s.isIndustry)
-    .reduce((a, s) => a + (s.netIndividualBt || 0), 0)
+  const equities = displayRows.filter((r) => r.kind === 'equity').map((r) => r.s)
+  const liveCount = equities.filter((s) => s.returnsSource).length
+  const flowSum = equities.reduce((a, s) => a + (s.netIndividualBt || 0), 0)
+
+  const sectorCards = useMemo(() => {
+    const map = new Map<string, StockRow[]>()
+    for (const s of data.stocks) {
+      if (s.isIndustry || (group !== 'همه' && s.group !== group)) continue
+      if (!map.has(s.group)) map.set(s.group, [])
+      map.get(s.group)!.push(s)
+    }
+    return [...map.entries()].map(([sector, members]) => {
+      const tone = SECTOR_TONE[sector] || SECTOR_TONE.فلزات
+      const net = members.reduce((a, m) => a + (m.netIndividualBt || 0), 0)
+      const mv = members.reduce((a, m) => a + (m.marketValueBr || 0), 0)
+      const daily =
+        members.reduce((a, m) => a + (m.dailyPct || 0) * (m.marketValueBr || 0), 0) /
+        Math.max(1, members.reduce((a, m) => a + (m.marketValueBr || 0), 0))
+      return { sector, tone, net, mv, daily, count: members.length }
+    })
+  }, [data.stocks, group])
 
   return (
     <section id="stocks" className="scroll-mt-28 space-y-4">
@@ -51,12 +82,8 @@ export function StocksSection({ data }: { data: DashboardData }) {
         <div>
           <h2 className="section-title">وضعیت معاملات سهام شرکت‌های معدنی و فلزی</h2>
           <p className="section-sub">
-            بورس‌ویو · پایانی / تعدیلی
-            {liveCount
-              ? adjustedCount
-                ? ` · ${adjustedCount} نماد · خالص حقیقی امروز ${fmtNum(flowSum, 1)} م‌ت`
-                : ` · ${liveCount} نماد`
-              : ' · در حال دریافت…'}
+            بورس‌ویو · پایانی / تعدیلی · فولادی+مس = فلزات
+            {liveCount ? ` · ${liveCount} نماد · خالص حقیقی ${fmtNum(flowSum, 1)} م‌ت` : ' · در حال دریافت…'}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -90,11 +117,49 @@ export function StocksSection({ data }: { data: DashboardData }) {
         </div>
       </div>
 
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        {sectorCards.map((c, i) => (
+          <motion.button
+            key={c.sector}
+            type="button"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.04 }}
+            onClick={() => setGroup(c.sector as (typeof GROUPS)[number])}
+            className="sector-chip text-right"
+            style={{
+              background: `linear-gradient(135deg, ${c.tone.soft} 0%, white 70%)`,
+              borderColor: colorMix(c.tone.bar),
+            }}
+          >
+            <div className="sector-chip-bar" style={{ background: c.tone.bar }} />
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-sm font-bold" style={{ color: c.tone.ink }}>
+                {c.sector}
+              </span>
+              <span className="text-[10px] text-[var(--color-muted)]">{c.count} نماد</span>
+            </div>
+            <div className="mt-2 flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <div className="text-[9px] text-[var(--color-muted)]">ارزش بازار</div>
+                <div className="num text-sm font-semibold">{fmtInt(c.mv)}</div>
+              </div>
+              <div className="text-left">
+                <div className={`num text-sm font-bold ${changeClass(c.daily)}`}>{fmtPct(c.daily)}</div>
+                <div className={`num text-[10px] ${changeClass(c.net)}`}>
+                  حقیقی {fmtNum(c.net, 1)}
+                </div>
+              </div>
+            </div>
+          </motion.button>
+        ))}
+      </div>
+
       <div className="panel overflow-x-auto p-2 sm:p-3">
         <table className="data-table stocks-table min-w-[1100px]">
           <thead>
             <tr>
-              <th>گروه</th>
+              <th>صنعت</th>
               <th>نام / نماد</th>
               <th>ارزش بازار</th>
               <th>دلاری (m$)</th>
@@ -109,9 +174,13 @@ export function StocksSection({ data }: { data: DashboardData }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((s) => (
-              <StockTr key={`${s.group}-${s.name}`} s={s} />
-            ))}
+            {displayRows.map((row) =>
+              row.kind === 'equity' ? (
+                <EquityTr key={`${row.sector}-${row.s.name}`} row={row} />
+              ) : (
+                <IndustryTr key={`${row.sector}-ind`} row={row} showSector={!equitiesInSector(displayRows, row.sector)} />
+              ),
+            )}
           </tbody>
         </table>
       </div>
@@ -119,55 +188,116 @@ export function StocksSection({ data }: { data: DashboardData }) {
   )
 }
 
-function FlowCell({ value, industry }: { value?: number; industry?: boolean }) {
+function colorMix(hex: string) {
+  return `color-mix(in oklab, ${hex} 28%, white)`
+}
+
+function equitiesInSector(rows: DisplayRow[], sector: string) {
+  return rows.some((r) => r.kind === 'equity' && r.sector === sector)
+}
+
+function FlowCell({ value }: { value?: number }) {
   if (value == null || !Number.isFinite(value)) return <td className="num">—</td>
   const abs = Math.abs(value)
   const width = Math.min(100, Math.round((abs / Math.max(abs, 80)) * 100))
   return (
     <td className={`num flow-cell ${changeClass(value)}`}>
       <div className="flow-bar-wrap" aria-hidden>
-        <span
-          className={`flow-bar ${value >= 0 ? 'in' : 'out'}`}
-          style={{ width: industry ? '100%' : `${Math.max(12, width)}%` }}
-        />
+        <span className={`flow-bar ${value >= 0 ? 'in' : 'out'}`} style={{ width: `${Math.max(12, width)}%` }} />
       </div>
       <span className="relative z-[1] font-semibold">{fmtNum(value, 1)}</span>
     </td>
   )
 }
 
-function StockTr({ s }: { s: StockRow }) {
+function PctPill({ value }: { value: number }) {
+  return (
+    <td className="num">
+      <span className={`pct-pill ${changeClass(value)}`}>{fmtPct(value)}</span>
+    </td>
+  )
+}
+
+function EquityTr({
+  row,
+}: {
+  row: Extract<DisplayRow, { kind: 'equity' }>
+}) {
+  const { s, sector, rowSpan, showSector } = row
+  const tone = SECTOR_TONE[sector] || SECTOR_TONE.فلزات
   return (
     <motion.tr
       layout
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className={s.isIndustry ? 'industry' : s.halted ? 'halted' : undefined}
+      className={s.halted ? 'halted' : undefined}
     >
-      <td>{s.group}</td>
+      {showSector ? (
+        <td className="sector-cell" rowSpan={rowSpan} style={{ background: tone.soft }}>
+          <div className="sector-stack">
+            <span className="sector-dot" style={{ background: tone.bar }} />
+            <span className="sector-label" style={{ color: tone.ink }}>
+              {sector}
+            </span>
+          </div>
+        </td>
+      ) : null}
       <td className="font-semibold name-cell">
-        {s.name}
-        {s.symbol ? (
-          <span className="symbol-tag">({s.symbol})</span>
-        ) : null}
+        <span className="name-main">{s.name}</span>
+        {s.symbol ? <span className="symbol-tag">{s.symbol}</span> : null}
         {s.halted ? <span className="halt-tag">متوقف</span> : null}
-        {!s.isIndustry && s.returnsAdjusted ? <span className="adj-tag">تعدیل</span> : null}
+        {s.returnsAdjusted ? <span className="adj-tag">تعدیل</span> : null}
       </td>
       <td className="num">{s.marketValueBr ? fmtInt(s.marketValueBr) : '—'}</td>
       <td className="num">{s.marketValueUsdM ? fmtInt(s.marketValueUsdM) : '—'}</td>
-      <td className="num">{s.isIndustry || s.volume == null ? (s.isIndustry ? fmtInt(s.volume || 0) : '—') : fmtInt(s.volume)}</td>
+      <td className="num">{s.volume != null ? fmtInt(s.volume) : '—'}</td>
       <td className="num">{s.tradeValueMr ? fmtInt(s.tradeValueMr) : '—'}</td>
-      <td className="num">{s.isIndustry || !s.closePrice ? '—' : fmtInt(s.closePrice)}</td>
-      <td className={`num font-semibold ${changeClass(s.dailyPct)}`}>{fmtPct(s.dailyPct)}</td>
-      <td className={`num ${changeClass(s.weekPct)}`}>{fmtPct(s.weekPct)}</td>
-      <td className={`num ${changeClass(s.monthPct)}`}>{fmtPct(s.monthPct)}</td>
-      <td className={`num ${changeClass(s.ytdPct)}`}>{fmtPct(s.ytdPct)}</td>
-      <FlowCell value={s.netIndividualBt} industry={s.isIndustry} />
+      <td className="num">{s.closePrice ? fmtInt(s.closePrice) : '—'}</td>
+      <PctPill value={s.dailyPct} />
+      <PctPill value={s.weekPct} />
+      <PctPill value={s.monthPct} />
+      <PctPill value={s.ytdPct} />
+      <FlowCell value={s.netIndividualBt} />
     </motion.tr>
   )
 }
 
-/** Exclude bonds/sukuk/debt instruments that sometimes leak into trade rankings. */
+function IndustryTr({
+  row,
+  showSector,
+}: {
+  row: Extract<DisplayRow, { kind: 'industry' }>
+  showSector: boolean
+}) {
+  const { s, sector } = row
+  const tone = SECTOR_TONE[sector] || SECTOR_TONE.فلزات
+  return (
+    <tr className="industry">
+      {showSector ? (
+        <td className="sector-cell" style={{ background: tone.soft }}>
+          <div className="sector-stack">
+            <span className="sector-dot" style={{ background: tone.bar }} />
+            <span className="sector-label" style={{ color: tone.ink }}>
+              {sector}
+            </span>
+          </div>
+        </td>
+      ) : null}
+      <td className="font-semibold name-cell">{s.name}</td>
+      <td className="num">{s.marketValueBr ? fmtInt(s.marketValueBr) : '—'}</td>
+      <td className="num">{s.marketValueUsdM ? fmtInt(s.marketValueUsdM) : '—'}</td>
+      <td className="num">{s.volume ? fmtInt(s.volume) : '—'}</td>
+      <td className="num">{s.tradeValueMr ? fmtInt(s.tradeValueMr) : '—'}</td>
+      <td className="num">—</td>
+      <PctPill value={s.dailyPct} />
+      <PctPill value={s.weekPct} />
+      <PctPill value={s.monthPct} />
+      <PctPill value={s.ytdPct} />
+      <FlowCell value={s.netIndividualBt} />
+    </tr>
+  )
+}
+
 function isBondLikeSymbol(name: string): boolean {
   const n = String(name || '').trim()
   if (!n) return true

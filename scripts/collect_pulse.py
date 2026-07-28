@@ -23,11 +23,13 @@ TA_INDUSTRIES = "https://tradersarena.ir/data/industries"
 UA = "Mozilla/5.0 (compatible; midco-pulse-collector/1.0)"
 RIAL_PER_BT = 1e10
 PULSE_START = "08:45"
-PULSE_END = "12:30"
+PULSE_CASH_END = "12:30"
+# Gold commodity ETFs (صندوق طلا) trade into the afternoon (~18:00).
+PULSE_END = "18:00"
 MAX_DAYS = 45
-MAX_POINTS = 480
+MAX_POINTS = 720
 TEHRAN = ZoneInfo("Asia/Tehran")
-# TSE cash market: Sat–Wed
+# TSE + commodity fund week: Sat–Wed
 MARKET_WEEKDAYS = {5, 6, 0, 1, 2}  # Sat..Wed (Mon=0)
 
 
@@ -235,7 +237,8 @@ def in_session(now: datetime) -> bool:
     if now.weekday() not in MARKET_WEEKDAYS:
         return False
     t = now.time()
-    return time(8, 40) <= t <= time(12, 40)
+    # Cash board ~08:45–12:30; gold ETFs continue until ~18:00
+    return time(8, 40) <= t <= time(18, 10)
 
 
 def main() -> int:

@@ -300,7 +300,8 @@ export function MarketOverview({
         <p className="mb-3 text-[10px] text-[var(--color-muted)]">
           وضعیت نمادها و ورود پول حقیقی · منبع TradersArena
           {pulse?.time ? ` · آخرین نمونه ${pulse.time}` : ''}
-          {pulseHist.length > 1 ? ` · ${pulseHist.length} نقطه از ۹:۰۰` : ''}
+          {pulseHist.length > 1 ? ` · ${pulseHist.length} نقطه از ${pulseHist[0]?.time || '۰۸:۴۵'}` : ''}
+          {' · تاریخچه سرور از ابتدای جلسه'}
         </p>
         <div className="grid gap-3 lg:grid-cols-2">
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="panel p-4">

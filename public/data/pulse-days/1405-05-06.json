@@ -19,43 +19,6 @@
       "perCapitaSell": 88.67
     }
   ],
-  "days": {
-    "1405/05/05": [
-      {
-        "time": "12:53",
-        "positive": 587,
-        "negative": 203,
-        "flat": 83,
-        "orderBuy": 7405.9,
-        "orderSell": 2251.0,
-        "retailFlow": -1182.7,
-        "flowStocks": 1088.2,
-        "flowEquityFunds": -978.4,
-        "flowFixedIncome": -1292.5,
-        "perCapitaBuy": 98.63,
-        "perCapitaSell": 80.29
-      }
-    ],
-    "1405/05/06": [
-      {
-        "time": "10:59",
-        "positive": 618,
-        "negative": 164,
-        "flat": 93,
-        "orderBuy": 11207.9,
-        "orderSell": 1832.9,
-        "retailFlow": -759.8,
-        "flowStocks": 1181.0,
-        "flowEquityFunds": -496.4,
-        "flowFixedIncome": -1444.4,
-        "flowBasicMetals": 37.3,
-        "flowMetalOres": 43.9,
-        "flowGoldFunds": 0.0,
-        "perCapitaBuy": 102.78,
-        "perCapitaSell": 88.67
-      }
-    ]
-  },
   "current": {
     "asOf": "2026-07-28T07:29:09.134446+00:00",
     "time": "10:59",

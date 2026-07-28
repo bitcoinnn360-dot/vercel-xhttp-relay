@@ -453,7 +453,7 @@ async function fetchOverviewApi(): Promise<OverviewApi | null> {
   }
 }
 
-const PULSE_SESSION_KEY = 'midco-pulse-history-v4'
+const PULSE_SESSION_KEY = 'midco-pulse-history-v5'
 export const PULSE_REFRESH_MS = 30 * 1000
 export const PULSE_HIST_START = '08:45'
 export const PULSE_HIST_END = '12:30'
@@ -471,6 +471,21 @@ type PulseApi = {
   marketPulse?: DashboardData['overview']['marketPulse']
   marketPulseHistory?: DashboardData['overview']['marketPulseHistory']
   dateJalali?: string
+  availableDays?: string[]
+}
+
+function pulseStorage(): Storage | null {
+  try {
+    if (typeof localStorage !== 'undefined') return localStorage
+  } catch {
+    /* private mode */
+  }
+  try {
+    if (typeof sessionStorage !== 'undefined') return sessionStorage
+  } catch {
+    /* ignore */
+  }
+  return null
 }
 
 function readSessionPulse(): {
@@ -478,7 +493,9 @@ function readSessionPulse(): {
   history: NonNullable<DashboardData['overview']['marketPulseHistory']>
 } {
   try {
-    const raw = sessionStorage.getItem(PULSE_SESSION_KEY)
+    const store = pulseStorage()
+    if (!store) return { history: [] }
+    const raw = store.getItem(PULSE_SESSION_KEY) || sessionStorage.getItem('midco-pulse-history-v4')
     if (!raw) return { history: [] }
     const parsed = JSON.parse(raw) as { dateJalali?: string; history?: DashboardData['overview']['marketPulseHistory'] }
     return { dateJalali: parsed.dateJalali, history: Array.isArray(parsed.history) ? parsed.history : [] }
@@ -492,7 +509,8 @@ function writeSessionPulse(
   history: NonNullable<DashboardData['overview']['marketPulseHistory']>,
 ) {
   try {
-    sessionStorage.setItem(PULSE_SESSION_KEY, JSON.stringify({ dateJalali, history }))
+    const store = pulseStorage()
+    store?.setItem(PULSE_SESSION_KEY, JSON.stringify({ dateJalali, history }))
   } catch {
     /* quota / private mode */
   }

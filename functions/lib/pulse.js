@@ -1,34 +1,40 @@
 /**
- * TradersArena live pulse + Cloudflare Cache history helpers.
+ * TradersArena live pulse + durable history helpers.
  * Source: https://tradersarena.ir/data/market
  * Industries: https://tradersarena.ir/data/industries  (field `t` = net retail flow, rial)
  *
- * `o` ≈ [فروش ۵خط, خرید ۵خط, فروش صف, خرید صف] (ریال)
- * `m[2]`/`m[3]` ≈ سرانه خرید/فروش حقیقی (ریال)
- * `m[5]` ≈ خالص ورود پول حقیقی کل بازار (ریال)
- * `st[5]` / `sf[5]` / `nsf[5]` ≈ ورود پول سهام+حق‌تقدم / ص.سهامی / ص.درآمدثابت
- * `pp`/`pm` ≈ تعداد نماد مثبت/منفی
+ * History is merged from:
+ *  1) Cloudflare Cache API (edge, best-effort)
+ *  2) Static /data/market_pulse.json (last deploy)
+ *  3) GitHub raw pulse-data branch (cron collector)
  */
 const TA_MARKET = 'https://tradersarena.ir/data/market'
 const TA_INDUSTRIES = 'https://tradersarena.ir/data/industries'
 const RIAL_PER_BILLION_TOMAN = 1e10
 const RIAL_PER_MILLION_TOMAN = 1e7
-const PULSE_CACHE_URL = 'https://pulse-cache.internal/market-pulse-v4'
+const PULSE_CACHE_URL = 'https://pulse-cache.internal/market-pulse-v5'
 const PULSE_CACHE_URL_LEGACY = [
+  'https://pulse-cache.internal/market-pulse-v4',
   'https://pulse-cache.internal/market-pulse-v3',
   'https://pulse-cache.internal/market-pulse-v2',
 ]
 /** Cash-market session window (Tehran). After close, ticks update the end slot. */
-const PULSE_HIST_START = '08:45'
-const PULSE_HIST_END = '12:30'
+export const PULSE_HIST_START = '08:45'
+export const PULSE_HIST_END = '12:30'
+const MAX_DAY_ARCHIVE = 45
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
 
-/** Industry ids on TradersArena industries table (bottom of tradersarena.ir). */
+/** Raw JSON written by GitHub Actions cron (scripts/collect_pulse.py). */
+export const PULSE_REMOTE_URLS = [
+  'https://raw.githubusercontent.com/bitcoinnn360-dot/vercel-xhttp-relay/pulse-data/market_pulse.json',
+  'https://cdn.jsdelivr.net/gh/bitcoinnn360-dot/vercel-xhttp-relay@pulse-data/market_pulse.json',
+]
+
+/** Industry ids on TradersArena industries table. */
 const INDUSTRY_FLOW_IDS = {
-  basicMetals: '27', // فلزات اساسی
-  metalOres: '13', // استخراج کانه های فلزی
-  // کل ورود پول حقیقی گروه «صندوق های طلا و سکه» (زیر صندوق‌های سهامی در جدول صنایع)
+  basicMetals: '27',
+  metalOres: '13',
   goldFunds: 'gold-funds',
 }
 
@@ -183,7 +189,6 @@ export function parseTradersArenaMarket(data, industryFlows = null) {
     flowBasicMetalsBillionToman: ind.flowBasicMetalsBillionToman ?? null,
     flowMetalOresBillionToman: ind.flowMetalOresBillionToman ?? null,
     flowGoldFundsBillionToman: ind.flowGoldFundsBillionToman ?? null,
-    // m[1] = ارزش معاملات کل بازار (ریال) → همت
     totalTradeValueHmt:
       m[1] != null && Number.isFinite(Number(m[1]))
         ? Math.round((Number(m[1]) / 1e13) * 100) / 100
@@ -221,37 +226,146 @@ export async function fetchTradersArenaPulse() {
   return pulse
 }
 
-export async function loadPulseStore(cache, fallback = null) {
-  const empty = { dateJalali: null, history: [], current: null }
-  const tryMatch = async (url) => {
+function normalizeStore(raw) {
+  if (!raw || typeof raw !== 'object') {
+    return { dateJalali: null, history: [], days: {}, current: null }
+  }
+  const days = raw.days && typeof raw.days === 'object' ? { ...raw.days } : {}
+  const dateJalali = raw.dateJalali || null
+  let history = Array.isArray(raw.history) ? raw.history : []
+  if (dateJalali && (!history.length) && Array.isArray(days[dateJalali])) {
+    history = days[dateJalali]
+  }
+  if (dateJalali && history.length && !days[dateJalali]) {
+    days[dateJalali] = history
+  }
+  return {
+    dateJalali,
+    history,
+    days,
+    current: raw.current || null,
+    updatedAt: raw.updatedAt || null,
+  }
+}
+
+function historyScore(store) {
+  const h = store?.history
+  return Array.isArray(h) ? h.length : 0
+}
+
+/** Prefer the store with the denser same-day history. */
+export function pickRicherStore(a, b) {
+  const A = normalizeStore(a)
+  const B = normalizeStore(b)
+  if (!A.dateJalali) return B
+  if (!B.dateJalali) return A
+  if (A.dateJalali !== B.dateJalali) {
+    // keep both days in archive; prefer today's active history
+    const today = jalaliTodayTehran().dateJalali
+    const primary = A.dateJalali === today ? A : B.dateJalali === today ? B : historyScore(A) >= historyScore(B) ? A : B
+    const other = primary === A ? B : A
+    const days = { ...(other.days || {}), ...(primary.days || {}) }
+    if (other.dateJalali && other.history?.length) days[other.dateJalali] = other.history
+    if (primary.dateJalali && primary.history?.length) days[primary.dateJalali] = primary.history
+    return { ...primary, days }
+  }
+  const days = { ...(A.days || {}), ...(B.days || {}) }
+  const mergedHist = mergeHistoryLists(A.history, B.history)
+  days[A.dateJalali] = mergedHist
+  const current =
+    (A.updatedAt || '') >= (B.updatedAt || '') ? A.current || B.current : B.current || A.current
+  return {
+    dateJalali: A.dateJalali,
+    history: mergedHist,
+    days,
+    current,
+    updatedAt: (A.updatedAt || '') >= (B.updatedAt || '') ? A.updatedAt : B.updatedAt,
+  }
+}
+
+export function mergeHistoryLists(...lists) {
+  const byTime = new Map()
+  for (const list of lists) {
+    for (const p of list || []) {
+      if (!p?.time) continue
+      const t = clampPulseHistoryTime(String(p.time))
+      if (!t) continue
+      byTime.set(t, { ...byTime.get(t), ...p, time: t })
+    }
+  }
+  return [...byTime.values()]
+    .sort((a, b) => String(a.time).localeCompare(String(b.time)))
+    .slice(-480)
+}
+
+async function tryMatchCache(cache, url) {
+  try {
+    if (!cache) return null
+    const hit = await cache.match(url)
+    if (!hit) return null
+    const json = await hit.json()
+    return json && typeof json === 'object' ? normalizeStore(json) : null
+  } catch {
+    return null
+  }
+}
+
+export async function fetchRemotePulseStore() {
+  for (const url of PULSE_REMOTE_URLS) {
     try {
-      if (!cache) return null
-      const hit = await cache.match(url)
-      if (!hit) return null
-      const json = await hit.json()
-      return json && typeof json === 'object' ? json : null
+      const res = await fetch(url, {
+        headers: { Accept: 'application/json', 'User-Agent': UA },
+        cf: { cacheTtl: 30, cacheEverything: true },
+      })
+      if (!res.ok) continue
+      const json = await res.json()
+      if (json && typeof json === 'object') return normalizeStore(json)
     } catch {
-      return null
+      /* try next */
     }
   }
-  const primary = await tryMatch(PULSE_CACHE_URL)
-  if (primary?.history?.length) return primary
+  return null
+}
+
+export async function loadPulseStore(cache, fallback = null) {
+  const empty = { dateJalali: null, history: [], days: {}, current: null }
+  let store = empty
+
+  const primary = await tryMatchCache(cache, PULSE_CACHE_URL)
+  if (primary) store = pickRicherStore(store, primary)
+
   for (const url of PULSE_CACHE_URL_LEGACY) {
-    const legacy = await tryMatch(url)
-    if (legacy?.history?.length) {
-      return { ...legacy, migratedFrom: url }
-    }
+    const legacy = await tryMatchCache(cache, url)
+    if (legacy) store = pickRicherStore(store, legacy)
   }
-  if (primary) return primary
-  return fallback && typeof fallback === 'object' ? fallback : empty
+
+  if (fallback && typeof fallback === 'object') {
+    store = pickRicherStore(store, normalizeStore(fallback))
+  }
+
+  const remote = await fetchRemotePulseStore()
+  if (remote) store = pickRicherStore(store, remote)
+
+  return store.dateJalali || historyScore(store) ? store : empty
 }
 
 export async function savePulseStore(cache, store) {
   if (!cache) return
   try {
+    const normalized = normalizeStore(store)
+    // keep archive trimmed
+    const days = { ...(normalized.days || {}) }
+    const keys = Object.keys(days).sort()
+    if (keys.length > MAX_DAY_ARCHIVE) {
+      for (const k of keys.slice(0, keys.length - MAX_DAY_ARCHIVE)) delete days[k]
+    }
+    if (normalized.dateJalali && normalized.history?.length) {
+      days[normalized.dateJalali] = normalized.history
+    }
+    const payload = { ...normalized, days, updatedAt: new Date().toISOString() }
     await cache.put(
       PULSE_CACHE_URL,
-      new Response(JSON.stringify(store), {
+      new Response(JSON.stringify(payload), {
         headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'public, max-age=86400',
@@ -265,16 +379,22 @@ export async function savePulseStore(cache, store) {
 
 export function mergePulseHistory(store, pulse, { maxPoints = 480 } = {}) {
   const today = pulse?.dateJalali || jalaliTodayTehran().dateJalali
-  let base =
-    store && store.dateJalali === today
-      ? store
-      : { dateJalali: today, history: [], current: null }
+  const prev = normalizeStore(store)
+  const days = { ...(prev.days || {}) }
+
+  let history =
+    prev.dateJalali === today
+      ? [...(prev.history || [])]
+      : [...(days[today] || [])]
+
+  if (prev.dateJalali && prev.dateJalali !== today && prev.history?.length) {
+    days[prev.dateJalali] = prev.history
+  }
+
   const point = pulsePointFromSnapshot(pulse)
-  let history = Array.isArray(base.history) ? [...base.history] : []
   const t = clampPulseHistoryTime(point?.time)
   if (point && t) {
     point.time = t
-    // replace same minute (incl. after-hours updates to end slot)
     history = history.filter((h) => h?.time !== t)
     history.push(point)
     history = history
@@ -285,10 +405,26 @@ export function mergePulseHistory(store, pulse, { maxPoints = 480 } = {}) {
       .sort((a, b) => String(a.time).localeCompare(String(b.time)))
       .slice(-maxPoints)
   }
+
+  days[today] = history
+  const keys = Object.keys(days).sort()
+  if (keys.length > MAX_DAY_ARCHIVE) {
+    for (const k of keys.slice(0, keys.length - MAX_DAY_ARCHIVE)) delete days[k]
+  }
+
   return {
     dateJalali: today,
     history,
+    days,
     current: pulse,
     updatedAt: new Date().toISOString(),
   }
+}
+
+/** History for a Jalali day (today by default). */
+export function historyForDay(store, dateJalali) {
+  const s = normalizeStore(store)
+  const day = dateJalali || s.dateJalali || jalaliTodayTehran().dateJalali
+  if (s.dateJalali === day && s.history?.length) return s.history
+  return Array.isArray(s.days?.[day]) ? s.days[day] : []
 }

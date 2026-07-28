@@ -1,0 +1,58 @@
+name: Collect market pulse
+
+# Samples TradersArena every 5 minutes during Tehran cash session (Sat–Wed).
+# Writes public/data/market_pulse.json to the pulse-data branch so /api/pulse
+# can load a full 08:45→12:30 series even if nobody opened the dashboard.
+
+on:
+  schedule:
+    # GitHub cron is UTC. Tehran = UTC+3:30 → 08:45–12:30 ≈ 05:15–09:00 UTC.
+    - cron: '*/5 5-9 * * 0-3,6'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pulse-collect
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout pulse-data branch
+        uses: actions/checkout@v4
+        with:
+          ref: pulse-data
+          fetch-depth: 1
+
+      - name: Ensure collector script present
+        run: |
+          if [ ! -f scripts/collect_pulse.py ]; then
+            git fetch origin cursor/daily-market-dashboard-db3c --depth=1 || git fetch origin main --depth=1
+            git checkout origin/cursor/daily-market-dashboard-db3c -- scripts/collect_pulse.py 2>/dev/null \
+              || git checkout origin/main -- scripts/collect_pulse.py
+          fi
+          mkdir -p public/data/pulse-days
+
+      - name: Collect pulse sample
+        id: collect
+        run: |
+          set -e
+          python3 scripts/collect_pulse.py | tee /tmp/pulse-out.json
+          echo "result<<EOF" >> "$GITHUB_OUTPUT"
+          cat /tmp/pulse-out.json >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Commit & push if changed
+        run: |
+          if git diff --quiet -- public/data/market_pulse.json public/data/pulse-days; then
+            echo "No pulse file changes"
+            exit 0
+          fi
+          git config user.name "pulse-bot"
+          git config user.email "pulse-bot@users.noreply.github.com"
+          git add public/data/market_pulse.json public/data/pulse-days
+          git commit -m "pulse: update $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push origin HEAD:pulse-data

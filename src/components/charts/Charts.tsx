@@ -195,6 +195,7 @@ export function ImpactDivergingChart({
             type="category"
             dataKey="symbol"
             width={58}
+            interval={0}
             tick={{ fontSize: 11, fill: '#334155', fontWeight: 600 }}
             axisLine={false}
             tickLine={false}
@@ -286,14 +287,15 @@ export function TopTradesBarChart({
     return `rgb(${mid.r},${mid.g},${mid.b})`
   })
 
+  const chartH = Math.max(320, data.length * 30)
   return (
-    <div className="chart-ltr" style={{ height, width: '100%' }}>
+    <div className="chart-ltr" style={{ height: Math.max(height, chartH), width: '100%' }}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           layout="vertical"
           data={data}
-          margin={{ top: 4, right: 36, left: 4, bottom: 4 }}
-          barCategoryGap="12%"
+          margin={{ top: 4, right: 40, left: 4, bottom: 4 }}
+          barCategoryGap="14%"
         >
           <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" horizontal={false} />
           <XAxis
@@ -306,7 +308,8 @@ export function TopTradesBarChart({
           <YAxis
             type="category"
             dataKey="name"
-            width={58}
+            width={78}
+            interval={0}
             tick={{ fontSize: 11, fill: '#334155', fontWeight: 600 }}
             axisLine={false}
             tickLine={false}

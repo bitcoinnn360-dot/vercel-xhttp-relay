@@ -1,9 +1,10 @@
 /**
  * Cloudflare Pages Function — lightweight market pulse tick
  * GET /api/pulse
+ * GET /api/pulse?date=1405/05/06  → history for that Jalali day
  *
- * Fetches TradersArena /data/market, appends to CF Cache history (09:00→now),
- * returns current snapshot + intraday series for the pulse charts.
+ * Fetches TradersArena, merges cron/static/cache history (08:45→12:30),
+ * returns current snapshot + intraday series.
  */
 import {
   fetchTradersArenaPulse,
@@ -11,12 +12,17 @@ import {
   savePulseStore,
   mergePulseHistory,
   jalaliTodayTehran,
+  historyForDay,
+  PULSE_HIST_START,
+  PULSE_HIST_END,
 } from '../lib/pulse.js'
 
 export async function onRequestGet(context) {
   const errors = []
   const cache = typeof caches !== 'undefined' ? caches.default : null
   const origin = new URL(context.request.url).origin
+  const url = new URL(context.request.url)
+  const dateParam = url.searchParams.get('date')
 
   let fallback = null
   try {
@@ -39,18 +45,18 @@ export async function onRequestGet(context) {
   }
 
   const today = jalaliTodayTehran()
-  if (store?.dateJalali && store.dateJalali !== today.dateJalali && pulse) {
-    store = mergePulseHistory({ dateJalali: today.dateJalali, history: [] }, pulse)
-    await savePulseStore(cache, store)
-  }
+  const history = historyForDay(store, dateParam || today.dateJalali)
+  const days = Object.keys(store?.days || {}).sort()
 
   return Response.json(
     {
-      ok: Boolean(pulse),
+      ok: Boolean(pulse) || history.length > 0,
       updatedAt: new Date().toISOString(),
-      dateJalali: pulse?.dateJalali || today.dateJalali,
+      dateJalali: dateParam || pulse?.dateJalali || store?.dateJalali || today.dateJalali,
       marketPulse: pulse,
-      marketPulseHistory: store?.history || [],
+      marketPulseHistory: history,
+      availableDays: days.slice(-45),
+      session: { start: PULSE_HIST_START, end: PULSE_HIST_END },
       source: pulse?.source || null,
       errors,
     },

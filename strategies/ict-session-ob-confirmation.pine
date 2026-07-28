@@ -18,9 +18,8 @@
 // لحاظ می‌شود، و اردربلاک‌هایی که «بریکر» شده‌اند با نقشِ برعکس‌شده‌ی خودشان بررسی می‌شوند (نه با
 // جهتِ اصلیِ قبل از شکستن) - چون تایید/رد باید به کلِ تاریخچه‌ی فعالِ نواحی نگاه کند، نه فقط
 // نواحیِ تازه‌ساخته‌شده‌ی بعد از خودِ سیگنال.
-//   ۴) ماژولِ اختیاریِ استراتژیِ «NY 9:30 ORB + FVG» - با یک تیک قابل‌فعال‌سازی؛ چون این اسکریپت
-//      indicator است، سیگنال‌هایش به‌صورتِ لیبل (با Entry/SL/TP) نمایش داده می‌شوند و به همان صفِ
-//      تایید/رد اضافه می‌شوند، نه strategy.entry/exit واقعی.
+//   ۴) ماژولِ اختیاریِ NY 9:30 Volume Profile (۳ کندل اول) + جمع نقدینگی زیر/بالا -
+//      سیگنال با لیبل کوچک و صفِ تایید/رد؛ نه strategy.entry/exit.
 indicator('CVD ICT Breakout + OB/Liquidity Confirmation Engine', shorttitle='CVD_BSG_OB_Confirm', max_boxes_count=500, max_lines_count=500, max_labels_count=500, overlay=true, max_bars_back=1000)
 
 //#############################################################################
@@ -1760,28 +1759,29 @@ alertcondition(confirmed_this_bar, title="Session Signal Confirmed by OB/Liquidi
 alertcondition(rejected_this_bar, title="Session Signal Rejected by OB/Liquidity", message="سیگنال قبلیِ سیستم سشن توسط اردربلاک/لیکوییدیتی رد شد.")
 
 //#############################################################################
-// بخش ۴: استراتژیِ NY ORB + FVG (سشنِ ۹:۳۰ نیویورک) - ماژولِ اختیاری، با یک تیک قابل‌فعال‌سازی
-// این دقیقاً آخرین نسخه‌ی استراتژیِ جداگانه‌ی «NY ORB + FVG» است (رنج ۱۵ دقیقه‌ای، flip شدنِ جهتِ
-// بریک‌اوت، اردربلاکِ گپ با پوشش‌دهنده، بافرِ SL، جداسازیِ TP از بافر، ورودِ فوری + ریتست). چون این
-// اسکریپت indicator است نه strategy، به‌جای strategy.entry/strategy.exit واقعی، فقط لیبل (با مقادیرِ
-// Entry/SL/TP روی خودش) رسم می‌شود و هر سیگنال به همان صفِ تایید/ردِ بخشِ ۳ اضافه می‌شود - یعنی
-// سیگنال‌های این استراتژی هم مثلِ Sweep/LQR/BSG با اردربلاک/لیکوییدیتی تایید یا رد می‌شوند.
+// بخش ۴: NY 9:30 — Volume Profile روی ۳ کندل اول + جمع نقدینگی (جایگزین ORB+FVG)
+// منطق:
+//   ۱) از ۹:۳۰ NY سه کندل اول را VP کن (row=100، VA=70%)
+//   ۲) موقعیت POC بین VAL و VAH: زیر ۵۰٪ → بایاس Buy، بالای ۵۰٪ → بایاس Sell
+//   ۳) صبر برای جمع نقدینگی هم‌جهت با بایاس:
+//      Buy: سوییپ زیرِ رنج + ریجکت، سپس کلوز بالای high همان کندل ریجکت (تا N کندل)
+//           یا سوییپ زیر + برگشت با گپ/IFVG به داخل رنج
+//      Sell: قرینه از بالا
+//   ۴) اگر اول سمتِ مخالف سوییپ شد، تا چند کندل صبر؛ اگر سمتِ درست نیامد → Cancel
 //#############################################################################
-show_ny_orb           = input.bool(false, "فعال‌سازی ماژولِ NY 9:30 ORB + FVG", group="NY ORB+FVG (9:30)")
-orb_startHour         = input.int(9, "NY Session Start Hour", minval=0, maxval=23, group="NY ORB+FVG (9:30)")
-orb_startMinute       = input.int(30, "NY Session Start Minute", minval=0, maxval=59, group="NY ORB+FVG (9:30)")
-orb_rangeMinutes      = input.int(15, "Opening Range Minutes", minval=1, maxval=240, group="NY ORB+FVG (9:30)")
-orb_endHour           = input.int(16, "NY Session End Hour", minval=0, maxval=23, group="NY ORB+FVG (9:30)")
-orb_endMinute         = input.int(0, "NY Session End Minute", minval=0, maxval=59, group="NY ORB+FVG (9:30)")
-orb_minFvgSizeTicks   = input.int(5, "Min FVG Size (ticks)", minval=1, group="NY ORB+FVG (9:30)")
-orb_slBufferPercent   = input.float(40.0, "SL Extra Buffer (% of 1st FVG Candle Range)", minval=0.0, step=5.0, group="NY ORB+FVG (9:30)")
-orb_tpMultiplier      = input.float(1.5, "TP Multiplier", minval=0.1, step=0.1, group="NY ORB+FVG (9:30)")
-orb_showRangeBox      = input.bool(true, "Show Range Box", group="NY ORB+FVG (9:30)")
-orb_showFvg           = input.bool(true, "Show FVG", group="NY ORB+FVG (9:30)")
-orb_maxOneTradePerDay = input.bool(true, "Max One Trade Per Day", group="NY ORB+FVG (9:30)")
+show_ny_orb           = input.bool(false, "فعال‌سازی NY 9:30 VP + Liquidity", group="NY Open VP (9:30)")
+orb_startHour         = input.int(9, "NY Start Hour", minval=0, maxval=23, group="NY Open VP (9:30)")
+orb_startMinute       = input.int(30, "NY Start Minute", minval=0, maxval=59, group="NY Open VP (9:30)")
+orb_endHour           = input.int(16, "NY End Hour", minval=0, maxval=23, group="NY Open VP (9:30)")
+orb_endMinute         = input.int(0, "NY End Minute", minval=0, maxval=59, group="NY Open VP (9:30)")
+orb_vp_candles        = input.int(3, "VP Candles (opening)", minval=2, maxval=6, group="NY Open VP (9:30)")
+orb_vp_rows           = input.int(100, "VP Row Size", minval=20, maxval=200, group="NY Open VP (9:30)")
+orb_va_pct            = input.float(70.0, "Value Area Volume %", minval=50.0, maxval=90.0, step=5.0, group="NY Open VP (9:30)")
+orb_liq_wait_bars     = input.int(12, "Max Bars for Liq Confirm", minval=3, maxval=40, group="NY Open VP (9:30)")
+orb_wrong_wait_bars   = input.int(8, "Wait After Wrong-Side Sweep", minval=2, maxval=30, group="NY Open VP (9:30)")
+orb_showRangeBox      = input.bool(true, "Show Range / VA / POC", group="NY Open VP (9:30)")
+orb_maxOneTradePerDay = input.bool(true, "Max One Signal Per Day", group="NY Open VP (9:30)")
 
-//@function مثلِ in_session بخشِ ۱، ولی کاملاً مستقل تعریف شده تا این ماژول به هیچ تابعی از بخش‌های
-//دیگر وابسته نباشد.
 orb_inSession(string sessionString) =>
     not na(time(timeframe.period, sessionString, "America/New_York"))
 
@@ -1789,13 +1789,76 @@ orb_getDateKey() =>
     year(time, "America/New_York") * 10000 + month(time, "America/New_York") * 100 + dayofmonth(time, "America/New_York")
 
 orb_tradeSession = str.format("{0,number,00}{1,number,00}-{2,number,00}{3,number,00}", orb_startHour, orb_startMinute, orb_endHour, orb_endMinute)
-orb_rangeSession = str.format("{0,number,00}{1,number,00}-{2,number,00}{3,number,00}", orb_startHour, orb_startMinute, orb_startHour + int(math.floor((orb_startMinute + orb_rangeMinutes) / 60)), (orb_startMinute + orb_rangeMinutes) % 60)
-
-orb_inRange = show_ny_orb and orb_inSession(orb_rangeSession)
 orb_inTradeSession = show_ny_orb and orb_inSession(orb_tradeSession)
-orb_rangeEndReached = not orb_inRange and orb_inRange[1]
 orb_currentDateKey = orb_getDateKey()
 orb_newDay = na(orb_currentDateKey[1]) or orb_currentDateKey != orb_currentDateKey[1]
+
+// آیا این کندل، کندلِ شروع ۹:۳۰ NY است؟
+orb_mins_ny = hour(time, "America/New_York") * 60 + minute(time, "America/New_York")
+orb_start_mins = orb_startHour * 60 + orb_startMinute
+orb_is_open_bar = show_ny_orb and orb_mins_ny == orb_start_mins
+
+// ---------- VP builder روی N کندل ذخیره‌شده ----------
+orb_vp_compute(float[] his, float[] los, float[] vols, int rows, float vaPct) =>
+    float poc = na
+    float vah = na
+    float val = na
+    float poc_pct = na
+    int n = array.size(his)
+    if n > 0
+        float pHi = array.get(his, 0)
+        float pLo = array.get(los, 0)
+        float totV = 0.0
+        for i = 0 to n - 1
+            pHi := math.max(pHi, array.get(his, i))
+            pLo := math.min(pLo, array.get(los, i))
+            totV := totV + array.get(vols, i)
+        float span = pHi - pLo
+        if span > 0 and totV > 0
+            float rowH = span / rows
+            float[] bucket = array.new_float(rows, 0.0)
+            for i = 0 to n - 1
+                float h = array.get(his, i)
+                float l = array.get(los, i)
+                float v = array.get(vols, i)
+                int r0 = int(math.floor((l - pLo) / rowH))
+                int r1 = int(math.floor((h - pLo) / rowH))
+                r0 := math.max(0, math.min(rows - 1, r0))
+                r1 := math.max(0, math.min(rows - 1, r1))
+                if r1 < r0
+                    int tmp = r0
+                    r0 := r1
+                    r1 := tmp
+                int cnt = r1 - r0 + 1
+                float per = v / cnt
+                for r = r0 to r1
+                    array.set(bucket, r, array.get(bucket, r) + per)
+            int poc_i = 0
+            float poc_v = array.get(bucket, 0)
+            for r = 1 to rows - 1
+                float bv = array.get(bucket, r)
+                if bv > poc_v
+                    poc_v := bv
+                    poc_i := r
+            poc := pLo + (poc_i + 0.5) * rowH
+            float target = totV * (vaPct / 100.0)
+            float acc = poc_v
+            int lo_i = poc_i
+            int hi_i = poc_i
+            while acc < target and (lo_i > 0 or hi_i < rows - 1)
+                float below = lo_i > 0 ? array.get(bucket, lo_i - 1) : -1.0
+                float above = hi_i < rows - 1 ? array.get(bucket, hi_i + 1) : -1.0
+                if above >= below
+                    hi_i := hi_i + 1
+                    acc := acc + array.get(bucket, hi_i)
+                else
+                    lo_i := lo_i - 1
+                    acc := acc + array.get(bucket, lo_i)
+            val := pLo + lo_i * rowH
+            vah := pLo + (hi_i + 1) * rowH
+            float va_span = vah - val
+            poc_pct := va_span > 0 ? (poc - val) / va_span : 0.5
+    [poc, vah, val, poc_pct]
 
 var float orb_rangeHigh = na
 var float orb_rangeLow = na
@@ -1803,20 +1866,33 @@ var int orb_rangeLeftBar = na
 var int orb_rangeRightBar = na
 var bool orb_rangeFinalized = false
 var bool orb_tradedToday = false
-var bool orb_breakoutBull = false
-var bool orb_breakoutBear = false
-var bool orb_fvgFound = false
-var bool orb_fvgIsBull = false
-var bool orb_immediateEntryTaken = false
-var bool orb_mitigationDone = false
-var float orb_fvgTop = na
-var float orb_fvgBottom = na
-var float orb_fvgStopLevel = na
-var float orb_fvgFirstCandleRange = na
+var int orb_build_count = 0
+var float[] orb_vp_h = array.new_float()
+var float[] orb_vp_l = array.new_float()
+var float[] orb_vp_v = array.new_float()
+var float orb_poc = na
+var float orb_vah = na
+var float orb_val = na
+var float orb_poc_pct = na
+var int orb_bias = 0  // 1 buy, -1 sell, 0 none
+var bool orb_low_swept = false
+var bool orb_high_swept = false
+var int orb_rej_low_bar = na
+var float orb_rej_low_high = na  // high of rejection candle that swept low
+var int orb_rej_high_bar = na
+var float orb_rej_high_low = na
+var int orb_wrong_side_bar = na  // when opposite sweep happened first
+var bool orb_canceled = false
+var bool orb_signaled = false
 var box orb_rangeBox = na
-var box orb_fvgBox = na
+var line orb_pocLine = na
+var line orb_vahLine = na
+var line orb_valLine = na
 var line orb_rangeHighLine = na
 var line orb_rangeLowLine = na
+
+var bool orb_collecting = false
+var int orb_last_push_bar = na
 
 if show_ny_orb and orb_newDay
     orb_rangeHigh := na
@@ -1825,22 +1901,38 @@ if show_ny_orb and orb_newDay
     orb_rangeRightBar := na
     orb_rangeFinalized := false
     orb_tradedToday := false
-    orb_breakoutBull := false
-    orb_breakoutBear := false
-    orb_fvgFound := false
-    orb_fvgIsBull := false
-    orb_immediateEntryTaken := false
-    orb_mitigationDone := false
-    orb_fvgTop := na
-    orb_fvgBottom := na
-    orb_fvgStopLevel := na
-    orb_fvgFirstCandleRange := na
+    orb_build_count := 0
+    orb_collecting := false
+    orb_last_push_bar := na
+    array.clear(orb_vp_h)
+    array.clear(orb_vp_l)
+    array.clear(orb_vp_v)
+    orb_poc := na
+    orb_vah := na
+    orb_val := na
+    orb_poc_pct := na
+    orb_bias := 0
+    orb_low_swept := false
+    orb_high_swept := false
+    orb_rej_low_bar := na
+    orb_rej_low_high := na
+    orb_rej_high_bar := na
+    orb_rej_high_low := na
+    orb_wrong_side_bar := na
+    orb_canceled := false
+    orb_signaled := false
     if not na(orb_rangeBox)
         box.delete(orb_rangeBox)
         orb_rangeBox := na
-    if not na(orb_fvgBox)
-        box.delete(orb_fvgBox)
-        orb_fvgBox := na
+    if not na(orb_pocLine)
+        line.delete(orb_pocLine)
+        orb_pocLine := na
+    if not na(orb_vahLine)
+        line.delete(orb_vahLine)
+        orb_vahLine := na
+    if not na(orb_valLine)
+        line.delete(orb_valLine)
+        orb_valLine := na
     if not na(orb_rangeHighLine)
         line.delete(orb_rangeHighLine)
         orb_rangeHighLine := na
@@ -1848,172 +1940,164 @@ if show_ny_orb and orb_newDay
         line.delete(orb_rangeLowLine)
         orb_rangeLowLine := na
 
-if show_ny_orb and orb_inRange
-    if na(orb_rangeHigh)
-        orb_rangeHigh := high
-        orb_rangeLow := low
-        orb_rangeLeftBar := bar_index
-    else
-        orb_rangeHigh := math.max(orb_rangeHigh, high)
-        orb_rangeLow := math.min(orb_rangeLow, low)
-    orb_rangeRightBar := bar_index
+// شروع جمع از کندل ۹:۳۰ (فقط یک‌بار در روز)
+if show_ny_orb and orb_is_open_bar and not orb_rangeFinalized and not orb_collecting and orb_build_count == 0
+    orb_collecting := true
+    array.clear(orb_vp_h)
+    array.clear(orb_vp_l)
+    array.clear(orb_vp_v)
+    orb_build_count := 0
+    orb_last_push_bar := na
+    orb_rangeLeftBar := bar_index
+    orb_rangeHigh := high
+    orb_rangeLow := low
 
-if show_ny_orb and orb_rangeEndReached and not orb_rangeFinalized and not na(orb_rangeHigh) and not na(orb_rangeLow)
+// هر کندل فقط یک‌بار (جلوگیری از دوباره‌شماری روی تیک ریل‌تایم)
+bool orb_can_push = show_ny_orb and orb_collecting and not orb_rangeFinalized and orb_build_count < orb_vp_candles and (na(orb_last_push_bar) or bar_index != orb_last_push_bar) and barstate.isconfirmed
+if orb_can_push
+    array.push(orb_vp_h, high)
+    array.push(orb_vp_l, low)
+    array.push(orb_vp_v, volume)
+    orb_last_push_bar := bar_index
+    orb_build_count := orb_build_count + 1
+    orb_rangeHigh := math.max(nz(orb_rangeHigh, high), high)
+    orb_rangeLow := math.min(nz(orb_rangeLow, low), low)
+    orb_rangeRightBar := bar_index
+    if orb_build_count >= orb_vp_candles
+        orb_collecting := false
+
+// نهایی کردن VP بعد از N کندل
+if show_ny_orb and not orb_rangeFinalized and orb_build_count >= orb_vp_candles and barstate.isconfirmed
     orb_rangeFinalized := true
-    if orb_showRangeBox
+    [p, vh, vl, pct] = orb_vp_compute(orb_vp_h, orb_vp_l, orb_vp_v, orb_vp_rows, orb_va_pct)
+    orb_poc := p
+    orb_vah := vh
+    orb_val := vl
+    orb_poc_pct := pct
+    if not na(pct)
+        orb_bias := pct < 0.5 ? 1 : -1
+    if orb_showRangeBox and not na(orb_rangeHigh) and not na(orb_rangeLow)
         if not na(orb_rangeBox)
             box.delete(orb_rangeBox)
-        orb_rangeBox := box.new(orb_rangeLeftBar, orb_rangeHigh, orb_rangeRightBar, orb_rangeLow, xloc=xloc.bar_index, border_color=color.blue, bgcolor=color.new(color.blue, 85))
+        orb_rangeBox := box.new(orb_rangeLeftBar, orb_rangeHigh, orb_rangeRightBar, orb_rangeLow, xloc=xloc.bar_index, border_color=color.blue, bgcolor=color.new(color.blue, 88))
+        if not na(orb_pocLine)
+            line.delete(orb_pocLine)
+        if not na(orb_vahLine)
+            line.delete(orb_vahLine)
+        if not na(orb_valLine)
+            line.delete(orb_valLine)
+        if not na(orb_rangeHighLine)
+            line.delete(orb_rangeHighLine)
+        if not na(orb_rangeLowLine)
+            line.delete(orb_rangeLowLine)
+        orb_rangeHighLine := line.new(orb_rangeLeftBar, orb_rangeHigh, bar_index, orb_rangeHigh, xloc=xloc.bar_index, extend=extend.right, color=color.blue, width=1)
+        orb_rangeLowLine := line.new(orb_rangeLeftBar, orb_rangeLow, bar_index, orb_rangeLow, xloc=xloc.bar_index, extend=extend.right, color=color.blue, width=1)
+        if not na(orb_poc)
+            orb_pocLine := line.new(orb_rangeLeftBar, orb_poc, bar_index, orb_poc, xloc=xloc.bar_index, extend=extend.right, color=color.orange, width=2)
+        if not na(orb_vah)
+            orb_vahLine := line.new(orb_rangeLeftBar, orb_vah, bar_index, orb_vah, xloc=xloc.bar_index, extend=extend.right, color=color.new(color.teal, 0), width=1)
+        if not na(orb_val)
+            orb_valLine := line.new(orb_rangeLeftBar, orb_val, bar_index, orb_val, xloc=xloc.bar_index, extend=extend.right, color=color.new(color.teal, 0), width=1)
+        if orb_bias == 1
+            label.new(bar_index, orb_rangeLow, "VP↑", style=label.style_label_up, color=color.new(color.green, 30), textcolor=color.white, size=size.tiny)
+        else if orb_bias == -1
+            label.new(bar_index, orb_rangeHigh, "VP↓", style=label.style_label_down, color=color.new(color.red, 30), textcolor=color.white, size=size.tiny)
+
+if show_ny_orb and orb_rangeFinalized and orb_showRangeBox
+    if not na(orb_rangeBox)
+        box.set_right(orb_rangeBox, bar_index)
     if not na(orb_rangeHighLine)
-        line.delete(orb_rangeHighLine)
+        line.set_x2(orb_rangeHighLine, bar_index)
     if not na(orb_rangeLowLine)
-        line.delete(orb_rangeLowLine)
-    orb_rangeHighLine := line.new(orb_rangeLeftBar, orb_rangeHigh, bar_index, orb_rangeHigh, xloc=xloc.bar_index, extend=extend.right, color=color.blue, width=2)
-    orb_rangeLowLine := line.new(orb_rangeLeftBar, orb_rangeLow, bar_index, orb_rangeLow, xloc=xloc.bar_index, extend=extend.right, color=color.blue, width=2)
+        line.set_x2(orb_rangeLowLine, bar_index)
+    if not na(orb_pocLine)
+        line.set_x2(orb_pocLine, bar_index)
+    if not na(orb_vahLine)
+        line.set_x2(orb_vahLine, bar_index)
+    if not na(orb_valLine)
+        line.set_x2(orb_valLine, bar_index)
 
-if show_ny_orb and orb_rangeFinalized and orb_showRangeBox and not na(orb_rangeBox)
-    box.set_right(orb_rangeBox, bar_index)
-    box.set_top(orb_rangeBox, orb_rangeHigh)
-    box.set_bottom(orb_rangeBox, orb_rangeLow)
+// ---------- تشخیص جمع نقدینگی ----------
+bool orb_active = show_ny_orb and orb_rangeFinalized and not orb_signaled and not orb_canceled and orb_bias != 0 and orb_inTradeSession and (not orb_maxOneTradePerDay or not orb_tradedToday)
 
-if show_ny_orb and orb_rangeFinalized and not na(orb_rangeHighLine)
-    line.set_x2(orb_rangeHighLine, bar_index)
-    line.set_y2(orb_rangeHighLine, orb_rangeHigh)
-if show_ny_orb and orb_rangeFinalized and not na(orb_rangeLowLine)
-    line.set_x2(orb_rangeLowLine, bar_index)
-    line.set_y2(orb_rangeLowLine, orb_rangeLow)
+// سوییپ: فتیله زیر/بالای رنج (کلوز می‌تواند داخل یا بیرون باشد)
+bool orb_sweep_low_now = orb_active and barstate.isconfirmed and not na(orb_rangeLow) and low < orb_rangeLow
+bool orb_sweep_high_now = orb_active and barstate.isconfirmed and not na(orb_rangeHigh) and high > orb_rangeHigh
 
-// NOTE: جهتِ بریک‌اوت می‌تواند در طول روز flip شود (مثلاً سوییپِ زیرِ رنج، بعد بازگشت و بستن بالای
-// رنج) - به همین دلیل روی اولین سمتی که شکسته قفل نمی‌کنیم.
-orb_bullishBreakout = show_ny_orb and orb_rangeFinalized and not orb_breakoutBull and close > orb_rangeHigh and close[1] <= orb_rangeHigh and not orb_inRange
-orb_bearishBreakout = show_ny_orb and orb_rangeFinalized and not orb_breakoutBear and close < orb_rangeLow and close[1] >= orb_rangeLow and not orb_inRange
+if orb_sweep_low_now and not orb_low_swept
+    orb_low_swept := true
+    orb_rej_low_bar := bar_index
+    orb_rej_low_high := high
+    if orb_bias == -1 and not orb_high_swept and na(orb_wrong_side_bar)
+        orb_wrong_side_bar := bar_index
 
-if orb_bullishBreakout
-    orb_breakoutBull := true
-    orb_breakoutBear := false
-    if orb_fvgFound and not orb_fvgIsBull
-        orb_fvgFound := false
-        orb_fvgIsBull := false
-        orb_immediateEntryTaken := false
-        orb_mitigationDone := false
-        orb_fvgTop := na
-        orb_fvgBottom := na
-        orb_fvgStopLevel := na
-        orb_fvgFirstCandleRange := na
-        if not na(orb_fvgBox)
-            box.delete(orb_fvgBox)
-            orb_fvgBox := na
+if orb_sweep_high_now and not orb_high_swept
+    orb_high_swept := true
+    orb_rej_high_bar := bar_index
+    orb_rej_high_low := low
+    if orb_bias == 1 and not orb_low_swept and na(orb_wrong_side_bar)
+        orb_wrong_side_bar := bar_index
 
-if orb_bearishBreakout
-    orb_breakoutBear := true
-    orb_breakoutBull := false
-    if orb_fvgFound and orb_fvgIsBull
-        orb_fvgFound := false
-        orb_fvgIsBull := false
-        orb_immediateEntryTaken := false
-        orb_mitigationDone := false
-        orb_fvgTop := na
-        orb_fvgBottom := na
-        orb_fvgStopLevel := na
-        orb_fvgFirstCandleRange := na
-        if not na(orb_fvgBox)
-            box.delete(orb_fvgBox)
-            orb_fvgBox := na
+// Buy: بعد از سوییپ لو → کلوز بالای high کندل ریجکت، یا برگشت با گپ به داخل رنج
+bool orb_buy_confirm_rej = false
+bool orb_buy_confirm_gap = false
+if orb_active and barstate.isconfirmed and orb_bias == 1 and orb_low_swept and not na(orb_rej_low_bar)
+    int age = bar_index - orb_rej_low_bar
+    if age > 0 and age <= orb_liq_wait_bars
+        if close > orb_rej_low_high
+            orb_buy_confirm_rej := true
+        // گپ/IFVG صعودی به داخل رنج
+        if high[2] < low and low >= orb_rangeLow
+            orb_buy_confirm_gap := true
+        // کلوز زیر رنج بوده، بعد برگشت داخل
+        if close[1] < orb_rangeLow and close >= orb_rangeLow and open < orb_rangeLow
+            orb_buy_confirm_gap := true
 
-orb_bullFvg = bar_index >= 2 and high[2] < low
-orb_bearFvg = bar_index >= 2 and low[2] > high
-orb_minFvgSize = orb_minFvgSizeTicks * syminfo.mintick
-orb_bullFvgSize = bar_index >= 2 ? low - high[2] : na
-orb_bearFvgSize = bar_index >= 2 ? low[2] - high : na
+bool orb_sell_confirm_rej = false
+bool orb_sell_confirm_gap = false
+if orb_active and barstate.isconfirmed and orb_bias == -1 and orb_high_swept and not na(orb_rej_high_bar)
+    int age = bar_index - orb_rej_high_bar
+    if age > 0 and age <= orb_liq_wait_bars
+        if close < orb_rej_high_low
+            orb_sell_confirm_rej := true
+        if low[2] > high and high <= orb_rangeHigh
+            orb_sell_confirm_gap := true
+        if close[1] > orb_rangeHigh and close <= orb_rangeHigh and open > orb_rangeHigh
+            orb_sell_confirm_gap := true
 
-// گپی حساب می‌شود که حداقل بخشی از آن بیرون از رنج افتاده باشد (نه لزوماً کاملِ آن).
-orb_bullFvgValid = show_ny_orb and orb_breakoutBull and orb_bullFvg and orb_bullFvgSize >= orb_minFvgSize and low > orb_rangeHigh
-orb_bearFvgValid = show_ny_orb and orb_breakoutBear and orb_bearFvg and orb_bearFvgSize >= orb_minFvgSize and low[2] < orb_rangeLow
+bool orb_buy_fire = orb_buy_confirm_rej or orb_buy_confirm_gap
+bool orb_sell_fire = orb_sell_confirm_rej or orb_sell_confirm_gap
 
-orb_canTradeNewSignal = show_ny_orb and (not orb_maxOneTradePerDay or not orb_tradedToday) and not orb_inRange and orb_inTradeSession
+// wrong-side اول → تا چند کندل صبر؛ اگر سمت درست نیامد Cancel
+if orb_active and barstate.isconfirmed and not na(orb_wrong_side_bar)
+    if orb_bias == 1 and not orb_low_swept and (bar_index - orb_wrong_side_bar) >= orb_wrong_wait_bars
+        orb_canceled := true
+        label.new(bar_index, high, "NY X", style=label.style_label_down, color=color.new(color.gray, 40), textcolor=color.white, size=size.tiny)
+    if orb_bias == -1 and not orb_high_swept and (bar_index - orb_wrong_side_bar) >= orb_wrong_wait_bars
+        orb_canceled := true
+        label.new(bar_index, low, "NY X", style=label.style_label_up, color=color.new(color.gray, 40), textcolor=color.white, size=size.tiny)
 
-if orb_bullFvgValid and not orb_fvgFound
-    orb_fvgFound := true
-    orb_fvgIsBull := true
-    orb_fvgTop := low
-    orb_fvgBottom := high[2]
-    orb_fvgStopLevel := low[2]
-    orb_fvgFirstCandleRange := high[2] - low[2]
-    orb_immediateEntryTaken := false
-    orb_mitigationDone := false
-    if orb_showFvg
-        if not na(orb_fvgBox)
-            box.delete(orb_fvgBox)
-        orb_fvgBox := box.new(bar_index - 2, orb_fvgTop, bar_index, orb_fvgBottom, xloc=xloc.bar_index, border_color=color.lime, bgcolor=color.new(color.lime, 85))
-    // ورودِ اول: بلافاصله روی کندلِ خودِ FVG، بدون صبر برای برگشت (ریتست).
-    if orb_canTradeNewSignal
-        orb_candidateEntry = close
-        orb_riskBasis = orb_candidateEntry - orb_fvgStopLevel
-        if orb_riskBasis > 0
-            orb_immediateEntryTaken := true
-            orb_slBuffer = orb_fvgFirstCandleRange * (orb_slBufferPercent / 100)
-            orb_stop = orb_fvgStopLevel - orb_slBuffer - syminfo.mintick
-            orb_tp = orb_candidateEntry + orb_tpMultiplier * orb_riskBasis
-            orb_tradedToday := true
-            queue_signal("ORB Long (Immediate)", true)
-            label.new(bar_index, low, "ORB Long (Immediate)\nEntry " + str.tostring(orb_candidateEntry, format.mintick) + "  SL " + str.tostring(orb_stop, format.mintick) + "  TP " + str.tostring(orb_tp, format.mintick), style=label.style_label_up, textcolor=color.white, color=color.green, size=size.tiny)
+// انقضا اگر سوییپ هم‌جهت نیامد
+if orb_active and barstate.isconfirmed and not na(orb_rangeRightBar)
+    if (bar_index - orb_rangeRightBar) > orb_liq_wait_bars + orb_wrong_wait_bars
+        if (orb_bias == 1 and not orb_low_swept) or (orb_bias == -1 and not orb_high_swept)
+            orb_canceled := true
+            label.new(bar_index, close, "NY X", style=label.style_label_left, color=color.new(color.gray, 40), textcolor=color.white, size=size.tiny)
 
-if orb_bearFvgValid and not orb_fvgFound
-    orb_fvgFound := true
-    orb_fvgIsBull := false
-    orb_fvgTop := high
-    orb_fvgBottom := low[2]
-    orb_fvgStopLevel := high[2]
-    orb_fvgFirstCandleRange := high[2] - low[2]
-    orb_immediateEntryTaken := false
-    orb_mitigationDone := false
-    if orb_showFvg
-        if not na(orb_fvgBox)
-            box.delete(orb_fvgBox)
-        orb_fvgBox := box.new(bar_index - 2, orb_fvgBottom, bar_index, orb_fvgTop, xloc=xloc.bar_index, border_color=color.red, bgcolor=color.new(color.red, 85))
-    if orb_canTradeNewSignal
-        orb_candidateEntry = close
-        orb_riskBasis = orb_fvgStopLevel - orb_candidateEntry
-        if orb_riskBasis > 0
-            orb_immediateEntryTaken := true
-            orb_slBuffer = orb_fvgFirstCandleRange * (orb_slBufferPercent / 100)
-            orb_stop = orb_fvgStopLevel + orb_slBuffer + syminfo.mintick
-            orb_tp = orb_candidateEntry - orb_tpMultiplier * orb_riskBasis
-            orb_tradedToday := true
-            queue_signal("ORB Short (Immediate)", false)
-            label.new(bar_index, high, "ORB Short (Immediate)\nEntry " + str.tostring(orb_candidateEntry, format.mintick) + "  SL " + str.tostring(orb_stop, format.mintick) + "  TP " + str.tostring(orb_tp, format.mintick), style=label.style_label_down, textcolor=color.white, color=color.red, size=size.tiny)
+if orb_buy_fire and not orb_signaled and not orb_canceled
+    orb_signaled := true
+    orb_tradedToday := true
+    queue_signal("NY VP Buy", true)
+    label.new(bar_index, low, "NY B", style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.white, size=size.tiny)
 
-if not na(orb_fvgBox)
-    box.set_right(orb_fvgBox, bar_index)
+if orb_sell_fire and not orb_signaled and not orb_canceled
+    orb_signaled := true
+    orb_tradedToday := true
+    queue_signal("NY VP Sell", false)
+    label.new(bar_index, high, "NY S", style=label.style_label_down, color=color.new(color.red, 0), textcolor=color.white, size=size.tiny)
 
-// ورودِ دوم: مستقل از ورودِ اول، اگر قیمت بعداً به داخلِ همان FVG برگردد (ریتست/میتیگیشن).
-orb_longMitigation = orb_fvgFound and orb_fvgIsBull and not orb_mitigationDone and low < orb_fvgTop and low[1] >= orb_fvgTop
-orb_shortMitigation = orb_fvgFound and not orb_fvgIsBull and not orb_mitigationDone and high > orb_fvgBottom and high[1] <= orb_fvgBottom
-orb_canTradeRetest = show_ny_orb and not orb_inRange and orb_inTradeSession
-
-if orb_longMitigation and orb_canTradeRetest
-    orb_candidateEntry = close
-    orb_riskBasis = orb_candidateEntry - orb_fvgStopLevel
-    if orb_riskBasis > 0
-        orb_mitigationDone := true
-        orb_slBuffer = orb_fvgFirstCandleRange * (orb_slBufferPercent / 100)
-        orb_stop = orb_fvgStopLevel - orb_slBuffer - syminfo.mintick
-        orb_tp = orb_candidateEntry + orb_tpMultiplier * orb_riskBasis
-        orb_tradedToday := true
-        queue_signal("ORB Long (Retest)", true)
-        label.new(bar_index, low, "ORB Long (Retest)\nEntry " + str.tostring(orb_candidateEntry, format.mintick) + "  SL " + str.tostring(orb_stop, format.mintick) + "  TP " + str.tostring(orb_tp, format.mintick), style=label.style_label_up, textcolor=color.white, color=color.green, size=size.tiny)
-
-if orb_shortMitigation and orb_canTradeRetest
-    orb_candidateEntry = close
-    orb_riskBasis = orb_fvgStopLevel - orb_candidateEntry
-    if orb_riskBasis > 0
-        orb_mitigationDone := true
-        orb_slBuffer = orb_fvgFirstCandleRange * (orb_slBufferPercent / 100)
-        orb_stop = orb_fvgStopLevel + orb_slBuffer + syminfo.mintick
-        orb_tp = orb_candidateEntry - orb_tpMultiplier * orb_riskBasis
-        orb_tradedToday := true
-        queue_signal("ORB Short (Retest)", false)
-        label.new(bar_index, high, "ORB Short (Retest)\nEntry " + str.tostring(orb_candidateEntry, format.mintick) + "  SL " + str.tostring(orb_stop, format.mintick) + "  TP " + str.tostring(orb_tp, format.mintick), style=label.style_label_down, textcolor=color.white, color=color.red, size=size.tiny)
-
-plot(show_ny_orb ? orb_rangeHigh : na, "ORB Range High", color=color.blue, linewidth=2, style=plot.style_linebr)
-plot(show_ny_orb ? orb_rangeLow : na, "ORB Range Low", color=color.blue, linewidth=2, style=plot.style_linebr)
+plot(show_ny_orb and orb_rangeFinalized ? orb_rangeHigh : na, "NY Range High", color=color.blue, linewidth=1, style=plot.style_linebr)
+plot(show_ny_orb and orb_rangeFinalized ? orb_rangeLow : na, "NY Range Low", color=color.blue, linewidth=1, style=plot.style_linebr)
+plot(show_ny_orb and orb_rangeFinalized ? orb_poc : na, "NY POC", color=color.orange, linewidth=2, style=plot.style_linebr)
+plot(show_ny_orb and orb_rangeFinalized ? orb_vah : na, "NY VAH", color=color.teal, linewidth=1, style=plot.style_linebr)
+plot(show_ny_orb and orb_rangeFinalized ? orb_val : na, "NY VAL", color=color.teal, linewidth=1, style=plot.style_linebr)

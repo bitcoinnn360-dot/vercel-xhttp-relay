@@ -371,7 +371,50 @@ def _jalali_year() -> int:
         return 1405
 
 
+def _norm_shamsi(raw) -> str:
+    s = str(raw or "").replace("-", "/")
+    parts = s.split("/")
+    if len(parts) != 3:
+        return ""
+    try:
+        y, m, d = (int(parts[0]), int(parts[1]), int(parts[2]))
+    except ValueError:
+        return ""
+    return f"{y:04d}/{m:02d}/{d:02d}"
+
+
+def _previous_wednesday_key() -> str:
+    import jdatetime  # type: ignore
+
+    today = jdatetime.date.today()
+    # Sat=0 … Fri=6 in jdatetime
+    days_back = today.weekday() + 3
+    wed = today - jdatetime.timedelta(days=days_back)
+    return f"{wed.year:04d}/{wed.month:02d}/{wed.day:02d}"
+
+
+def _last_day_prev_jalali_month_key() -> str:
+    import jdatetime  # type: ignore
+
+    today = jdatetime.date.today()
+    first = jdatetime.date(today.year, today.month, 1)
+    prev = first - jdatetime.timedelta(days=1)
+    return f"{prev.year:04d}/{prev.month:02d}/{prev.day:02d}"
+
+
+def _jalali_year_start_key() -> str:
+    return f"{_jalali_year():04d}/01/01"
+
+
+def _adj_on_or_before(traded: list[dict], target: str) -> dict | None:
+    for row in traded:
+        if row["shamsi"] and row["shamsi"] <= target and row["adj"] > 0:
+            return row
+    return None
+
+
 def _returns_from_closes(closes: list[tuple[str, float]]) -> dict:
+    """Legacy SA path: session-count week/month."""
     week_pct = month_pct = ytd_pct = None
     last_px = closes[0][1] if closes else None
     if closes:
@@ -457,7 +500,7 @@ def scrape_mineral_stock_symbol(symbol: str, *, adjusted_enabled: bool = False) 
 
 
 def scrape_mineral_stock_bourseview(row: dict, cookie: str) -> dict:
-    """Adjusted period returns via BourseView quotes (close * adjustingCoef)."""
+    """BourseView: پایانی=vwap, تعدیلی=close*coef, calendar week/month/ytd anchors."""
     exchange = row["exchange"]
     isin = row["isin"]
     symbol = row["symbol"]
@@ -480,7 +523,7 @@ def scrape_mineral_stock_bourseview(row: dict, cookie: str) -> dict:
     if not isinstance(items, list) or not items:
         raise RuntimeError("bourseview empty")
 
-    closes: list[tuple[str, float]] = []
+    traded: list[dict] = []
     for item in items:
         if not isinstance(item, dict):
             continue
@@ -489,34 +532,71 @@ def scrape_mineral_stock_bourseview(row: dict, cookie: str) -> dict:
             continue
         coef = _sa_num(item.get("adjustingCoef"))
         adj = close * (coef if coef and coef > 0 else 1.0)
-        shamsi = str(item.get("shamsiDate") or "").replace("-", "/")
-        closes.append((shamsi, adj))
+        traded.append(
+            {
+                "shamsi": _norm_shamsi(item.get("shamsiDate")),
+                "close": close,
+                "adj": adj,
+                "vwap": _sa_num(item.get("vwap")),
+                "volume": _sa_num(item.get("volume")) or 0,
+                "value": _sa_num(item.get("value")),
+                "marketCap": _sa_num(item.get("marketCap")),
+                "previousVwap": _sa_num(item.get("previousVwap")),
+            }
+        )
+    if not traded:
+        raise RuntimeError("bourseview no trades")
 
-    rets = _returns_from_closes(closes)
-    latest = next(
-        (i for i in items if isinstance(i, dict) and (_sa_num(i.get("close")) or 0) > 0),
-        items[0] if isinstance(items[0], dict) else {},
-    )
-    close_price = _sa_num(latest.get("close")) or rets["lastPrice"]
-    ret_frac = _sa_num(latest.get("returnValue"))
-    mv = _sa_num(latest.get("marketCap"))
-    tv = _sa_num(latest.get("value"))
-    vol = _sa_num(latest.get("volume"))
+    head = items[0] if isinstance(items[0], dict) else {}
+    halted = not ((_sa_num(head.get("close")) or 0) > 0)
+    last_trade = traded[0]
+
+    if halted:
+        close_price = last_trade.get("vwap") or last_trade["close"]
+        daily_pct = 0.0
+        volume = 0.0
+        trade_value_mr = 0
+        mv = last_trade.get("marketCap") or _sa_num(head.get("marketCap"))
+    else:
+        close_price = _sa_num(head.get("vwap")) or last_trade.get("vwap") or last_trade["close"]
+        daily_pct = _pct(_sa_num(head.get("previousVwap")), _sa_num(head.get("vwap")))
+        volume = _sa_num(head.get("volume")) or 0.0
+        tv = _sa_num(head.get("value"))
+        trade_value_mr = round(tv / 1e6) if tv else 0
+        mv = _sa_num(head.get("marketCap"))
+
+    # بازدهی روی مقیاس تعدیلی: پایانی×coef آخرین معامله
+    last_vwap = last_trade.get("vwap") or last_trade["close"]
+    coef = (last_trade["adj"] / last_trade["close"]) if last_trade["close"] else 1.0
+    current_for_return = (last_vwap or last_trade["close"]) * coef
+
+    week_base = _adj_on_or_before(traded, _previous_wednesday_key())
+    month_base = _adj_on_or_before(traded, _last_day_prev_jalali_month_key())
+    ytd_base = _adj_on_or_before(traded, _jalali_year_start_key())
 
     return {
         "symbol": symbol,
         "closePrice": close_price,
         "lastPrice": close_price,
-        "dailyPct": round(ret_frac * 100, 2) if ret_frac is not None else None,
-        "weekPct": rets["weekPct"],
-        "monthPct": rets["monthPct"],
-        "ytdPct": rets["ytdPct"],
+        "dailyPct": daily_pct,
+        "weekPct": _pct(week_base["adj"], current_for_return) if week_base else None,
+        "monthPct": _pct(month_base["adj"], current_for_return) if month_base else None,
+        "ytdPct": _pct(ytd_base["adj"], current_for_return) if ytd_base else None,
         "marketValueBr": round(mv / 1e9) if mv else None,
-        "volume": vol,
-        "tradeValueMr": round(tv / 1e6) if tv else None,
+        "volume": volume,
+        "tradeValueMr": trade_value_mr,
         "returnsAdjusted": True,
         "returnsSource": "bourseview-adjusted",
-        "historyCount": rets["historyCount"],
+        "historyCount": len(traded),
+        "halted": halted,
+        "anchors": {
+            "week": week_base["shamsi"] if week_base else None,
+            "month": month_base["shamsi"] if month_base else None,
+            "ytd": ytd_base["shamsi"] if ytd_base else None,
+            "weekAdj": week_base["adj"] if week_base else None,
+            "monthAdj": month_base["adj"] if month_base else None,
+            "ytdAdj": ytd_base["adj"] if ytd_base else None,
+        },
         "isin": isin,
         "exchange": exchange,
     }

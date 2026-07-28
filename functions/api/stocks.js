@@ -1,11 +1,16 @@
 /**
  * Cloudflare Pages Function: mineral stock snapshots + period returns.
  *
- * Primary: BourseView adjusted daily quotes (close * adjustingCoef)
- *   requires env BOURSEVIEW_COOKIE (`authentication=…`; optional `; id_token=…`)
- * Fallback: SourceArena live + unadjusted history (rate-limited / no adjust on demo)
- * Last resort: /data/mineral_stocks.json
+ * Primary: BourseView price history
+ *   - قیمت پایانی = vwap (not `close` which is آخرین معامله)
+ *   - قیمت تعدیلی = close * adjustingCoef
+ *   - week: vs last trading day on/before previous Wednesday
+ *   - month: vs last trading day on/before last day of previous Jalali month
+ *   - ytd: vs last trading day on/before 01 Farvardin
+ *   - halted: volume/value/dailyPct = 0, پایانی = last traded vwap
  *
+ * requires env BOURSEVIEW_COOKIE (`authentication=…`)
+ * Fallback: SourceArena / static mineral_stocks.json
  * Shakhesban is intentionally NOT used.
  */
 
@@ -47,7 +52,7 @@ const MINERAL_STOCKS = [
 ]
 
 const CACHE_TTL_MS = 20 * 60 * 1000
-const CACHE_KEY = 'https://cache.local/mineral-stocks-bv-v1'
+const CACHE_KEY = 'https://cache.local/mineral-stocks-bv-v2'
 
 function num(raw) {
   if (raw == null) return null
@@ -60,17 +65,79 @@ function pct(from, to) {
   return Math.round((to / from - 1) * 10000) / 100
 }
 
-function jalaliTodayYear() {
+function jalaliParts(date = new Date()) {
   try {
     const fmt = new Intl.DateTimeFormat('en-US-u-ca-persian', {
       timeZone: 'Asia/Tehran',
       year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
     })
-    const parts = Object.fromEntries(fmt.formatToParts(new Date()).map((p) => [p.type, p.value]))
-    return Number(parts.year) || 1405
+    const parts = Object.fromEntries(fmt.formatToParts(date).map((p) => [p.type, p.value]))
+    const year = Number(String(parts.year).replace(/\D/g, '')) || 1405
+    const month = Number(parts.month) || 1
+    const day = Number(parts.day) || 1
+    return {
+      year,
+      month,
+      day,
+      key: `${year}/${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}`,
+    }
   } catch {
-    return 1405
+    return { year: 1405, month: 1, day: 1, key: '1405/01/01' }
   }
+}
+
+function tehranWeekdaySat0(date = new Date()) {
+  const name = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Tehran',
+    weekday: 'short',
+  }).format(date)
+  const map = { Sat: 0, Sun: 1, Mon: 2, Tue: 3, Wed: 4, Thu: 5, Fri: 6 }
+  return map[name] ?? 0
+}
+
+function tehranNoonDate() {
+  const iso = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Tehran',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date())
+  return new Date(`${iso}T12:00:00+03:30`)
+}
+
+/** چهارشنبهٔ هفتهٔ گذشته (شنبه=۰ … جمعه=۶) */
+function previousWednesdayKey() {
+  const base = tehranNoonDate()
+  const wd = tehranWeekdaySat0(base)
+  const daysBack = wd + 3
+  return jalaliParts(new Date(base.getTime() - daysBack * 86400000)).key
+}
+
+/** آخرین روز ماه شمسی قبل */
+function lastDayPrevJalaliMonthKey() {
+  const base = tehranNoonDate()
+  const cur = jalaliParts(base)
+  for (let i = 1; i <= 40; i++) {
+    const j = jalaliParts(new Date(base.getTime() - i * 86400000))
+    if (j.year !== cur.year || j.month !== cur.month) return j.key
+  }
+  return cur.key
+}
+
+function jalaliYearStartKey() {
+  const y = jalaliParts().year
+  return `${y}/01/01`
+}
+
+function normShamsi(raw) {
+  if (!raw) return ''
+  const m = String(raw)
+    .replace(/-/g, '/')
+    .match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/)
+  if (!m) return ''
+  return `${m[1]}/${m[2].padStart(2, '0')}/${m[3].padStart(2, '0')}`
 }
 
 function normalizeCookie(raw) {
@@ -144,7 +211,7 @@ function returnsFromSaHistory(rows) {
   const last = closes[0].price
   const week = closes[Math.min(5, closes.length - 1)]?.price
   const month = closes[Math.min(22, closes.length - 1)]?.price
-  const yStart = `${jalaliTodayYear()}/01/01`
+  const yStart = jalaliYearStartKey()
   const ytdRows = closes.filter((c) => c.date >= yStart)
   const ytdBase = ytdRows.length ? ytdRows[ytdRows.length - 1].price : null
 
@@ -157,31 +224,44 @@ function returnsFromSaHistory(rows) {
   }
 }
 
-function returnsFromBvItems(items) {
-  const closes = []
+/** First trading row on/before target shamsi (items newest-first). */
+function adjOnOrBefore(traded, targetKey) {
+  for (const row of traded) {
+    if (row.shamsi && row.shamsi <= targetKey && row.adj > 0) return row
+  }
+  return null
+}
+
+function returnsFromBvItems(items, currentPayani) {
+  const traded = []
   for (const row of items) {
     const close = num(row?.close)
     if (close == null || !(close > 0)) continue
     const coef = num(row?.adjustingCoef)
     const adj = close * (coef != null && coef > 0 ? coef : 1)
-    const shamsi = String(row?.shamsiDate || '').replace(/-/g, '/')
-    closes.push({ date: shamsi, price: adj })
+    const shamsi = normShamsi(row?.shamsiDate)
+    const vwap = num(row?.vwap)
+    traded.push({ shamsi, close, adj, vwap, volume: num(row?.volume) || 0 })
   }
-  if (!closes.length) return {}
+  if (!traded.length) return { historyCount: 0 }
 
-  const last = closes[0].price
-  const week = closes[Math.min(5, closes.length - 1)]?.price
-  const month = closes[Math.min(22, closes.length - 1)]?.price
-  const yStart = `${jalaliTodayYear()}/01/01`
-  const ytdRows = closes.filter((c) => c.date && c.date >= yStart)
-  const ytdBase = ytdRows.length ? ytdRows[ytdRows.length - 1].price : null
+  const weekBase = adjOnOrBefore(traded, previousWednesdayKey())
+  const monthBase = adjOnOrBefore(traded, lastDayPrevJalaliMonthKey())
+  const ytdBase = adjOnOrBefore(traded, jalaliYearStartKey())
 
   return {
-    weekPct: pct(week, last),
-    monthPct: pct(month, last),
-    ytdPct: pct(ytdBase, last),
-    lastPrice: last,
-    historyCount: closes.length,
+    weekPct: pct(weekBase?.adj, currentPayani),
+    monthPct: pct(monthBase?.adj, currentPayani),
+    ytdPct: pct(ytdBase?.adj, currentPayani),
+    historyCount: traded.length,
+    anchors: {
+      week: weekBase?.shamsi || null,
+      month: monthBase?.shamsi || null,
+      ytd: ytdBase?.shamsi || null,
+      weekAdj: weekBase?.adj ?? null,
+      monthAdj: monthBase?.adj ?? null,
+      ytdAdj: ytdBase?.adj ?? null,
+    },
   }
 }
 
@@ -214,28 +294,63 @@ async function bvFetchQuotes(cookie, exchange, isin, attempts = 3) {
 }
 
 function snapFromBv(meta, items) {
-  const latest = items.find((r) => num(r?.close) != null && num(r.close) > 0) || items[0] || {}
-  const rets = returnsFromBvItems(items)
-  const closePrice = num(latest.close) || rets.lastPrice
-  const retFrac = num(latest.returnValue)
-  const mv = num(latest.marketCap)
-  const tv = num(latest.value)
-  const vol = num(latest.volume)
+  const head = items[0] || {}
+  const tradedHead = items.find((r) => num(r?.close) != null && num(r.close) > 0)
+  const halted = !(num(head?.close) > 0)
+
+  // قیمت پایانی نمایشی = vwap؛ برای نماد متوقف: آخرین پایانیِ روز معاملاتی
+  const closePrice = halted
+    ? num(tradedHead?.vwap) || num(tradedHead?.close)
+    : num(head.vwap) || num(tradedHead?.vwap) || num(tradedHead?.close)
+
+  // صورت کسر بازدهی روی مقیاس تعدیلی (vwap×coef آخرین معامله)
+  const lastCoef = num(tradedHead?.adjustingCoef)
+  const lastVwap = num(tradedHead?.vwap) || num(tradedHead?.close)
+  const currentForReturn =
+    lastVwap != null
+      ? lastVwap * (lastCoef != null && lastCoef > 0 ? lastCoef : 1)
+      : closePrice
+
+  const rets = returnsFromBvItems(items, currentForReturn)
+
+  let dailyPct = null
+  let volume = 0
+  let tradeValueMr = 0
+  let marketValueBr
+
+  if (halted) {
+    dailyPct = 0
+    volume = 0
+    tradeValueMr = 0
+    const mv = num(tradedHead?.marketCap) || num(head?.marketCap)
+    marketValueBr = mv != null ? Math.round(mv / 1e9) : undefined
+  } else {
+    const vwap = num(head.vwap)
+    const prev = num(head.previousVwap)
+    dailyPct = pct(prev, vwap)
+    volume = num(head.volume) || 0
+    const tv = num(head.value)
+    tradeValueMr = tv != null ? Math.round(tv / 1e6) : 0
+    const mv = num(head.marketCap)
+    marketValueBr = mv != null ? Math.round(mv / 1e9) : undefined
+  }
 
   return {
     symbol: meta.symbol,
     closePrice,
     lastPrice: closePrice,
-    dailyPct: retFrac != null ? Math.round(retFrac * 10000) / 100 : null,
+    dailyPct,
     weekPct: rets.weekPct,
     monthPct: rets.monthPct,
     ytdPct: rets.ytdPct,
-    marketValueBr: mv != null ? Math.round(mv / 1e9) : undefined,
-    volume: vol ?? undefined,
-    tradeValueMr: tv != null ? Math.round(tv / 1e6) : undefined,
+    marketValueBr,
+    volume,
+    tradeValueMr,
     returnsAdjusted: true,
     returnsSource: 'bourseview-adjusted',
     historyCount: rets.historyCount || 0,
+    halted,
+    anchors: rets.anchors,
     isin: meta.isin,
     exchange: meta.exchange,
   }
@@ -314,11 +429,13 @@ async function loadStaticFallback(origin) {
 export async function onRequestGet(context) {
   const { request, env } = context
   const origin = new URL(request.url).origin
+  const url = new URL(request.url)
+  const forceRefresh = url.searchParams.has('refresh')
   const token = (env?.SOURCEARENA_TOKEN || DEMO_TOKEN).trim()
   const bvCookie = normalizeCookie(env?.BOURSEVIEW_COOKIE || env?.BOURSEVIEW_TOKEN || '')
   const cache = typeof caches !== 'undefined' ? caches.default : null
 
-  if (cache) {
+  if (cache && !forceRefresh) {
     const hit = await cache.match(CACHE_KEY)
     if (hit) {
       const cachedAt = Number(hit.headers.get('x-cached-at') || 0)
@@ -417,7 +534,7 @@ export async function onRequestGet(context) {
   let note = 'بازدهی از قیمت غیرتعدیل SourceArena'
   if (bvOk > 0 && adjustedCount > 0) {
     source = 'bourseview-adjusted'
-    note = 'بازدهی از قیمت تعدیل‌شده بورس‌ویو (close × adjustingCoef)'
+    note = 'بازدهی = قیمت پایانی (vwap) نسبت به قیمت تعدیلی تاریخچه بورس‌ویو'
   } else if (adjustedCount > 0) {
     source = 'sourcearena-adjusted'
     note = 'بازدهی از قیمت تعدیل‌شده SourceArena'

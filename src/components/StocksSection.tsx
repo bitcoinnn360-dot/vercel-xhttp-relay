@@ -23,10 +23,10 @@ export function StocksSection({ data }: { data: DashboardData }) {
         <div>
           <h2 className="section-title">وضعیت معاملات سهام شرکت‌های معدنی و فلزی</h2>
           <p className="section-sub">
-            ارزش بازار و بازدهی از بورس‌ویو (تعدیل‌شده)
+            ارزش بازار و بازدهی از بورس‌ویو (پایانی / تعدیلی)
             {liveCount
               ? adjustedCount
-                ? ` · ${adjustedCount} نماد با قیمت تعدیل‌شده`
+                ? ` · ${adjustedCount} نماد · هفته=چهارشنبه قبل · ماه=آخر ماه قبل`
                 : ` · ${liveCount} نماد · در حال دریافت تاریخچه`
               : ' · در حال دریافت…'}
           </p>

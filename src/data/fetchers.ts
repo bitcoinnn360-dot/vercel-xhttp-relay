@@ -959,7 +959,7 @@ function applyMineralStockReturns(base: DashboardData, snaps: MineralStockSnap[]
     if (snap.closePrice != null && snap.closePrice > 0) s.closePrice = snap.closePrice
     else if (snap.lastPrice != null && snap.lastPrice > 0) s.closePrice = snap.lastPrice
     if (snap.dailyPct != null && Number.isFinite(snap.dailyPct)) s.dailyPct = snap.dailyPct
-    // Period returns from SourceArena history (adjusted when token allows)
+    // Period returns from BourseView adjusted quotes (fallback: SourceArena)
     if (snap.weekPct != null && Number.isFinite(snap.weekPct)) s.weekPct = snap.weekPct
     if (snap.monthPct != null && Number.isFinite(snap.monthPct)) s.monthPct = snap.monthPct
     if (snap.ytdPct != null && Number.isFinite(snap.ytdPct)) s.ytdPct = snap.ytdPct

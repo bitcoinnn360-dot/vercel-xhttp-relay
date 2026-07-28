@@ -23,11 +23,11 @@ export function StocksSection({ data }: { data: DashboardData }) {
         <div>
           <h2 className="section-title">وضعیت معاملات سهام شرکت‌های معدنی و فلزی</h2>
           <p className="section-sub">
-            ارزش بازار و بازدهی از SourceArena
+            ارزش بازار و بازدهی از بورس‌ویو (تعدیل‌شده)
             {liveCount
               ? adjustedCount
                 ? ` · ${adjustedCount} نماد با قیمت تعدیل‌شده`
-                : ` · ${liveCount} نماد · تاریخچه غیرتعدیل (تا فعال‌سازی adjusted یا کدال/بورس‌ویو)`
+                : ` · ${liveCount} نماد · در حال دریافت تاریخچه`
               : ' · در حال دریافت…'}
           </p>
         </div>

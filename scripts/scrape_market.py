@@ -286,34 +286,36 @@ def scrape_tgju_ohlc_from(key: str, from_greg: str = "2022/01/01") -> list[dict]
 
 
 MINERAL_STOCKS = [
-    {"name": "توسعه معادن و فلزات", "symbol": "ومعادن"},
-    {"name": "تجلی توسعه معادن و فلزات", "symbol": "تجلی"},
-    {"name": "گروه مدیریت سرمایه‌گذاری امید", "symbol": "وامید"},
-    {"name": "سرمایه‌گذاری صدر تأمین", "symbol": "تاصیکو"},
-    {"name": "هلدینگ صنایع معدنی خاورمیانه", "symbol": "میدکو"},
-    {"name": "صنایع و معادن احیاء سپاهان", "symbol": "واحیا"},
-    {"name": "بین‌المللی توسعه صنایع و معادن غدیر", "symbol": "وغدیر"},
-    {"name": "گروه صنایع معادن فلات ایرانیان", "symbol": "فلات"},
-    {"name": "معدنی و صنعتی گل‌گهر", "symbol": "کگل"},
-    {"name": "معدنی و صنعتی چادرملو", "symbol": "کچاد"},
-    {"name": "سنگ آهن گهرزمین", "symbol": "کگهر"},
-    {"name": "توسعه معدنی و صنعتی صبانور", "symbol": "کنور"},
-    {"name": "فرآوری معدنی اپال کانی پارس", "symbol": "اپال"},
-    {"name": "فولاد مبارکه اصفهان", "symbol": "فولاد"},
-    {"name": "فولاد خوزستان", "symbol": "فخوز"},
-    {"name": "فولاد هرمزگان جنوب", "symbol": "هرمز"},
-    {"name": "آهن و فولاد ارفع", "symbol": "ارفع"},
-    {"name": "فولاد خراسان", "symbol": "فخاس"},
-    {"name": "فولاد امیرکبیر کاشان", "symbol": "فاما"},
-    {"name": "فولاد کاوه جنوب کیش", "symbol": "کاوه"},
-    {"name": "ذوب آهن اصفهان", "symbol": "ذوب"},
-    {"name": "جهان فولاد سیرجان", "symbol": "فجهان"},
-    {"name": "فولاد سیرجان ایرانیان", "symbol": "فسپا"},
-    {"name": "ملی صنایع مس ایران", "symbol": "فملی"},
-    {"name": "کارخانجات تولیدی شهید قندی", "symbol": "بکام"},
+    {"name": "توسعه معادن و فلزات", "symbol": "ومعادن", "isin": "IRO1MADN0001", "exchange": "IRTSENO"},
+    {"name": "تجلی توسعه معادن و فلزات", "symbol": "تجلی", "isin": "IRO3TMMZ0001", "exchange": "IRIFBNO"},
+    {"name": "گروه مدیریت سرمایه‌گذاری امید", "symbol": "وامید", "isin": "IRO1OIMC0001", "exchange": "IRTSENO"},
+    {"name": "سرمایه‌گذاری صدر تأمین", "symbol": "تاصیکو", "isin": "IRO1SADR0001", "exchange": "IRTSENO"},
+    {"name": "هلدینگ صنایع معدنی خاورمیانه", "symbol": "میدکو", "isin": "IRO1MDKO0001", "exchange": "IRTSENO"},
+    {"name": "صنایع و معادن احیاء سپاهان", "symbol": "واحیا", "isin": "IRO7VHYP0001", "exchange": "IRIFBOTC"},
+    {"name": "بین‌المللی توسعه صنایع و معادن غدیر", "symbol": "وغدیر", "isin": "IRO1GDIR0001", "exchange": "IRTSENO"},
+    {"name": "گروه صنایع معادن فلات ایرانیان", "symbol": "فلات", "isin": "IRO7FLTP0001", "exchange": "IRIFBOTC"},
+    {"name": "معدنی و صنعتی گل‌گهر", "symbol": "کگل", "isin": "IRO1GOLG0001", "exchange": "IRTSENO"},
+    {"name": "معدنی و صنعتی چادرملو", "symbol": "کچاد", "isin": "IRO1CHML0001", "exchange": "IRTSENO"},
+    {"name": "سنگ آهن گهرزمین", "symbol": "کگهر", "isin": "IRO3GZIZ0001", "exchange": "IRIFBNO"},
+    {"name": "توسعه معدنی و صنعتی صبانور", "symbol": "کنور", "isin": "IRO1KNRZ0001", "exchange": "IRTSENO"},
+    {"name": "فرآوری معدنی اپال کانی پارس", "symbol": "اپال", "isin": "IRO1OPAL0001", "exchange": "IRTSENO"},
+    {"name": "فولاد مبارکه اصفهان", "symbol": "فولاد", "isin": "IRO1FOLD0001", "exchange": "IRTSENO"},
+    {"name": "فولاد خوزستان", "symbol": "فخوز", "isin": "IRO1FKHZ0001", "exchange": "IRTSENO"},
+    {"name": "فولاد هرمزگان جنوب", "symbol": "هرمز", "isin": "IRO3FOHZ0001", "exchange": "IRIFBNO"},
+    {"name": "آهن و فولاد ارفع", "symbol": "ارفع", "isin": "IRO3ARFZ0001", "exchange": "IRIFBNO"},
+    {"name": "فولاد خراسان", "symbol": "فخاس", "isin": "IRO1FKAS0001", "exchange": "IRTSENO"},
+    {"name": "فولاد امیرکبیر کاشان", "symbol": "فجر", "isin": "IRO1FAJR0001", "exchange": "IRTSENO"},
+    {"name": "فولاد کاوه جنوب کیش", "symbol": "کاوه", "isin": "IRO1KVEH0001", "exchange": "IRTSENO"},
+    {"name": "ذوب آهن اصفهان", "symbol": "ذوب", "isin": "IRO1ZOBI0001", "exchange": "IRTSENO"},
+    {"name": "جهان فولاد سیرجان", "symbol": "فجهان", "isin": "IRO3SJSZ0001", "exchange": "IRIFBNO"},
+    {"name": "فولاد سیرجان ایرانیان", "symbol": "سیسکو", "isin": "IRO1SSCO0001", "exchange": "IRTSENO"},
+    {"name": "ملی صنایع مس ایران", "symbol": "فملی", "isin": "IRO1MSMI0001", "exchange": "IRTSENO"},
+    {"name": "کارخانجات تولیدی شهید قندی", "symbol": "بکام", "isin": "IRO1KGND0001", "exchange": "IRTSENO"},
 ]
 
 MINERAL_HISTORY_DAYS = 280
+BV_HISTORY_N = 300
+BV_BASE = "https://www.bourseview.com"
 
 
 def _pct(a: float | None, b: float | None) -> float | None:
@@ -328,6 +330,17 @@ def _sa_num(raw) -> float | None:
 
 def _sa_session_price(row: dict) -> float | None:
     return _sa_num(row.get("final_price")) or _sa_num(row.get("close_price"))
+
+
+def _bourseview_cookie() -> str:
+    raw = (os.environ.get("BOURSEVIEW_COOKIE") or os.environ.get("BOURSEVIEW_TOKEN") or "").strip()
+    if not raw and Path("/tmp/bv_cookie.txt").exists():
+        raw = Path("/tmp/bv_cookie.txt").read_text(encoding="utf-8").strip()
+    if not raw:
+        return ""
+    if "=" not in raw and " " not in raw:
+        return f"authentication={raw}"
+    return raw
 
 
 def _sourcearena_json(params: dict, attempts: int = 4) -> object:
@@ -349,12 +362,38 @@ def _sourcearena_json(params: dict, attempts: int = 4) -> object:
     raise last or RuntimeError(f"sourcearena failed: {params}")
 
 
-def scrape_mineral_stock_symbol(symbol: str, *, adjusted_enabled: bool = False) -> dict:
-    """Live + period returns from SourceArena (not Shakhesban).
+def _jalali_year() -> int:
+    try:
+        import jdatetime  # type: ignore
 
-    Tries adjusted history (&adjusted=1) when the token has it enabled;
-    otherwise uses raw closing history (`days=N`) and marks returns as unadjusted.
-    """
+        return int(jdatetime.datetime.now().year)
+    except Exception:
+        return 1405
+
+
+def _returns_from_closes(closes: list[tuple[str, float]]) -> dict:
+    week_pct = month_pct = ytd_pct = None
+    last_px = closes[0][1] if closes else None
+    if closes:
+        week = closes[min(5, len(closes) - 1)][1]
+        month = closes[min(22, len(closes) - 1)][1]
+        week_pct = _pct(week, last_px)
+        month_pct = _pct(month, last_px)
+        y_start = f"{_jalali_year():04d}/01/01"
+        ytd = [c for c in closes if c[0] >= y_start]
+        if ytd:
+            ytd_pct = _pct(ytd[-1][1], last_px)
+    return {
+        "weekPct": week_pct,
+        "monthPct": month_pct,
+        "ytdPct": ytd_pct,
+        "lastPrice": last_px,
+        "historyCount": len(closes),
+    }
+
+
+def scrape_mineral_stock_symbol(symbol: str, *, adjusted_enabled: bool = False) -> dict:
+    """Live + period returns from SourceArena (fallback when BourseView cookie missing)."""
     live = _sourcearena_json({"name": symbol})
     if not isinstance(live, dict) or live.get("Error") or not live.get("name"):
         raise RuntimeError((live or {}).get("Error") if isinstance(live, dict) else "live empty")
@@ -380,7 +419,6 @@ def scrape_mineral_stock_symbol(symbol: str, *, adjusted_enabled: bool = False) 
         adjusted = False
         source = "sourcearena-unadjusted"
 
-    # newest-first
     closes: list[tuple[str, float]] = []
     for row in hist:
         if not isinstance(row, dict):
@@ -390,25 +428,8 @@ def scrape_mineral_stock_symbol(symbol: str, *, adjusted_enabled: bool = False) 
         if d and p and p > 0:
             closes.append((d, p))
 
-    week_pct = month_pct = ytd_pct = None
-    last_px = closes[0][1] if closes else None
-    if closes:
-        week = closes[min(5, len(closes) - 1)][1]
-        month = closes[min(22, len(closes) - 1)][1]
-        week_pct = _pct(week, last_px)
-        month_pct = _pct(month, last_px)
-        try:
-            import jdatetime  # type: ignore
-
-            jy = jdatetime.datetime.now().year
-        except Exception:
-            jy = 1405
-        y_start = f"{jy:04d}/01/01"
-        ytd = [c for c in closes if c[0] >= y_start]
-        if ytd:
-            ytd_pct = _pct(ytd[-1][1], last_px)
-
-    close_price = _sa_num(live.get("final_price")) or _sa_num(live.get("close_price")) or last_px
+    rets = _returns_from_closes(closes)
+    close_price = _sa_num(live.get("final_price")) or _sa_num(live.get("close_price")) or rets["lastPrice"]
     last_price = _sa_num(live.get("close_price")) or close_price
     daily_pct = _sa_num(live.get("final_price_change_percent")) or _sa_num(
         live.get("close_price_change_percent")
@@ -422,16 +443,82 @@ def scrape_mineral_stock_symbol(symbol: str, *, adjusted_enabled: bool = False) 
         "closePrice": close_price,
         "lastPrice": last_price,
         "dailyPct": daily_pct,
-        "weekPct": week_pct,
-        "monthPct": month_pct,
-        "ytdPct": ytd_pct,
+        "weekPct": rets["weekPct"],
+        "monthPct": rets["monthPct"],
+        "ytdPct": rets["ytdPct"],
         "marketValueBr": round(mv / 1e9) if mv else None,
         "volume": vol,
         "tradeValueMr": round(tv / 1e6) if tv else None,
         "returnsAdjusted": adjusted,
         "returnsSource": source,
-        "historyCount": len(closes),
+        "historyCount": rets["historyCount"],
         "instanceCode": live.get("instance_code"),
+    }
+
+
+def scrape_mineral_stock_bourseview(row: dict, cookie: str) -> dict:
+    """Adjusted period returns via BourseView quotes (close * adjustingCoef)."""
+    exchange = row["exchange"]
+    isin = row["isin"]
+    symbol = row["symbol"]
+    url = (
+        f"{BV_BASE}/api/v2/exchanges/{exchange}/stocks/{isin}/quotes"
+        f"?timeFrame=daily&lastN={BV_HISTORY_N}&expand=shamsiDate"
+    )
+    raw = fetch(
+        url,
+        timeout=60,
+        headers={
+            "Accept": "application/json",
+            "Cookie": cookie,
+            "Referer": "https://www.bourseview.com/",
+            "Origin": "https://www.bourseview.com",
+        },
+    ).decode("utf-8", errors="replace")
+    data = json.loads(raw)
+    items = data.get("items") if isinstance(data, dict) else None
+    if not isinstance(items, list) or not items:
+        raise RuntimeError("bourseview empty")
+
+    closes: list[tuple[str, float]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        close = _sa_num(item.get("close"))
+        if close is None or not (close > 0):
+            continue
+        coef = _sa_num(item.get("adjustingCoef"))
+        adj = close * (coef if coef and coef > 0 else 1.0)
+        shamsi = str(item.get("shamsiDate") or "").replace("-", "/")
+        closes.append((shamsi, adj))
+
+    rets = _returns_from_closes(closes)
+    latest = next(
+        (i for i in items if isinstance(i, dict) and (_sa_num(i.get("close")) or 0) > 0),
+        items[0] if isinstance(items[0], dict) else {},
+    )
+    close_price = _sa_num(latest.get("close")) or rets["lastPrice"]
+    ret_frac = _sa_num(latest.get("returnValue"))
+    mv = _sa_num(latest.get("marketCap"))
+    tv = _sa_num(latest.get("value"))
+    vol = _sa_num(latest.get("volume"))
+
+    return {
+        "symbol": symbol,
+        "closePrice": close_price,
+        "lastPrice": close_price,
+        "dailyPct": round(ret_frac * 100, 2) if ret_frac is not None else None,
+        "weekPct": rets["weekPct"],
+        "monthPct": rets["monthPct"],
+        "ytdPct": rets["ytdPct"],
+        "marketValueBr": round(mv / 1e9) if mv else None,
+        "volume": vol,
+        "tradeValueMr": round(tv / 1e6) if tv else None,
+        "returnsAdjusted": True,
+        "returnsSource": "bourseview-adjusted",
+        "historyCount": rets["historyCount"],
+        "isin": isin,
+        "exchange": exchange,
     }
 
 
@@ -449,13 +536,52 @@ def _probe_adjusted_enabled() -> bool:
 
 def scrape_mineral_stocks() -> list[dict]:
     out: list[dict] = []
+    cookie = _bourseview_cookie()
+    if cookie:
+        print("  mineral source=bourseview-adjusted")
+        for row in MINERAL_STOCKS:
+            sym = row["symbol"]
+            try:
+                snap = scrape_mineral_stock_bourseview(row, cookie)
+                snap["name"] = row["name"]
+                out.append(snap)
+                print(
+                    f"  mineral {sym}: ytd={snap.get('ytdPct')} week={snap.get('weekPct')} "
+                    f"src={snap.get('returnsSource')} n={snap.get('historyCount')}"
+                )
+            except Exception as exc:  # noqa: BLE001
+                print(f"  mineral {sym}: BV FAIL {exc} — trying SourceArena")
+                try:
+                    snap = scrape_mineral_stock_symbol(sym, adjusted_enabled=_probe_adjusted_enabled())
+                    snap["name"] = row["name"]
+                    snap["isin"] = row["isin"]
+                    snap["exchange"] = row["exchange"]
+                    out.append(snap)
+                except Exception as sa_exc:  # noqa: BLE001
+                    print(f"  mineral {sym}: SA FAIL {sa_exc}")
+                    out.append(
+                        {
+                            "symbol": sym,
+                            "name": row["name"],
+                            "isin": row["isin"],
+                            "exchange": row["exchange"],
+                            "returnsAdjusted": False,
+                            "returnsSource": "error",
+                            "error": str(sa_exc),
+                        }
+                    )
+            time.sleep(0.08)
+        return out
+
     adjusted_enabled = _probe_adjusted_enabled()
-    print(f"  sourcearena adjusted enabled={adjusted_enabled}")
+    print(f"  mineral source=sourcearena adjusted_enabled={adjusted_enabled}")
     for row in MINERAL_STOCKS:
         sym = row["symbol"]
         try:
             snap = scrape_mineral_stock_symbol(sym, adjusted_enabled=adjusted_enabled)
             snap["name"] = row["name"]
+            snap["isin"] = row["isin"]
+            snap["exchange"] = row["exchange"]
             out.append(snap)
             print(
                 f"  mineral {sym}: ytd={snap.get('ytdPct')} week={snap.get('weekPct')} "
@@ -467,6 +593,8 @@ def scrape_mineral_stocks() -> list[dict]:
                 {
                     "symbol": sym,
                     "name": row["name"],
+                    "isin": row["isin"],
+                    "exchange": row["exchange"],
                     "returnsAdjusted": False,
                     "returnsSource": "error",
                     "error": str(exc),
@@ -1935,7 +2063,7 @@ def main() -> int:
         ]
     print(f"candles1401={len(candles)}")
 
-    print("mineral stocks (SourceArena live + history)…")
+    print("mineral stocks (BourseView adjusted → SourceArena fallback)…")
     mineral_stocks = scrape_mineral_stocks()
     print(
         f"mineralStocks ok={sum(1 for s in mineral_stocks if s.get('historyCount'))}/{len(mineral_stocks)} "
@@ -2139,9 +2267,13 @@ def main() -> int:
             {
                 "updatedAt": market["updatedAt"],
                 "source": (
-                    "sourcearena-adjusted"
-                    if any(s.get("returnsAdjusted") for s in mineral_stocks)
-                    else "sourcearena-unadjusted"
+                    "bourseview-adjusted"
+                    if any(s.get("returnsSource") == "bourseview-adjusted" for s in mineral_stocks)
+                    else (
+                        "sourcearena-adjusted"
+                        if any(s.get("returnsAdjusted") for s in mineral_stocks)
+                        else "sourcearena-unadjusted"
+                    )
                 ),
                 "stocks": mineral_stocks,
             },

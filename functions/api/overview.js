@@ -408,7 +408,6 @@ async function buildLiveTopTrades(_fundSet) {
   return {
     topTrades: top.map(({ name, valueBr }) => ({ name, valueBr })),
     topTradesSource: top.length ? 'tradersarena-mainwatch-symbols' : null,
-    equityFundsEnriched: 0,
   }
 }
 
@@ -1095,9 +1094,6 @@ export async function onRequestGet(context) {
     const liveTop = await buildLiveTopTrades(equityFundSet)
     topTrades = liveTop.topTrades || []
     topTradesSource = liveTop.topTradesSource
-    if (liveTop.equityFundsEnriched === 0 && equityFundSet.size) {
-      errors.push('top-trades-equity-funds: rahavard enrich empty')
-    }
   } catch (e) {
     errors.push(`top-trades: ${e}`)
     // last-resort: board equities only (may be stale/wrong — better than empty)

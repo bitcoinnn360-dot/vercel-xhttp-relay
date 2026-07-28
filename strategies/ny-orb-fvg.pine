@@ -1,0 +1,369 @@
+//@version=6
+// pyramiding=2 and default_qty_value=50 (i.e. 50% of equity per entry) let a single FVG signal
+// fire up to 2 separate half-size entries - one immediately on the FVG's own completion candle,
+// and one more if price later retests (mitigates) the gap - while keeping the combined max
+// exposure (if both fire) equal to the original single 100%-of-equity entry.
+strategy("NY ORB + FVG", overlay=true, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=50, commission_type=strategy.commission.percent, commission_value=0.1, pyramiding=2, process_orders_on_close=true, max_lines_count=500, max_boxes_count=500, max_labels_count=500)
+
+//#region Inputs
+startHour = input.int(9, "NY Session Start Hour", minval=0, maxval=23)
+startMinute = input.int(30, "NY Session Start Minute", minval=0, maxval=59)
+rangeMinutes = input.int(15, "Opening Range Minutes", minval=1, maxval=240)
+endHour = input.int(16, "NY Session End Hour", minval=0, maxval=23)
+endMinute = input.int(0, "NY Session End Minute", minval=0, maxval=59)
+minFvgSizeTicks = input.int(5, "Min FVG Size (ticks)", minval=1)
+slBufferPercent = input.float(40.0, "SL Extra Buffer (% of 1st FVG Candle Range)", minval=0.0, step=5.0)
+tpMultiplier = input.float(1.5, "TP Multiplier", minval=0.1, step=0.1)
+showRangeBox = input.bool(true, "Show Range Box")
+showFvg = input.bool(true, "Show FVG")
+maxOneTradePerDay = input.bool(true, "Max One Trade Per Day")
+showDebugInfo = input.bool(true, "Show Debug Info (Data Window)", group="Debug")
+//#endregion
+
+//#region Constants
+const string NY_TZ = "America/New_York"
+const string RANGE_SESSION = "0930-0945"
+const string TRADE_SESSION = "0930-1600"
+//#endregion
+
+//#region Functions
+//@function Returns true when the current bar is inside a session string in New York time.
+//@param sessionString Session string.
+//@returns True when the bar is in session.
+inSession(string sessionString) =>
+    not na(time(timeframe.period, sessionString, NY_TZ))
+
+//@function Builds a HHMM-HHMM session string from start time and duration in minutes.
+//@param h Start hour.
+//@param m Start minute.
+//@param minutes Duration in minutes.
+//@returns Session string.
+makeSession(int h, int m, int minutes) =>
+    endH = h + int(math.floor((m + minutes) / 60))
+    endM = (m + minutes) % 60
+    str.format("{0,number,00}{1,number,00}-{2,number,00}{3,number,00}", h, m, endH, endM)
+
+//@function Returns the date key in New York time.
+//@returns Integer YYYYMMDD.
+getDateKey() =>
+    year(time, NY_TZ) * 10000 + month(time, NY_TZ) * 100 + dayofmonth(time, NY_TZ)
+//#endregion
+
+//#region Session state
+tradeSession = str.format("{0,number,00}{1,number,00}-{2,number,00}{3,number,00}", startHour, startMinute, endHour, endMinute)
+rangeSession = str.format("{0,number,00}{1,number,00}-{2,number,00}{3,number,00}", startHour, startMinute, startHour + int(math.floor((startMinute + rangeMinutes) / 60)), (startMinute + rangeMinutes) % 60)
+
+inRange = inSession(rangeSession)
+inTradeSession = inSession(tradeSession)
+rangeEndReached = not inRange and inRange[1]
+tradeEndReached = not inTradeSession and inTradeSession[1]
+currentDateKey = getDateKey()
+newDay = na(currentDateKey[1]) or currentDateKey != currentDateKey[1]
+//#endregion
+
+//#region Persistent variables
+var float rangeHigh = na
+var float rangeLow = na
+var int rangeStartTime = na
+var int rangeEndTime = na
+var int rangeLeftBar = na
+var int rangeRightBar = na
+var bool rangeFinalized = false
+var bool tradedToday = false
+var bool breakoutBull = false
+var bool breakoutBear = false
+var bool fvgFound = false
+var bool fvgIsBull = false
+var bool immediateEntryTaken = false  // whether the "enter right away on the FVG candle" entry has fired for the current FVG
+var bool mitigationDone = false  // whether the "enter on retest/mitigation" entry has fired for the current FVG
+var float fvgTop = na
+var float fvgBottom = na
+var float fvgStopLevel = na  // low (bull) / high (bear) of the FIRST of the 3 FVG candles, captured at detection time
+var float fvgFirstCandleRange = na  // high-low of the 1st FVG candle, captured at detection time (used for SL buffer)
+var float entryPrice = na
+var float stopPrice = na
+var float takeProfitPrice = na
+var box rangeBox = na
+var box fvgBox = na
+var line rangeHighLine = na
+var line rangeLowLine = na
+//#endregion
+
+//#region Daily reset
+if newDay
+    rangeHigh := na
+    rangeLow := na
+    rangeStartTime := na
+    rangeEndTime := na
+    rangeLeftBar := na
+    rangeRightBar := na
+    rangeFinalized := false
+    tradedToday := false
+    breakoutBull := false
+    breakoutBear := false
+    fvgFound := false
+    fvgIsBull := false
+    immediateEntryTaken := false
+    mitigationDone := false
+    fvgTop := na
+    fvgBottom := na
+    fvgStopLevel := na
+    fvgFirstCandleRange := na
+    entryPrice := na
+    stopPrice := na
+    takeProfitPrice := na
+    if not na(rangeBox)
+        box.delete(rangeBox)
+        rangeBox := na
+    if not na(fvgBox)
+        box.delete(fvgBox)
+        fvgBox := na
+    if not na(rangeHighLine)
+        line.delete(rangeHighLine)
+        rangeHighLine := na
+    if not na(rangeLowLine)
+        line.delete(rangeLowLine)
+        rangeLowLine := na
+//#endregion
+
+//#region Opening range build
+if inRange
+    if na(rangeHigh)
+        rangeHigh := high
+        rangeLow := low
+        rangeLeftBar := bar_index
+        rangeStartTime := time
+    else
+        rangeHigh := math.max(rangeHigh, high)
+        rangeLow := math.min(rangeLow, low)
+    rangeRightBar := bar_index
+
+if rangeEndReached and not rangeFinalized and not na(rangeHigh) and not na(rangeLow)
+    rangeFinalized := true
+    rangeEndTime := time
+    if showRangeBox
+        if not na(rangeBox)
+            box.delete(rangeBox)
+        rangeBox := box.new(rangeLeftBar, rangeHigh, rangeRightBar, rangeLow, xloc=xloc.bar_index, border_color=color.blue, bgcolor=color.new(color.blue, 85))
+    if not na(rangeHighLine)
+        line.delete(rangeHighLine)
+    if not na(rangeLowLine)
+        line.delete(rangeLowLine)
+    rangeHighLine := line.new(rangeLeftBar, rangeHigh, bar_index, rangeHigh, xloc=xloc.bar_index, extend=extend.right, color=color.blue, width=2)
+    rangeLowLine := line.new(rangeLeftBar, rangeLow, bar_index, rangeLow, xloc=xloc.bar_index, extend=extend.right, color=color.blue, width=2)
+
+if rangeFinalized and showRangeBox and not na(rangeBox)
+    box.set_right(rangeBox, bar_index)
+    box.set_top(rangeBox, rangeHigh)
+    box.set_bottom(rangeBox, rangeLow)
+
+if rangeFinalized and not na(rangeHighLine)
+    line.set_x2(rangeHighLine, bar_index)
+    line.set_y2(rangeHighLine, rangeHigh)
+if rangeFinalized and not na(rangeLowLine)
+    line.set_x2(rangeLowLine, bar_index)
+    line.set_y2(rangeLowLine, rangeLow)
+//#endregion
+
+//#region Breakout detection
+// NOTE: breakout direction can flip during the day (e.g. price sweeps below rangeLow -
+// "liquidating" that side - then reverses and closes above rangeHigh). We track the most
+// recent confirmed close-breakout as the active bias, instead of permanently locking onto
+// whichever side broke first, otherwise a real breakout in the opposite direction would
+// never be recognized (and FVGs matching it would never be validated / traded).
+bullishBreakout = rangeFinalized and not breakoutBull and close > rangeHigh and close[1] <= rangeHigh and not inRange
+bearishBreakout = rangeFinalized and not breakoutBear and close < rangeLow and close[1] >= rangeLow and not inRange
+
+if bullishBreakout
+    breakoutBull := true
+    breakoutBear := false
+    // A stale bearish FVG no longer matches the new (bullish) bias -> drop our tracking of it so
+    // the detection logic below is free to find a fresh bullish FVG. This only clears our own
+    // script-level bookkeeping; it does NOT cancel any order/bracket already placed on a prior
+    // entry for that FVG (that keeps running to its own stop/TP independently).
+    if fvgFound and not fvgIsBull
+        fvgFound := false
+        fvgIsBull := false
+        immediateEntryTaken := false
+        mitigationDone := false
+        fvgTop := na
+        fvgBottom := na
+        fvgStopLevel := na
+        fvgFirstCandleRange := na
+        if not na(fvgBox)
+            box.delete(fvgBox)
+            fvgBox := na
+
+if bearishBreakout
+    breakoutBear := true
+    breakoutBull := false
+    // Symmetric cleanup for a stale bullish FVG when the bias flips bearish.
+    if fvgFound and fvgIsBull
+        fvgFound := false
+        fvgIsBull := false
+        immediateEntryTaken := false
+        mitigationDone := false
+        fvgTop := na
+        fvgBottom := na
+        fvgStopLevel := na
+        fvgFirstCandleRange := na
+        if not na(fvgBox)
+            box.delete(fvgBox)
+            fvgBox := na
+//#endregion
+
+//#region FVG detection
+bullFvg = bar_index >= 2 and high[2] < low
+bearFvg = bar_index >= 2 and low[2] > high
+minFvgSize = minFvgSizeTicks * syminfo.mintick
+bullFvgSize = bar_index >= 2 ? low - high[2] : na
+bearFvgSize = bar_index >= 2 ? low[2] - high : na
+
+// A gap qualifies as long as AT LEAST PART of it (or all of it) falls outside the opening range -
+// it does NOT need to be fully clear of the range on both edges. For a bull gap (above the range
+// after an up-breakout) that means its top edge (fvgTop = low) must clear rangeHigh - the bottom
+// edge (fvgBottom = high[2]) is allowed to still be inside the range. Symmetrically, for a bear
+// gap (below the range after a down-breakout) it's the bottom edge (fvgBottom = low[2]) that must
+// clear rangeLow - the top edge (fvgTop = high) is allowed to still be inside the range.
+bullFvgValid = breakoutBull and bullFvg and bullFvgSize >= minFvgSize and low > rangeHigh
+bearFvgValid = breakoutBear and bearFvg and bearFvgSize >= minFvgSize and low[2] < rangeLow
+
+// canTradeNewSignal gates the FIRST (immediate) entry of a brand-new FVG signal against the
+// daily trade-limit setting and session windows. It intentionally does NOT check
+// strategy.position_size, since pyramiding=2 lets the immediate + retest entries of the SAME
+// FVG stack on top of each other.
+canTradeNewSignal = (not maxOneTradePerDay or not tradedToday) and not inRange and inTradeSession
+
+if bullFvgValid and not fvgFound
+    fvgFound := true
+    fvgIsBull := true
+    fvgTop := low
+    fvgBottom := high[2]
+    fvgStopLevel := low[2]  // low of the 1st of the 3 FVG candles -> SL goes below this
+    fvgFirstCandleRange := high[2] - low[2]
+    immediateEntryTaken := false
+    mitigationDone := false
+    if showFvg
+        if not na(fvgBox)
+            box.delete(fvgBox)
+        fvgBox := box.new(bar_index - 2, fvgTop, bar_index, fvgBottom, xloc=xloc.bar_index, border_color=color.lime, bgcolor=color.new(color.lime, 85))
+    // 1st entry: fire immediately on the FVG's own completion candle, without waiting for a
+    // retest of the gap. A 2nd, independent entry can still happen later if price comes back
+    // and mitigates the gap (see the "Entry and exits" region below).
+    if canTradeNewSignal
+        candidateEntry = close
+        riskBasis = candidateEntry - fvgStopLevel
+        if riskBasis > 0
+            immediateEntryTaken := true
+            entryPrice := candidateEntry
+            slBuffer = fvgFirstCandleRange * (slBufferPercent / 100)
+            stopPrice := fvgStopLevel - slBuffer - syminfo.mintick
+            takeProfitPrice := entryPrice + tpMultiplier * riskBasis
+            strategy.entry("Long Immediate", strategy.long)
+            strategy.exit("Long Immediate Exit", "Long Immediate", stop=stopPrice, limit=takeProfitPrice)
+            tradedToday := true
+            label.new(bar_index, low, "Long (Immediate)", style=label.style_label_up, textcolor=color.white, color=color.green)
+
+if bearFvgValid and not fvgFound
+    fvgFound := true
+    fvgIsBull := false
+    fvgTop := high
+    fvgBottom := low[2]
+    fvgStopLevel := high[2]  // high of the 1st of the 3 FVG candles -> SL goes above this
+    fvgFirstCandleRange := high[2] - low[2]
+    immediateEntryTaken := false
+    mitigationDone := false
+    if showFvg
+        if not na(fvgBox)
+            box.delete(fvgBox)
+        fvgBox := box.new(bar_index - 2, fvgBottom, bar_index, fvgTop, xloc=xloc.bar_index, border_color=color.red, bgcolor=color.new(color.red, 85))
+    if canTradeNewSignal
+        candidateEntry = close
+        riskBasis = fvgStopLevel - candidateEntry
+        if riskBasis > 0
+            immediateEntryTaken := true
+            entryPrice := candidateEntry
+            slBuffer = fvgFirstCandleRange * (slBufferPercent / 100)
+            stopPrice := fvgStopLevel + slBuffer + syminfo.mintick
+            takeProfitPrice := entryPrice - tpMultiplier * riskBasis
+            strategy.entry("Short Immediate", strategy.short)
+            strategy.exit("Short Immediate Exit", "Short Immediate", stop=stopPrice, limit=takeProfitPrice)
+            tradedToday := true
+            label.new(bar_index, high, "Short (Immediate)", style=label.style_label_down, textcolor=color.white, color=color.red)
+
+if not na(fvgBox)
+    box.set_right(fvgBox, bar_index)
+//#endregion
+
+//#region Entry and exits (retest / mitigation - the 2nd possible entry per FVG)
+// This fires independently of whether the immediate entry above happened, and independently of
+// maxOneTradePerDay/tradedToday - it belongs to the SAME signal, not a new one, so the daily
+// trade-limit setting only gates whether a brand-new FVG can start a new signal, not whether an
+// already-tracked FVG can take its 2nd entry.
+longMitigation = fvgFound and fvgIsBull and not mitigationDone and low < fvgTop and low[1] >= fvgTop
+shortMitigation = fvgFound and not fvgIsBull and not mitigationDone and high > fvgBottom and high[1] <= fvgBottom
+canTradeRetest = not inRange and inTradeSession
+
+if longMitigation and canTradeRetest
+    candidateEntry = close
+    // Risk used to size TP is the tight/technical distance (entry -> raw FVG-candle low),
+    // deliberately NOT inflated by the SL safety buffer, so TP stays a sane multiple of the
+    // real structural risk instead of ballooning whenever slBufferPercent is increased.
+    riskBasis = candidateEntry - fvgStopLevel
+    if riskBasis > 0
+        mitigationDone := true
+        entryPrice := candidateEntry
+        slBuffer = fvgFirstCandleRange * (slBufferPercent / 100)
+        stopPrice := fvgStopLevel - slBuffer - syminfo.mintick
+        takeProfitPrice := entryPrice + tpMultiplier * riskBasis
+        strategy.entry("Long Retest", strategy.long)
+        strategy.exit("Long Retest Exit", "Long Retest", stop=stopPrice, limit=takeProfitPrice)
+        tradedToday := true
+        label.new(bar_index, low, "Long (Retest)", style=label.style_label_up, textcolor=color.white, color=color.green)
+
+if shortMitigation and canTradeRetest
+    candidateEntry = close
+    riskBasis = fvgStopLevel - candidateEntry
+    if riskBasis > 0
+        mitigationDone := true
+        entryPrice := candidateEntry
+        slBuffer = fvgFirstCandleRange * (slBufferPercent / 100)
+        stopPrice := fvgStopLevel + slBuffer + syminfo.mintick
+        takeProfitPrice := entryPrice - tpMultiplier * riskBasis
+        strategy.entry("Short Retest", strategy.short)
+        strategy.exit("Short Retest Exit", "Short Retest", stop=stopPrice, limit=takeProfitPrice)
+        tradedToday := true
+        label.new(bar_index, high, "Short (Retest)", style=label.style_label_down, textcolor=color.white, color=color.red)
+
+if tradeEndReached and strategy.position_size != 0
+    strategy.close_all(comment="NY 16:00 Exit")
+//#endregion
+
+//#region Plots
+plot(rangeHigh, "Range High", color=color.blue, linewidth=2, style=plot.style_linebr)
+plot(rangeLow, "Range Low", color=color.blue, linewidth=2, style=plot.style_linebr)
+//#endregion
+
+//#region Debug (Data Window)
+// These series don't draw anything on the chart - hover over any historical bar and open
+// TradingView's "Data Window" panel to read the exact internal state at that bar. This is the
+// fastest way to pinpoint exactly which condition blocked a trade you expected to see.
+plot(showDebugInfo ? (inRange ? 1 : 0) : na, "Debug: In Opening Range", display=display.data_window)
+plot(showDebugInfo ? (rangeFinalized ? 1 : 0) : na, "Debug: Range Finalized", display=display.data_window)
+plot(showDebugInfo ? rangeHigh : na, "Debug: Range High", display=display.data_window)
+plot(showDebugInfo ? rangeLow : na, "Debug: Range Low", display=display.data_window)
+plot(showDebugInfo ? (breakoutBull ? 1 : 0) : na, "Debug: Breakout Bull", display=display.data_window)
+plot(showDebugInfo ? (breakoutBear ? 1 : 0) : na, "Debug: Breakout Bear", display=display.data_window)
+plot(showDebugInfo ? (fvgFound ? 1 : 0) : na, "Debug: FVG Found", display=display.data_window)
+plot(showDebugInfo ? (fvgFound ? (fvgIsBull ? 1 : 0) : na) : na, "Debug: FVG Is Bull", display=display.data_window)
+plot(showDebugInfo ? fvgTop : na, "Debug: FVG Top", display=display.data_window)
+plot(showDebugInfo ? fvgBottom : na, "Debug: FVG Bottom", display=display.data_window)
+plot(showDebugInfo ? fvgStopLevel : na, "Debug: FVG Stop Level (1st candle low/high)", display=display.data_window)
+plot(showDebugInfo ? (immediateEntryTaken ? 1 : 0) : na, "Debug: Immediate Entry Taken", display=display.data_window)
+plot(showDebugInfo ? (mitigationDone ? 1 : 0) : na, "Debug: Retest Entry Taken (mitigationDone)", display=display.data_window)
+plot(showDebugInfo ? (longMitigation ? 1 : 0) : na, "Debug: Long Retest Triggered", display=display.data_window)
+plot(showDebugInfo ? (shortMitigation ? 1 : 0) : na, "Debug: Short Retest Triggered", display=display.data_window)
+plot(showDebugInfo ? (canTradeNewSignal ? 1 : 0) : na, "Debug: Can Trade New Signal", display=display.data_window)
+plot(showDebugInfo ? (tradedToday ? 1 : 0) : na, "Debug: Traded Today", display=display.data_window)
+plot(showDebugInfo ? (inTradeSession ? 1 : 0) : na, "Debug: In Trade Session", display=display.data_window)
+//#endregion

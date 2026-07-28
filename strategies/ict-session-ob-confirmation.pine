@@ -18,7 +18,7 @@
 // لحاظ می‌شود، و اردربلاک‌هایی که «بریکر» شده‌اند با نقشِ برعکس‌شده‌ی خودشان بررسی می‌شوند (نه با
 // جهتِ اصلیِ قبل از شکستن) - چون تایید/رد باید به کلِ تاریخچه‌ی فعالِ نواحی نگاه کند، نه فقط
 // نواحیِ تازه‌ساخته‌شده‌ی بعد از خودِ سیگنال.
-//   ۴) ماژولِ اختیاریِ NY 9:30 Volume Profile (۳ کندل اول) + جمع نقدینگی زیر/بالا -
+//   ۴) ماژولِ اختیاریِ NY 9:30–9:45 Volume Profile (۳×۵م) + جمع نقدینگی -
 //      سیگنال با لیبل کوچک و صفِ تایید/رد؛ نه strategy.entry/exit.
 indicator('CVD ICT Breakout + OB/Liquidity Confirmation Engine', shorttitle='CVD_BSG_OB_Confirm', max_boxes_count=500, max_lines_count=500, max_labels_count=500, overlay=true, max_bars_back=1000)
 
@@ -1759,22 +1759,17 @@ alertcondition(confirmed_this_bar, title="Session Signal Confirmed by OB/Liquidi
 alertcondition(rejected_this_bar, title="Session Signal Rejected by OB/Liquidity", message="سیگنال قبلیِ سیستم سشن توسط اردربلاک/لیکوییدیتی رد شد.")
 
 //#############################################################################
-// بخش ۴: NY 9:30 — Volume Profile روی ۳ کندل اول + جمع نقدینگی (جایگزین ORB+FVG)
-// منطق:
-//   ۱) از ۹:۳۰ NY سه کندل اول را VP کن (row=100، VA=70%)
-//   ۲) موقعیت POC بین VAL و VAH: زیر ۵۰٪ → بایاس Buy، بالای ۵۰٪ → بایاس Sell
-//   ۳) صبر برای جمع نقدینگی هم‌جهت با بایاس:
-//      Buy: سوییپ زیرِ رنج + ریجکت، سپس کلوز بالای high همان کندل ریجکت (تا N کندل)
-//           یا سوییپ زیر + برگشت با گپ/IFVG به داخل رنج
-//      Sell: قرینه از بالا
-//   ۴) اگر اول سمتِ مخالف سوییپ شد، تا چند کندل صبر؛ اگر سمتِ درست نیامد → Cancel
+// بخش ۴: NY 9:30 — Volume Profile روی ۱۵ دقیقه‌ی اول (۹:۳۰–۹:۴۵ NY = ۱۷:۰۰–۱۷:۱۵ تهران)
+// روی چارت ۵دقیقه = دقیقاً ۳ کندل. row=100 ، VA=70%
+// POC داخل VAL↔VAH: نیمه‌ی پایین (<50%) → Buy ، نیمه‌ی بالا (≥50%) → Sell
+// سپس تأیید با جمع نقدینگی هم‌جهت؛ wrong-side اول → صبر؛ نیامد → Cancel
 //#############################################################################
 show_ny_orb           = input.bool(false, "فعال‌سازی NY 9:30 VP + Liquidity", group="NY Open VP (9:30)")
 orb_startHour         = input.int(9, "NY Start Hour", minval=0, maxval=23, group="NY Open VP (9:30)")
 orb_startMinute       = input.int(30, "NY Start Minute", minval=0, maxval=59, group="NY Open VP (9:30)")
+orb_vp_window_mins    = input.int(15, "VP Window (mins) 9:30→9:45", minval=5, maxval=30, group="NY Open VP (9:30)")
 orb_endHour           = input.int(16, "NY End Hour", minval=0, maxval=23, group="NY Open VP (9:30)")
 orb_endMinute         = input.int(0, "NY End Minute", minval=0, maxval=59, group="NY Open VP (9:30)")
-orb_vp_candles        = input.int(3, "VP Candles (opening)", minval=2, maxval=6, group="NY Open VP (9:30)")
 orb_vp_rows           = input.int(100, "VP Row Size", minval=20, maxval=200, group="NY Open VP (9:30)")
 orb_va_pct            = input.float(70.0, "Value Area Volume %", minval=50.0, maxval=90.0, step=5.0, group="NY Open VP (9:30)")
 orb_liq_wait_bars     = input.int(12, "Max Bars for Liq Confirm", minval=3, maxval=40, group="NY Open VP (9:30)")
@@ -1788,18 +1783,22 @@ orb_inSession(string sessionString) =>
 orb_getDateKey() =>
     year(time, "America/New_York") * 10000 + month(time, "America/New_York") * 100 + dayofmonth(time, "America/New_York")
 
-orb_tradeSession = str.format("{0,number,00}{1,number,00}-{2,number,00}{3,number,00}", orb_startHour, orb_startMinute, orb_endHour, orb_endMinute)
-orb_inTradeSession = show_ny_orb and orb_inSession(orb_tradeSession)
-orb_currentDateKey = orb_getDateKey()
-orb_newDay = na(orb_currentDateKey[1]) or orb_currentDateKey != orb_currentDateKey[1]
+orb_clamp_row(int r, int rows) =>
+    math.max(0, math.min(rows - 1, r))
 
-// آیا این کندل، کندلِ شروع ۹:۳۰ NY است؟
-orb_mins_ny = hour(time, "America/New_York") * 60 + minute(time, "America/New_York")
-orb_start_mins = orb_startHour * 60 + orb_startMinute
-orb_is_open_bar = show_ny_orb and orb_mins_ny == orb_start_mins
+orb_add_vol_span(float[] bucket, int rows, float pLo, float rowH, float px0, float px1, float vol) =>
+    float[] out = bucket
+    if vol > 0 and rowH > 0
+        int r0 = orb_clamp_row(int(math.floor((math.min(px0, px1) - pLo) / rowH)), rows)
+        int r1 = orb_clamp_row(int(math.floor((math.max(px0, px1) - pLo) / rowH)), rows)
+        int cnt = r1 - r0 + 1
+        float per = vol / cnt
+        for r = r0 to r1
+            array.set(out, r, array.get(out, r) + per)
+    out
 
-// ---------- VP builder روی N کندل ذخیره‌شده ----------
-orb_vp_compute(float[] his, float[] los, float[] vols, int rows, float vaPct) =>
+// VP با وزن بدنه‌ی کندل؛ VA بدون بایاسِ systematically-up در تساوی
+orb_vp_compute(float[] opens, float[] his, float[] los, float[] closes, float[] vols, int rows, float vaPct) =>
     float poc = na
     float vah = na
     float val = na
@@ -1818,26 +1817,33 @@ orb_vp_compute(float[] his, float[] los, float[] vols, int rows, float vaPct) =>
             float rowH = span / rows
             float[] bucket = array.new_float(rows, 0.0)
             for i = 0 to n - 1
+                float o = array.get(opens, i)
                 float h = array.get(his, i)
                 float l = array.get(los, i)
+                float c = array.get(closes, i)
                 float v = array.get(vols, i)
-                int r0 = int(math.floor((l - pLo) / rowH))
-                int r1 = int(math.floor((h - pLo) / rowH))
-                r0 := math.max(0, math.min(rows - 1, r0))
-                r1 := math.max(0, math.min(rows - 1, r1))
-                if r1 < r0
-                    int tmp = r0
-                    r0 := r1
-                    r1 := tmp
-                int cnt = r1 - r0 + 1
-                float per = v / cnt
-                for r = r0 to r1
-                    array.set(bucket, r, array.get(bucket, r) + per)
+                float bodyTop = math.max(o, c)
+                float bodyBot = math.min(o, c)
+                // ۷۰٪ حجم روی بدنه، ۳۰٪ روی ویک‌ها
+                bucket := orb_add_vol_span(bucket, rows, pLo, rowH, bodyBot, bodyTop, v * 0.70)
+                float wickVol = v * 0.30
+                float upperW = h - bodyTop
+                float lowerW = bodyBot - l
+                float wickSpan = upperW + lowerW
+                if wickSpan > 0
+                    if upperW > 0
+                        bucket := orb_add_vol_span(bucket, rows, pLo, rowH, bodyTop, h, wickVol * (upperW / wickSpan))
+                    if lowerW > 0
+                        bucket := orb_add_vol_span(bucket, rows, pLo, rowH, l, bodyBot, wickVol * (lowerW / wickSpan))
+                else
+                    bucket := orb_add_vol_span(bucket, rows, pLo, rowH, bodyBot, bodyTop, wickVol)
+            // POC = ردیف با بیشترین حجم (در تساوی، ردیفِ وسط‌ترِ رنج)
+            int mid_i = int(math.floor((rows - 1) * 0.5))
             int poc_i = 0
             float poc_v = array.get(bucket, 0)
             for r = 1 to rows - 1
                 float bv = array.get(bucket, r)
-                if bv > poc_v
+                if bv > poc_v or (bv == poc_v and math.abs(r - mid_i) < math.abs(poc_i - mid_i))
                     poc_v := bv
                     poc_i := r
             poc := pLo + (poc_i + 0.5) * rowH
@@ -1848,17 +1854,43 @@ orb_vp_compute(float[] his, float[] los, float[] vols, int rows, float vaPct) =>
             while acc < target and (lo_i > 0 or hi_i < rows - 1)
                 float below = lo_i > 0 ? array.get(bucket, lo_i - 1) : -1.0
                 float above = hi_i < rows - 1 ? array.get(bucket, hi_i + 1) : -1.0
-                if above >= below
+                if above > below
                     hi_i := hi_i + 1
                     acc := acc + array.get(bucket, hi_i)
-                else
+                else if below > above
                     lo_i := lo_i - 1
                     acc := acc + array.get(bucket, lo_i)
+                else
+                    // تساوی: سمتی که POC را وسط‌تر نگه می‌دارد (نه همیشه بالا)
+                    int upRoom = rows - 1 - hi_i
+                    int dnRoom = lo_i
+                    if upRoom > 0 and (dnRoom == 0 or (hi_i - poc_i) <= (poc_i - lo_i))
+                        hi_i := hi_i + 1
+                        acc := acc + array.get(bucket, hi_i)
+                    else if dnRoom > 0
+                        lo_i := lo_i - 1
+                        acc := acc + array.get(bucket, lo_i)
+                    else
+                        break
             val := pLo + lo_i * rowH
             vah := pLo + (hi_i + 1) * rowH
             float va_span = vah - val
+            // ۰ = روی VAL ، ۱ = روی VAH ؛ ≥۰.۵ = نیمه‌ی بالایی → Sell
             poc_pct := va_span > 0 ? (poc - val) / va_span : 0.5
     [poc, vah, val, poc_pct]
+
+orb_tradeSession = str.format("{0,number,00}{1,number,00}-{2,number,00}{3,number,00}", orb_startHour, orb_startMinute, orb_endHour, orb_endMinute)
+orb_inTradeSession = show_ny_orb and orb_inSession(orb_tradeSession)
+orb_currentDateKey = orb_getDateKey()
+orb_newDay = na(orb_currentDateKey[1]) or orb_currentDateKey != orb_currentDateKey[1]
+
+// پنجره‌ی VP: ۹:۳۰ تا ۹:۴۵ نیویورک (۱۷:۰۰–۱۷:۱۵ تهران) — روی ۵م = ۳ کندل
+orb_mins_ny = hour(time, "America/New_York") * 60 + minute(time, "America/New_York")
+orb_start_mins = orb_startHour * 60 + orb_startMinute
+orb_vp_end_mins = orb_start_mins + orb_vp_window_mins
+orb_in_vp_window = show_ny_orb and orb_mins_ny >= orb_start_mins and orb_mins_ny < orb_vp_end_mins
+orb_tf_mins = math.max(1, int(timeframe.in_seconds(timeframe.period) / 60))
+orb_is_last_vp_bar = orb_in_vp_window and (orb_mins_ny + orb_tf_mins) >= orb_vp_end_mins
 
 var float orb_rangeHigh = na
 var float orb_rangeLow = na
@@ -1867,8 +1899,10 @@ var int orb_rangeRightBar = na
 var bool orb_rangeFinalized = false
 var bool orb_tradedToday = false
 var int orb_build_count = 0
+var float[] orb_vp_o = array.new_float()
 var float[] orb_vp_h = array.new_float()
 var float[] orb_vp_l = array.new_float()
+var float[] orb_vp_c = array.new_float()
 var float[] orb_vp_v = array.new_float()
 var float orb_poc = na
 var float orb_vah = na
@@ -1878,10 +1912,10 @@ var int orb_bias = 0  // 1 buy, -1 sell, 0 none
 var bool orb_low_swept = false
 var bool orb_high_swept = false
 var int orb_rej_low_bar = na
-var float orb_rej_low_high = na  // high of rejection candle that swept low
+var float orb_rej_low_high = na
 var int orb_rej_high_bar = na
 var float orb_rej_high_low = na
-var int orb_wrong_side_bar = na  // when opposite sweep happened first
+var int orb_wrong_side_bar = na
 var bool orb_canceled = false
 var bool orb_signaled = false
 var box orb_rangeBox = na
@@ -1890,6 +1924,7 @@ var line orb_vahLine = na
 var line orb_valLine = na
 var line orb_rangeHighLine = na
 var line orb_rangeLowLine = na
+var line orb_vaMidLine = na
 
 var bool orb_collecting = false
 var int orb_last_push_bar = na
@@ -1904,8 +1939,10 @@ if show_ny_orb and orb_newDay
     orb_build_count := 0
     orb_collecting := false
     orb_last_push_bar := na
+    array.clear(orb_vp_o)
     array.clear(orb_vp_h)
     array.clear(orb_vp_l)
+    array.clear(orb_vp_c)
     array.clear(orb_vp_v)
     orb_poc := na
     orb_vah := na
@@ -1933,6 +1970,9 @@ if show_ny_orb and orb_newDay
     if not na(orb_valLine)
         line.delete(orb_valLine)
         orb_valLine := na
+    if not na(orb_vaMidLine)
+        line.delete(orb_vaMidLine)
+        orb_vaMidLine := na
     if not na(orb_rangeHighLine)
         line.delete(orb_rangeHighLine)
         orb_rangeHighLine := na
@@ -1940,11 +1980,13 @@ if show_ny_orb and orb_newDay
         line.delete(orb_rangeLowLine)
         orb_rangeLowLine := na
 
-// شروع جمع از کندل ۹:۳۰ (فقط یک‌بار در روز)
-if show_ny_orb and orb_is_open_bar and not orb_rangeFinalized and not orb_collecting and orb_build_count == 0
+// شروع جمع وقتی وارد پنجره‌ی ۹:۳۰–۹:۴۵ شدیم
+if show_ny_orb and orb_in_vp_window and not orb_rangeFinalized and not orb_collecting and orb_build_count == 0
     orb_collecting := true
+    array.clear(orb_vp_o)
     array.clear(orb_vp_h)
     array.clear(orb_vp_l)
+    array.clear(orb_vp_c)
     array.clear(orb_vp_v)
     orb_build_count := 0
     orb_last_push_bar := na
@@ -1952,30 +1994,35 @@ if show_ny_orb and orb_is_open_bar and not orb_rangeFinalized and not orb_collec
     orb_rangeHigh := high
     orb_rangeLow := low
 
-// هر کندل فقط یک‌بار (جلوگیری از دوباره‌شماری روی تیک ریل‌تایم)
-bool orb_can_push = show_ny_orb and orb_collecting and not orb_rangeFinalized and orb_build_count < orb_vp_candles and (na(orb_last_push_bar) or bar_index != orb_last_push_bar) and barstate.isconfirmed
+// کندل‌های داخل پنجره (روی ۵م = ۳ کندل: ۹:۳۰، ۹:۳۵، ۹:۴۰)
+bool orb_can_push = show_ny_orb and orb_collecting and orb_in_vp_window and not orb_rangeFinalized and (na(orb_last_push_bar) or bar_index != orb_last_push_bar) and barstate.isconfirmed
 if orb_can_push
+    array.push(orb_vp_o, open)
     array.push(orb_vp_h, high)
     array.push(orb_vp_l, low)
+    array.push(orb_vp_c, close)
     array.push(orb_vp_v, volume)
     orb_last_push_bar := bar_index
     orb_build_count := orb_build_count + 1
     orb_rangeHigh := math.max(nz(orb_rangeHigh, high), high)
     orb_rangeLow := math.min(nz(orb_rangeLow, low), low)
     orb_rangeRightBar := bar_index
-    if orb_build_count >= orb_vp_candles
+    if orb_is_last_vp_bar
         orb_collecting := false
 
-// نهایی کردن VP بعد از N کندل
-if show_ny_orb and not orb_rangeFinalized and orb_build_count >= orb_vp_candles and barstate.isconfirmed
+// نهایی کردن VP بعد از بسته‌شدن آخرین کندلِ پنجره (۹:۴۰ روی ۵م)
+bool orb_ready_finalize = show_ny_orb and not orb_rangeFinalized and orb_build_count > 0 and barstate.isconfirmed and (orb_is_last_vp_bar or not orb_in_vp_window)
+if orb_ready_finalize
     orb_rangeFinalized := true
-    [p, vh, vl, pct] = orb_vp_compute(orb_vp_h, orb_vp_l, orb_vp_v, orb_vp_rows, orb_va_pct)
+    orb_collecting := false
+    [p, vh, vl, pct] = orb_vp_compute(orb_vp_o, orb_vp_h, orb_vp_l, orb_vp_c, orb_vp_v, orb_vp_rows, orb_va_pct)
     orb_poc := p
     orb_vah := vh
     orb_val := vl
     orb_poc_pct := pct
+    // نیمه‌ی بالایی VA (≥50%) → Sell ، نیمه‌ی پایینی → Buy
     if not na(pct)
-        orb_bias := pct < 0.5 ? 1 : -1
+        orb_bias := pct >= 0.5 ? -1 : 1
     if orb_showRangeBox and not na(orb_rangeHigh) and not na(orb_rangeLow)
         if not na(orb_rangeBox)
             box.delete(orb_rangeBox)
@@ -1986,6 +2033,8 @@ if show_ny_orb and not orb_rangeFinalized and orb_build_count >= orb_vp_candles 
             line.delete(orb_vahLine)
         if not na(orb_valLine)
             line.delete(orb_valLine)
+        if not na(orb_vaMidLine)
+            line.delete(orb_vaMidLine)
         if not na(orb_rangeHighLine)
             line.delete(orb_rangeHighLine)
         if not na(orb_rangeLowLine)
@@ -1998,6 +2047,9 @@ if show_ny_orb and not orb_rangeFinalized and orb_build_count >= orb_vp_candles 
             orb_vahLine := line.new(orb_rangeLeftBar, orb_vah, bar_index, orb_vah, xloc=xloc.bar_index, extend=extend.right, color=color.new(color.teal, 0), width=1)
         if not na(orb_val)
             orb_valLine := line.new(orb_rangeLeftBar, orb_val, bar_index, orb_val, xloc=xloc.bar_index, extend=extend.right, color=color.new(color.teal, 0), width=1)
+        if not na(orb_vah) and not na(orb_val)
+            float vaMid = (orb_vah + orb_val) * 0.5
+            orb_vaMidLine := line.new(orb_rangeLeftBar, vaMid, bar_index, vaMid, xloc=xloc.bar_index, extend=extend.right, color=color.new(color.gray, 30), width=1, style=line.style_dotted)
         if orb_bias == 1
             label.new(bar_index, orb_rangeLow, "VP↑", style=label.style_label_up, color=color.new(color.green, 30), textcolor=color.white, size=size.tiny)
         else if orb_bias == -1
@@ -2016,6 +2068,8 @@ if show_ny_orb and orb_rangeFinalized and orb_showRangeBox
         line.set_x2(orb_vahLine, bar_index)
     if not na(orb_valLine)
         line.set_x2(orb_valLine, bar_index)
+    if not na(orb_vaMidLine)
+        line.set_x2(orb_vaMidLine, bar_index)
 
 // ---------- تشخیص جمع نقدینگی ----------
 bool orb_active = show_ny_orb and orb_rangeFinalized and not orb_signaled and not orb_canceled and orb_bias != 0 and orb_inTradeSession and (not orb_maxOneTradePerDay or not orb_tradedToday)

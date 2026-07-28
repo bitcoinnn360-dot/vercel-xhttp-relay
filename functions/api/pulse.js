@@ -14,10 +14,17 @@ import {
   mergePulseHistory,
   jalaliTodayTehran,
   historyForDay,
+  clampPulseHistoryTime,
   PULSE_HIST_START,
   PULSE_CASH_END,
   PULSE_HIST_END,
 } from '../lib/pulse.js'
+
+function clampPulseSnapshot(pulse) {
+  if (!pulse || typeof pulse !== 'object') return pulse
+  const t = clampPulseHistoryTime(pulse.time) || (String(pulse.time || '') > PULSE_HIST_END ? PULSE_HIST_END : pulse.time)
+  return { ...pulse, time: t || PULSE_HIST_END }
+}
 
 export async function onRequestGet(context) {
   const errors = []
@@ -45,6 +52,8 @@ export async function onRequestGet(context) {
     errors.push(`tradersarena: ${e}`)
     pulse = store?.current || fallback?.current || null
   }
+
+  pulse = clampPulseSnapshot(pulse)
 
   const today = jalaliTodayTehran()
   const history = historyForDay(store, dateParam || today.dateJalali)

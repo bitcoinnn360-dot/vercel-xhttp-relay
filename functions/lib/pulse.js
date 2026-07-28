@@ -114,7 +114,7 @@ export function parseIndustryFlows(rows) {
   return out
 }
 
-function clampPulseHistoryTime(hhmm) {
+export function clampPulseHistoryTime(hhmm) {
   const t = String(hhmm || '')
   if (!/^\d{2}:\d{2}$/.test(t)) return null
   if (t < PULSE_HIST_START) return null

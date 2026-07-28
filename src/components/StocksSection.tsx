@@ -112,10 +112,10 @@ export function TopTrades({ data }: { data: DashboardData }) {
     >
       <h3 className="mb-1 text-sm font-bold">بیشترین ارزش معاملات</h3>
       <p className="mb-2 text-[10px] text-[var(--color-muted)]">
-        ۱۲ نماد برتر · سهام + همه صندوق‌های سهامی · میلیارد تومان
+        ۱۲ نماد برتر · همان جدول ارزش معاملات TradersArena (زیر حقیقی/حقوقی)
       </p>
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2 text-[10px] text-[var(--color-muted)]">
-        <span>رتبه‌بندی زنده · TradersArena (سهام + هیت‌مپ صندوق سهامی)</span>
+        <span>رتبه‌بندی زنده · tradersarena.ir/data/mainwatch/symbols</span>
         {total > 0 ? (
           <span>
             جمع ۱۲تای اول:{' '}

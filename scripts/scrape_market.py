@@ -419,11 +419,14 @@ def scrape_top_trade_candidates() -> list[dict]:
     return list(by_sym.values())
 
 
-def fetch_ta_market_value_trades() -> list[dict]:
-    """Reliable stock trade values from TradersArena /data/market-values (`t` = rial)."""
+def fetch_ta_mainwatch_trades() -> list[dict]:
+    """Homepage main watch table (under حقیقی/حقوقی), sorted by trade value on the site.
+
+    Row layout: [id, isin, name, volume, tradeValueRial, last, lastPct, close, ...]
+    """
     try:
         raw = fetch(
-            "https://tradersarena.ir/data/market-values",
+            "https://tradersarena.ir/data/mainwatch/symbols",
             timeout=45,
             headers={
                 "Accept": "application/json, text/plain, */*",
@@ -432,115 +435,36 @@ def fetch_ta_market_value_trades() -> list[dict]:
         )
         rows = json.loads(raw.decode("utf-8", errors="replace") if isinstance(raw, (bytes, bytearray)) else raw)
     except Exception as exc:  # noqa: BLE001
-        print(f"ta market-values: {exc}")
+        print(f"ta mainwatch symbols: {exc}")
         return []
     out: list[dict] = []
     if not isinstance(rows, list):
         return out
     for row in rows:
-        if not isinstance(row, dict):
+        if not isinstance(row, list) or len(row) < 5:
             continue
-        name = str(row.get("s") or "").strip()
+        name = str(row[2] or "").strip()
         try:
-            tv = float(row.get("t") or 0)
+            tv = float(row[4] or 0)
         except (TypeError, ValueError):
             continue
         if not name or tv <= 0:
             continue
-        out.append({"name": name, "valueBr": round(tv / RIAL_PER_BILLION_TOMAN, 1), "kind": "stock"})
+        out.append({"name": name, "valueBr": round(tv / RIAL_PER_BILLION_TOMAN, 1)})
     return out
 
 
-def fetch_rahavard_trade_value_br(symbol: str) -> float | None:
-    try:
-        search = json.loads(
-            fetch(
-                f"https://rahavard365.com/api/v2/search?keyword={urllib.parse.quote(symbol)}",
-                timeout=20,
-                headers={"Accept": "application/json", "Referer": "https://rahavard365.com/"},
-            ).decode("utf-8", errors="replace")
-        )
-    except Exception:
-        return None
-    hit = next(
-        (
-            x
-            for x in (search.get("data") or [])
-            if isinstance(x, dict) and x.get("trade_symbol") == symbol and x.get("type") in ("صندوق", "سهام")
-        ),
-        None,
-    )
-    if not hit or not hit.get("entity_id"):
-        return None
-    try:
-        asset = json.loads(
-            fetch(
-                f"https://rahavard365.com/api/v2/asset/{hit['entity_id']}",
-                timeout=20,
-                headers={"Accept": "application/json", "Referer": "https://rahavard365.com/"},
-            ).decode("utf-8", errors="replace")
-        )
-    except Exception:
-        return None
-    value = num(((asset.get("data") or {}).get("last_trade") or {}).get("value"))
-    if value is None or value <= 0:
-        return None
-    return round(value / RIAL_PER_BILLION_TOMAN, 1)
-
-
 def build_live_top_trades(fund_set: set[str], limit: int = 12) -> tuple[list[dict], str | None]:
-    stocks = fetch_ta_market_value_trades()
-    fund_board = scrape_shakhesban_market_pages("fund", max_pages=2)
-    cands = [
-        r
-        for r in fund_board
-        if is_equity_fund_row(r, fund_set) and float(r.get("tradeValue") or 0) > 0
-    ]
-    cands.sort(key=lambda r: float(r.get("tradeValue") or 0), reverse=True)
-    cands = cands[:28]
-    seen = {str(r.get("symbol") or "") for r in cands}
-    priority = [
-        "اهرم",
-        "شتاب",
-        "آگاس",
-        "موج",
-        "جهش",
-        "توان",
-        "نارنج",
-        "بیدار",
-        "پالایش",
-        "دارایکم",
-        "اطلس",
-        "سرو",
-        "کاریس",
-        "تمشک",
-        "همای",
-        "آساس",
-        "پتروآگاه",
-    ]
-    for sym in priority:
-        if sym in seen:
-            continue
-        key = _normalize_symbol_key(sym)
-        if fund_set and key not in fund_set and sym != "دارایکم":
-            continue
-        cands.append({"symbol": sym, "marketFa": "صندوق", "tradeValue": 1.0})
-        seen.add(sym)
-    fund_rows: list[dict] = []
-    for row in cands:
-        v = fetch_rahavard_trade_value_br(str(row.get("symbol") or ""))
-        if v is None:
-            continue
-        fund_rows.append({"name": row["symbol"], "valueBr": v, "kind": "equity-fund"})
-    merged = {r["name"]: r for r in [*stocks, *fund_rows]}
-    top = sorted(merged.values(), key=lambda r: r["valueBr"], reverse=True)[:limit]
-    out = [{"name": r["name"], "valueBr": r["valueBr"]} for r in top]
-    source = (
-        "tradersarena-market-values+rahavard-equity-funds"
-        if fund_rows
-        else ("tradersarena-market-values" if stocks else None)
-    )
-    return out, source
+    del fund_set  # unused — ranking comes solely from TA main watch
+    rows = fetch_ta_mainwatch_trades()
+    by_key: dict[str, dict] = {}
+    for row in rows:
+        key = _normalize_symbol_key(row["name"])
+        prev = by_key.get(key)
+        if not prev or float(row["valueBr"]) > float(prev["valueBr"]):
+            by_key[key] = row
+    top = sorted(by_key.values(), key=lambda r: float(r["valueBr"]), reverse=True)[:limit]
+    return top, ("tradersarena-mainwatch-symbols" if top else None)
 
 
 def scrape_shakhesban_board(max_pages: int = 15) -> list[dict]:

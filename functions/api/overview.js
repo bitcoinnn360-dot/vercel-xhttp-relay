@@ -22,7 +22,8 @@ const TGJU_TODAY = 'https://api.tgju.org/v1/market/indicator/today-table-data/bo
 const SHAKH_INDEX = 'https://www.shakhesban.com/markets/index'
 const SHAKH_LIST = 'https://www.shakhesban.com/stocks/list-data'
 const TA_HEATMAP_STOCK_FUNDS = 'https://tradersarena.ir/data/heatmap/stock-funds'
-const TA_MARKET_VALUES = 'https://tradersarena.ir/data/market-values'
+/** Default featured watch under حقیقی/حقوقی — already the live «ارزش» ranking table. */
+const TA_MAINWATCH_SYMBOLS = 'https://tradersarena.ir/data/mainwatch/symbols'
 const PARSIS_HOME = 'https://parsistahlil.ir/'
 const SOURCEARENA_API = 'https://apis.sourcearena.ir/api/'
 const RAHAVARD_API = 'https://rahavard365.com/api/v2'
@@ -364,100 +365,50 @@ function isBondLikeName(name) {
   return false
 }
 
-/** TradersArena market-values: stock trade value (`t`, rial). */
-async function fetchTaMarketValueRows() {
-  const res = await fetch(TA_MARKET_VALUES, {
+/**
+ * Top trades from TradersArena main watch table (third table on homepage,
+ * under حقیقی/حقوقی). Rows are [id, isin, name, volume, tradeValueRial, ...].
+ * Sort by trade value — same order the site shows when sorted by «ارزش».
+ */
+async function fetchMainWatchTradeRows() {
+  const res = await fetch(TA_MAINWATCH_SYMBOLS, {
     headers: {
       Accept: 'application/json, text/plain, */*',
       'User-Agent': UA,
       Referer: 'https://tradersarena.ir/',
     },
   })
-  if (!res.ok) throw new Error(`ta market-values ${res.status}`)
+  if (!res.ok) throw new Error(`ta mainwatch symbols ${res.status}`)
   const rows = await res.json()
   if (!Array.isArray(rows)) return []
   return rows
     .map((r) => {
-      const name = String(r?.s || '').trim()
-      const tradeValue = Number(r?.t)
+      if (!Array.isArray(r) || r.length < 5) return null
+      const name = String(r[2] || '').trim()
+      const tradeValue = Number(r[4])
       if (!name || !Number.isFinite(tradeValue) || tradeValue <= 0) return null
       if (isBondLikeName(name)) return null
       return {
         name,
         valueBr: Math.round((tradeValue / RIAL_PER_BILLION_TOMAN) * 10) / 10,
-        kind: 'stock',
       }
     })
     .filter(Boolean)
 }
 
-/**
- * Equity-fund trade values from TradersArena heatmap «صندوق های سهامی».
- * Field `value` is trade value in rial (matches Rahavard last_trade.value).
- */
-async function fetchTaEquityFundTradeRows() {
-  const res = await fetch(TA_HEATMAP_STOCK_FUNDS, {
-    headers: {
-      Accept: 'application/json, text/plain, */*',
-      'User-Agent': UA,
-      Referer: 'https://tradersarena.ir/',
-    },
-  })
-  if (!res.ok) throw new Error(`ta heatmap stock-funds ${res.status}`)
-  const rows = await res.json()
-  if (!Array.isArray(rows)) return []
-  return rows
-    .map((r) => {
-      const name = String(r?.name || '').trim()
-      const tradeValue = Number(r?.value)
-      if (!name || !Number.isFinite(tradeValue) || tradeValue <= 0) return null
-      // skip commodity / fixed-income style names that sometimes leak into labels
-      if (/طلا|سکه|نقره|درآمد\s*ثابت|املاک|مستغلات/.test(name)) return null
-      return {
-        name,
-        valueBr: Math.round((tradeValue / RIAL_PER_BILLION_TOMAN) * 10) / 10,
-        kind: 'equity-fund',
-      }
-    })
-    .filter(Boolean)
-}
-
-/**
- * Top 12 = سهام (TA market-values.t) ∪ همه صندوق‌های سهامی (TA heatmap value).
- * Heatmap values match Rahavard; covers leveraged ETFs beyond a fixed priority list.
- */
-async function buildLiveTopTrades(fundSet) {
-  const [stockRows, fundRows] = await Promise.all([
-    fetchTaMarketValueRows(),
-    fetchTaEquityFundTradeRows().catch(() => []),
-  ])
-
-  const fundKeys = new Set(
-    [...(fundSet || []), ...fundRows.map((r) => normalizeSymbolKey(r.name))].map((k) =>
-      normalizeSymbolKey(k),
-    ),
-  )
-
-  // Stocks only — drop anything that is also an equity-fund ticker
-  const stocksOnly = stockRows.filter((r) => !fundKeys.has(normalizeSymbolKey(r.name)))
-
+async function buildLiveTopTrades(_fundSet) {
+  const rows = await fetchMainWatchTradeRows()
   const byKey = new Map()
-  for (const row of [...stocksOnly, ...fundRows]) {
-    if (!row || !(row.valueBr > 0) || isBondLikeName(row.name)) continue
+  for (const row of rows) {
     const key = normalizeSymbolKey(row.name)
     const prev = byKey.get(key)
     if (!prev || row.valueBr > prev.valueBr) byKey.set(key, row)
   }
-
   const top = [...byKey.values()].sort((a, b) => b.valueBr - a.valueBr).slice(0, TOP_TRADES_LIMIT)
   return {
     topTrades: top.map(({ name, valueBr }) => ({ name, valueBr })),
-    topTradesSource: fundRows.length
-      ? 'tradersarena-market-values+heatmap-equity-funds'
-      : stockRows.length
-        ? 'tradersarena-market-values'
-        : null,
-    equityFundsEnriched: fundRows.length,
+    topTradesSource: top.length ? 'tradersarena-mainwatch-symbols' : null,
+    equityFundsEnriched: 0,
   }
 }
 

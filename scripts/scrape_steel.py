@@ -37,18 +37,61 @@ CUSTEEL_LOGIN = (
     "http://www.custeel.net/sec/dgserverlet"
     "?classname=login.LoginCtrl&method=loginInUiHomeByXmlHttp&ENG=yes"
 )
+CUSTEEL_HOME = "http://www.custeel.net/en/"
 CUSTEEL_PRICE = "http://www.custeel.net/luliao/price_center_image_en.jsp"
 CUSTEEL_INDICATORS = "http://www.custeel.com/reform/title/indexup_en.html"
 IME_URL = "https://www.ime.co.ir/subsystems/ime/services/home/imedata.asmx/GetAmareMoamelatList"
 
-# Custeel product codes → dashboard steel ids (domestic RMB unless noted)
+# Foreign quotes (外盘) = seaborne FOB USD. Domestic steel stays CNY market price.
 CUSTEEL_SERIES = {
-    "pb61": {"code": "001005001001008", "nameFa": "نرمه استرالیا PB ۶۱.۵٪", "unit": "دلار/تن", "region": "global", "currency": "usd"},
-    "brbf": {"code": "001005001001005", "nameFa": "نرمه کاراجاس برزیل ۶۵٪", "unit": "دلار/تن", "region": "global", "currency": "usd"},
-    "br_pellet": {"code": "001005001001007", "nameFa": "گندله برزیل ۶۵٪", "unit": "دلار/تن", "region": "global", "currency": "usd"},
-    "tangshan_billet": {"code": "001002001001001", "nameFa": "بیلت تانگشان", "unit": "دلار/تن", "region": "china", "currency": "cny"},
-    "hr_shanghai": {"code": "001001001001005031", "nameFa": "ورق گرم شانگهای", "unit": "دلار/تن", "region": "china", "currency": "cny"},
-    "rebar_beijing": {"code": "001001001001002075", "nameFa": "میلگرد تانگشان", "unit": "دلار/تن", "region": "china", "currency": "cny"},
+    "pb61": {
+        "code": "001005001001008",
+        "nameFa": "نرمه استرالیا PB ۶۱.۵٪ FOB",
+        "unit": "دلار/تن FOB",
+        "region": "global",
+        "currency": "usd",
+        "basis": "FOB",
+    },
+    "brbf": {
+        "code": "001005001001005",
+        "nameFa": "نرمه کاراجاس برزیل ۶۵٪ FOB",
+        "unit": "دلار/تن FOB",
+        "region": "global",
+        "currency": "usd",
+        "basis": "FOB",
+    },
+    "br_pellet": {
+        "code": "001005001001007",
+        "nameFa": "گندله برزیل ۶۵٪ FOB",
+        "unit": "دلار/تن FOB",
+        "region": "global",
+        "currency": "usd",
+        "basis": "FOB",
+    },
+    "tangshan_billet": {
+        "code": "001002001001001",
+        "nameFa": "بیلت تانگشان",
+        "unit": "دلار/تن",
+        "region": "china",
+        "currency": "cny",
+        "basis": "market",
+    },
+    "hr_shanghai": {
+        "code": "001001001001005031",
+        "nameFa": "ورق گرم شانگهای",
+        "unit": "دلار/تن",
+        "region": "china",
+        "currency": "cny",
+        "basis": "market",
+    },
+    "rebar_beijing": {
+        "code": "001001001001002075",
+        "nameFa": "میلگرد تانگشان",
+        "unit": "دلار/تن",
+        "region": "china",
+        "currency": "cny",
+        "basis": "market",
+    },
 }
 
 # Map IME GoodsName keywords → chain product + steel quote id
@@ -100,17 +143,25 @@ class HttpClient:
         headers: dict | None = None,
         timeout: int = 45,
         method: str | None = None,
+        attempts: int = 4,
     ) -> bytes:
-        hdrs = {"User-Agent": UA, **(headers or {})}
-        body: bytes | None = None
-        if isinstance(data, dict):
-            body = urllib.parse.urlencode(data).encode()
-            hdrs.setdefault("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8")
-        elif isinstance(data, (bytes, bytearray)):
-            body = bytes(data)
-        req = urllib.request.Request(url, data=body, headers=hdrs, method=method)
-        with self.opener.open(req, timeout=timeout) as resp:
-            return resp.read()
+        last: Exception | None = None
+        for i in range(attempts):
+            try:
+                hdrs = {"User-Agent": UA, **(headers or {})}
+                body: bytes | None = None
+                if isinstance(data, dict):
+                    body = urllib.parse.urlencode(data).encode()
+                    hdrs.setdefault("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8")
+                elif isinstance(data, (bytes, bytearray)):
+                    body = bytes(data)
+                req = urllib.request.Request(url, data=body, headers=hdrs, method=method)
+                with self.opener.open(req, timeout=timeout) as resp:
+                    return resp.read()
+            except Exception as exc:  # noqa: BLE001
+                last = exc
+                time.sleep(0.9 * (i + 1))
+        raise last or RuntimeError(f"request failed: {url}")
 
     def request_json(self, url: str, payload: dict, *, headers: dict | None = None, timeout: int = 60) -> Any:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -248,10 +299,11 @@ def scrape_custeel_series(client: HttpClient, cny_usd: float) -> dict[str, Any]:
                     "change": chg,
                     "changePct": chg_pct,
                     "region": meta["region"],
+                    "basis": meta.get("basis"),
                     "nativeValue": native,
-                    "nativeUnit": "یوان/تن" if meta["currency"] == "cny" else "دلار/تن",
+                    "nativeUnit": "یوان/تن" if meta["currency"] == "cny" else meta["unit"],
                     "asOf": last_d,
-                    "source": "custeel",
+                    "source": "custeel-price-center",
                 }
             )
             # keep ~180 points for charts (USD)
@@ -264,14 +316,179 @@ def scrape_custeel_series(client: HttpClient, cny_usd: float) -> dict[str, Any]:
                 for d, v in hist_pts
             ]
             ok += 1
-            print(f"  series {sid}: {last_usd} ({last_d})")
+            print(f"  series {sid}: {last_usd} {meta.get('basis') or ''} ({last_d})")
             time.sleep(0.35)
         except Exception as exc:  # noqa: BLE001
             print(f"  series {sid} fail: {exc}")
     return {"steel": steel, "histories": histories, "ok": ok}
 
 
+_MONTHS = {
+    "jan": 1,
+    "feb": 2,
+    "mar": 3,
+    "apr": 4,
+    "may": 5,
+    "jun": 6,
+    "jul": 7,
+    "aug": 8,
+    "sep": 9,
+    "oct": 10,
+    "nov": 11,
+    "dec": 12,
+}
+
+
+def _parse_english_date(text: str) -> str | None:
+    """Parse 'Jul 23, 2026' / 'July 23, 2026' → YYYY-MM-DD."""
+    m = re.search(r"\b([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})\b", text)
+    if not m:
+        return None
+    mon = _MONTHS.get(m.group(1)[:3].lower())
+    if not mon:
+        return None
+    return f"{int(m.group(3)):04d}-{mon:02d}-{int(m.group(2)):02d}"
+
+
+def _article_plain(html: str) -> str:
+    plain = re.sub(r"<script[^>]*>.*?</script>", " ", html, flags=re.I | re.S)
+    plain = re.sub(r"<style[^>]*>.*?</style>", " ", plain, flags=re.I | re.S)
+    plain = re.sub(r"<[^>]+>", " ", plain)
+    return re.sub(r"\s+", " ", unescape(plain))
+
+
+def scrape_tangshan_bf(client: HttpClient) -> dict[str, Any]:
+    """Tangshan BF operating rate from weekly research articles (not the national widget).
+
+    Uses «operating rate by number of blast furnaces» and the *session ending* date
+    inside the article body (publish date is often +1 day).
+    """
+    home = client.request(CUSTEEL_HOME, timeout=45).decode("utf-8", errors="replace")
+    links = re.findall(
+        r'href="(viewDetail\.do\?flag=3&id=\d+)"[^>]*>\s*([^<]*BF Operating Rate in Tangshan[^<]*)',
+        home,
+        flags=re.I,
+    )
+    if not links:
+        return {"ok": False, "error": "no BF Tangshan links"}
+
+    history: list[dict] = []
+    latest: dict[str, Any] | None = None
+    for href, title in links[:8]:
+        url = href if href.startswith("http") else f"http://www.custeel.net/en/{href}"
+        try:
+            html = client.request(url, timeout=45).decode("utf-8", errors="replace")
+        except Exception as exc:  # noqa: BLE001
+            print(f"  bf article fail {href}: {exc}")
+            continue
+        text = _article_plain(html)
+        sess = re.search(r"session ending\s+([A-Za-z]+\s+\d{1,2},\s*\d{4})", text, re.I)
+        as_of = _parse_english_date(sess.group(1)) if sess else None
+        pub = re.search(r"(20\d{2}-\d{2}-\d{2})\s+\d{2}:\d{2}:\d{2}", text)
+        published = pub.group(1) if pub else None
+        # Prefer furnace-count rate (user: 87.95%); also capture capacity-based.
+        m_num = re.search(
+            r"operating rate by number of blast furnaces was\s*([\d.]+)\s*%"
+            r"(?P<tail>.{0,80})",
+            text,
+            re.I,
+        )
+        m_cap = re.search(
+            r"leading to an operating rate of\s*([\d.]+)\s*%"
+            r"(?P<tail>.{0,80})",
+            text,
+            re.I,
+        )
+        if not m_num:
+            continue
+        rate = num(m_num.group(1))
+        if rate is None:
+            continue
+        wow = 0.0
+        tail = m_num.group("tail") or ""
+        m_wow = re.search(r"(?:falling|down|declining)\s+by\s*([\d.]+)\s*%", tail, re.I)
+        if m_wow:
+            wow = -abs(float(m_wow.group(1)))
+        else:
+            m_wow = re.search(r"(?:rising|up|gaining)\s+by\s*([\d.]+)\s*%", tail, re.I)
+            if m_wow:
+                wow = abs(float(m_wow.group(1)))
+            elif re.search(r"keep(?:ing)?\s+stable|unchanged|flat", tail, re.I):
+                wow = 0.0
+        cap_rate = num(m_cap.group(1)) if m_cap else None
+        row = {
+            "rate": rate,
+            "wowChangePct": wow,
+            "capacityRate": cap_rate,
+            "asOf": as_of or published,
+            "published": published,
+            "title": title.strip(),
+            "url": url,
+            "source": "custeel-tangshan-bf-article",
+            "note": "by number of blast furnaces; asOf=session ending",
+        }
+        history.append({"date": row["asOf"], "value": rate, "wowChangePct": wow})
+        if latest is None:
+            latest = row
+        time.sleep(0.25)
+
+    if not latest:
+        return {"ok": False, "error": "BF articles unparsed"}
+    latest["history"] = list(reversed(history))
+    print(
+        f"  BF Tangshan: {latest['rate']}% asOf={latest['asOf']} "
+        f"(published {latest['published']}) wow={latest['wowChangePct']}"
+    )
+    return {"ok": True, **latest}
+
+
+def scrape_ore_port_stocks(client: HttpClient) -> dict[str, Any]:
+    """Major China ports iron-ore stocks from the weekly inventory article (not sidebar widget)."""
+    home = client.request(CUSTEEL_HOME, timeout=45).decode("utf-8", errors="replace")
+    links = re.findall(
+        r'href="(viewDetail\.do\?flag=3&id=\d+)"[^>]*>\s*([^<]*Iron Ore in Stock of Major[^<]*)',
+        home,
+        flags=re.I,
+    )
+    if not links:
+        return {"ok": False, "error": "no ore stock links"}
+    href, title = links[0]
+    url = href if href.startswith("http") else f"http://www.custeel.net/en/{href}"
+    html = client.request(url, timeout=60).decode("utf-8", errors="replace")
+    # Update date in title: (Update: Jul 24, 2026)
+    as_of = None
+    m_upd = re.search(r"Update:\s*([A-Za-z]+\s+\d{1,2},\s*\d{4})", title + " " + html, re.I)
+    if m_upd:
+        as_of = _parse_english_date(m_upd.group(1))
+    total = wow = None
+    for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.I | re.S):
+        cells = [
+            " ".join(re.sub(r"<[^>]+>", " ", unescape(td)).split())
+            for td in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", tr, re.I | re.S)
+        ]
+        cells = [c for c in cells if c]
+        if cells and cells[0].lower() == "total" and len(cells) >= 3:
+            total = num(cells[1])
+            wow = num(cells[2]) or 0.0
+            break
+    if total is None:
+        return {"ok": False, "error": "total row missing", "url": url}
+    print(f"  ore ports: {total} kt wow={wow} asOf={as_of} ({title.strip()[:48]})")
+    return {
+        "ok": True,
+        "label": "موجودی انبار سنگ‌آهن بنادر چین",
+        "value": total,
+        "wowChange": wow,
+        "unit": "هزار تن",
+        "asOf": as_of,
+        "title": title.strip(),
+        "url": url,
+        "source": "custeel-port-stocks-article",
+    }
+
+
 def scrape_custeel_indicators(client: HttpClient) -> dict[str, Any]:
+    """Sidebar CSI indices + Tangshan billet stocks widget (BF/ore stocks overridden by articles)."""
     raw = client.request(CUSTEEL_INDICATORS, timeout=30)
     html = raw.decode("utf-8", errors="replace")
     rows: list[list[str]] = []
@@ -296,13 +513,9 @@ def scrape_custeel_indicators(client: HttpClient) -> dict[str, Any]:
         if len(r) >= 2:
             out["rows"].append({"label": r[0], "latest": r[1], "change": r[2] if len(r) > 2 else None})
 
+    steel_extra: list[dict] = []
     sea = find_row("seaborne", "62")
     port = find_row("portside", "62")
-    bf = find_row("bf operating")
-    ore_stk = find_row("iron ore stocks")
-    bil_stk = find_row("tangshan billet stocks")
-
-    steel_extra: list[dict] = []
     if sea:
         v = num(sea[1])
         ch = num(sea[2]) or 0.0
@@ -311,12 +524,13 @@ def scrape_custeel_indicators(client: HttpClient) -> dict[str, Any]:
                 {
                     "id": "seaborne62",
                     "name": "CSI Seaborne Index Fe62%",
-                    "nameFa": "شاخص سنگ‌آهن دریایی ۶۲٪",
+                    "nameFa": "شاخص سنگ‌آهن دریایی ۶۲٪ (CSI)",
                     "value": v,
                     "unit": "دلار/تن",
                     "change": ch,
                     "changePct": round((ch / (v - ch)) * 100, 2) if (v - ch) else 0.0,
                     "region": "global",
+                    "basis": "index",
                     "source": "custeel-indicator",
                 }
             )
@@ -334,33 +548,13 @@ def scrape_custeel_indicators(client: HttpClient) -> dict[str, Any]:
                     "change": ch,
                     "changePct": round((ch / (v - ch)) * 100, 2) if (v - ch) else 0.0,
                     "region": "china",
+                    "basis": "portside",
                     "source": "custeel-indicator",
                 }
             )
 
-    inventories = None
-    if ore_stk:
-        # English page is in kt
-        v = num(ore_stk[1])
-        ch = num(ore_stk[2]) or 0.0
-        if v:
-            inventories = {
-                "label": "موجودی انبار سنگ‌آهن بنادر چین",
-                "value": v,
-                "wowChange": ch,
-                "unit": "هزار تن",
-                "source": "custeel-indicator",
-            }
-
-    bf_rate = None
-    if bf:
-        # e.g. 78.57% | -0.36%
-        rate = num(str(bf[1]).replace("%", ""))
-        ch = num(str(bf[2]).replace("%", "")) or 0.0
-        if rate is not None:
-            bf_rate = {"rate": rate, "wowChangePct": ch, "source": "custeel-indicator"}
-
     billet_stocks = None
+    bil_stk = find_row("tangshan billet stocks")
     if bil_stk:
         v = num(bil_stk[1])
         ch = num(bil_stk[2]) or 0.0
@@ -373,6 +567,33 @@ def scrape_custeel_indicators(client: HttpClient) -> dict[str, Any]:
                 "source": "custeel-indicator",
             }
 
+    # Article-backed KPIs (preferred over national sidebar BF / stale ore widget)
+    bf = scrape_tangshan_bf(client)
+    ore = scrape_ore_port_stocks(client)
+
+    inventories = None
+    if ore.get("ok"):
+        inventories = {
+            "label": ore["label"],
+            "value": ore["value"],
+            "wowChange": ore["wowChange"],
+            "unit": ore["unit"],
+            "asOf": ore.get("asOf"),
+            "source": ore["source"],
+        }
+
+    bf_rate = None
+    if bf.get("ok"):
+        bf_rate = {
+            "rate": bf["rate"],
+            "wowChangePct": bf["wowChangePct"],
+            "capacityRate": bf.get("capacityRate"),
+            "asOf": bf.get("asOf"),
+            "published": bf.get("published"),
+            "source": bf["source"],
+            "note": bf.get("note"),
+        }
+
     out.update(
         {
             "ok": True,
@@ -380,6 +601,7 @@ def scrape_custeel_indicators(client: HttpClient) -> dict[str, Any]:
             "inventories": inventories,
             "bfRate": bf_rate,
             "billetStocks": billet_stocks,
+            "bfHistory": bf.get("history") or [],
         }
     )
     return out

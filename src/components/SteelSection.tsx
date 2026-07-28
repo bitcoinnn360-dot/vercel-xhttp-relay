@@ -13,12 +13,12 @@ import { changeClass, fmtInt, fmtNum, fmtPct } from '../lib/format'
 import { PriceAreaChart, Sparkline } from './charts/Charts'
 
 const CHART_IDS: { id: string; title: string; color: string }[] = [
-  { id: 'pb61', title: 'نرمه PB ۶۱.۵٪ (Custeel)', color: '#0b3d6e' },
-  { id: 'br_pellet', title: 'گندله برزیل ۶۵٪', color: '#9a3412' },
+  { id: 'pb61', title: 'نرمه PB ۶۱.۵٪ FOB', color: '#0b3d6e' },
+  { id: 'br_pellet', title: 'گندله برزیل ۶۵٪ FOB', color: '#9a3412' },
   { id: 'tangshan_billet', title: 'بیلت تانگشان', color: '#0f766e' },
   { id: 'hr_shanghai', title: 'ورق گرم شانگهای', color: '#a16207' },
   { id: 'rebar_beijing', title: 'میلگرد تانگشان', color: '#7c2d12' },
-  { id: 'seaborne62', title: 'شاخص سنگ‌آهن دریایی ۶۲٪', color: '#334155' },
+  { id: 'seaborne62', title: 'شاخص دریایی CSI ۶۲٪', color: '#334155' },
 ]
 
 export function SteelSection({
@@ -63,14 +63,19 @@ export function SteelSection({
         <div className="panel p-4">
           <div className="kpi-label">{data.inventories.label}</div>
           <div className="kpi-value num text-[1.5rem]">{fmtInt(data.inventories.value)}</div>
-          <div className="mt-1 text-xs text-[var(--color-muted)]">هزار تن</div>
+          <div className="mt-1 text-xs text-[var(--color-muted)]">
+            هزار تن{data.inventories.asOf ? ` · آمار ${data.inventories.asOf}` : ''}
+          </div>
           <div className={`mt-2 text-sm font-semibold num ${changeClass(data.inventories.wowChange)}`}>
             تغییر هفتگی: {fmtInt(data.inventories.wowChange)}
           </div>
         </div>
         <div className="panel p-4">
-          <div className="kpi-label">نرخ بهره‌برداری کوره بلند چین</div>
+          <div className="kpi-label">نرخ بهره‌برداری کوره بلند تانگشان</div>
           <div className="kpi-value num text-[1.5rem]">{fmtNum(data.bfRate.rate, 2)}٪</div>
+          <div className="mt-1 text-xs text-[var(--color-muted)]">
+            {data.bfRate.asOf ? `آمار ${data.bfRate.asOf} · تعداد کوره` : 'بر اساس تعداد کوره'}
+          </div>
           <div className={`mt-2 text-sm font-semibold num ${changeClass(data.bfRate.wowChangePct)}`}>
             تغییر هفتگی: {fmtPct(data.bfRate.wowChangePct)}
           </div>

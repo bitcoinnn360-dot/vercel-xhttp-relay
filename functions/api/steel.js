@@ -18,21 +18,53 @@ const IME_URL =
   'https://www.ime.co.ir/subsystems/ime/services/home/imedata.asmx/GetAmareMoamelatList'
 
 const SERIES = {
-  pb61: { code: '001005001001008', nameFa: 'نرمه استرالیا PB ۶۱.۵٪', region: 'global', currency: 'usd' },
-  brbf: { code: '001005001001005', nameFa: 'نرمه کاراجاس برزیل ۶۵٪', region: 'global', currency: 'usd' },
-  br_pellet: { code: '001005001001007', nameFa: 'گندله برزیل ۶۵٪', region: 'global', currency: 'usd' },
+  pb61: {
+    code: '001005001001008',
+    nameFa: 'نرمه استرالیا PB ۶۱.۵٪ FOB',
+    region: 'global',
+    currency: 'usd',
+    basis: 'FOB',
+    unit: 'دلار/تن FOB',
+  },
+  brbf: {
+    code: '001005001001005',
+    nameFa: 'نرمه کاراجاس برزیل ۶۵٪ FOB',
+    region: 'global',
+    currency: 'usd',
+    basis: 'FOB',
+    unit: 'دلار/تن FOB',
+  },
+  br_pellet: {
+    code: '001005001001007',
+    nameFa: 'گندله برزیل ۶۵٪ FOB',
+    region: 'global',
+    currency: 'usd',
+    basis: 'FOB',
+    unit: 'دلار/تن FOB',
+  },
   tangshan_billet: {
     code: '001002001001001',
     nameFa: 'بیلت تانگشان',
     region: 'china',
     currency: 'cny',
+    basis: 'market',
+    unit: 'دلار/تن',
   },
-  hr_shanghai: { code: '001001001001005031', nameFa: 'ورق گرم شانگهای', region: 'china', currency: 'cny' },
+  hr_shanghai: {
+    code: '001001001001005031',
+    nameFa: 'ورق گرم شانگهای',
+    region: 'china',
+    currency: 'cny',
+    basis: 'market',
+    unit: 'دلار/تن',
+  },
   rebar_beijing: {
     code: '001001001001002075',
     nameFa: 'میلگرد تانگشان',
     region: 'china',
     currency: 'cny',
+    basis: 'market',
+    unit: 'دلار/تن',
   },
 }
 
@@ -169,12 +201,13 @@ async function scrapeCusteel(cookie, cnyUsd) {
       name: title || sid,
       nameFa: meta.nameFa,
       value: lastUsd,
-      unit: 'دلار/تن',
+      unit: meta.unit || 'دلار/تن',
       change,
       changePct,
       region: meta.region,
+      basis: meta.basis,
       asOf: last.date,
-      source: 'custeel',
+      source: 'custeel-price-center',
     })
     histories[sid] = pts.slice(-180).map((p) => ({
       date: p.date,
@@ -190,6 +223,109 @@ function findIndicatorRow(rows, ...needles) {
     const j = r.join(' ').toLowerCase()
     return needles.every((n) => j.includes(n.toLowerCase()))
   })
+}
+
+const CUSTEEL_HOME = 'http://www.custeel.net/en/'
+
+const MONTHS = {
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+  jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+}
+
+function parseEnglishDate(text) {
+  const m = String(text || '').match(/\b([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})\b/)
+  if (!m) return null
+  const mon = MONTHS[m[1].slice(0, 3).toLowerCase()]
+  if (!mon) return null
+  return `${m[3]}-${String(mon).padStart(2, '0')}-${String(m[2]).padStart(2, '0')}`
+}
+
+function articlePlain(html) {
+  return String(html || '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+}
+
+async function scrapeTangshanBf(cookie) {
+  const homeRes = await fetch(CUSTEEL_HOME, {
+    headers: { 'User-Agent': UA, Cookie: cookie || '' },
+  })
+  if (!homeRes.ok) return { ok: false }
+  const home = await homeRes.text()
+  const links = [...home.matchAll(/href="(viewDetail\.do\?flag=3&id=\d+)"[^>]*>\s*([^<]*BF Operating Rate in Tangshan[^<]*)/gi)]
+  if (!links.length) return { ok: false, error: 'no BF links' }
+  const href = links[0][1]
+  const url = href.startsWith('http') ? href : `http://www.custeel.net/en/${href}`
+  const res = await fetch(url, { headers: { 'User-Agent': UA, Cookie: cookie || '' } })
+  if (!res.ok) return { ok: false }
+  const text = articlePlain(await res.text())
+  const sess = text.match(/session ending\s+([A-Za-z]+\s+\d{1,2},\s*\d{4})/i)
+  const asOf = sess ? parseEnglishDate(sess[1]) : null
+  const pub = text.match(/(20\d{2}-\d{2}-\d{2})\s+\d{2}:\d{2}:\d{2}/)
+  const mNum = text.match(
+    /operating rate by number of blast furnaces was\s*([\d.]+)\s*%(.{0,80})/i,
+  )
+  const mCap = text.match(/leading to an operating rate of\s*([\d.]+)\s*%/i)
+  if (!mNum) return { ok: false, error: 'bf rate missing' }
+  const rate = num(mNum[1])
+  const tail = mNum[2] || ''
+  let wow = 0
+  const down = tail.match(/(?:falling|down|declining)\s+by\s*([\d.]+)\s*%/i)
+  const up = tail.match(/(?:rising|up|gaining)\s+by\s*([\d.]+)\s*%/i)
+  if (down) wow = -Math.abs(Number(down[1]))
+  else if (up) wow = Math.abs(Number(up[1]))
+  return {
+    ok: true,
+    rate,
+    wowChangePct: wow,
+    capacityRate: mCap ? num(mCap[1]) : null,
+    asOf: asOf || (pub ? pub[1] : null),
+    published: pub ? pub[1] : null,
+    source: 'custeel-tangshan-bf-article',
+    note: 'by number of blast furnaces; asOf=session ending',
+  }
+}
+
+async function scrapeOrePortStocks(cookie) {
+  const homeRes = await fetch(CUSTEEL_HOME, {
+    headers: { 'User-Agent': UA, Cookie: cookie || '' },
+  })
+  if (!homeRes.ok) return { ok: false }
+  const home = await homeRes.text()
+  const links = [...home.matchAll(/href="(viewDetail\.do\?flag=3&id=\d+)"[^>]*>\s*([^<]*Iron Ore in Stock of Major[^<]*)/gi)]
+  if (!links.length) return { ok: false }
+  const href = links[0][1]
+  const title = links[0][2]
+  const url = href.startsWith('http') ? href : `http://www.custeel.net/en/${href}`
+  const res = await fetch(url, { headers: { 'User-Agent': UA, Cookie: cookie || '' } })
+  if (!res.ok) return { ok: false }
+  const html = await res.text()
+  const upd = `${title} ${html}`.match(/Update:\s*([A-Za-z]+\s+\d{1,2},\s*\d{4})/i)
+  const asOf = upd ? parseEnglishDate(upd[1]) : null
+  let total = null
+  let wow = 0
+  for (const tr of html.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) || []) {
+    const cells = [...tr.matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((m) =>
+      m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+    ).filter(Boolean)
+    if (cells[0]?.toLowerCase() === 'total' && cells.length >= 3) {
+      total = num(cells[1])
+      wow = num(cells[2]) || 0
+      break
+    }
+  }
+  if (total == null) return { ok: false }
+  return {
+    ok: true,
+    label: 'موجودی انبار سنگ‌آهن بنادر چین',
+    value: total,
+    wowChange: wow,
+    unit: 'هزار تن',
+    asOf,
+    source: 'custeel-port-stocks-article',
+  }
 }
 
 async function scrapeIndicators(cookie) {
@@ -208,8 +344,6 @@ async function scrapeIndicators(cookie) {
   const steelExtra = []
   const sea = findIndicatorRow(rows, 'seaborne', '62')
   const port = findIndicatorRow(rows, 'portside', '62')
-  const bf = findIndicatorRow(rows, 'bf operating')
-  const ore = findIndicatorRow(rows, 'iron ore stocks')
   const bil = findIndicatorRow(rows, 'tangshan billet stocks')
 
   if (sea) {
@@ -219,12 +353,13 @@ async function scrapeIndicators(cookie) {
       steelExtra.push({
         id: 'seaborne62',
         name: 'CSI Seaborne Fe62%',
-        nameFa: 'شاخص سنگ‌آهن دریایی ۶۲٪',
+        nameFa: 'شاخص سنگ‌آهن دریایی ۶۲٪ (CSI)',
         value: v,
         unit: 'دلار/تن',
         change: ch,
         changePct: v - ch ? +((ch / (v - ch)) * 100).toFixed(2) : 0,
         region: 'global',
+        basis: 'index',
         source: 'custeel-indicator',
       })
   }
@@ -241,29 +376,11 @@ async function scrapeIndicators(cookie) {
         change: ch,
         changePct: v - ch ? +((ch / (v - ch)) * 100).toFixed(2) : 0,
         region: 'china',
+        basis: 'portside',
         source: 'custeel-indicator',
       })
   }
 
-  let inventories = null
-  if (ore) {
-    const v = num(ore[1])
-    const ch = num(ore[2]) || 0
-    if (v != null)
-      inventories = {
-        label: 'موجودی انبار سنگ‌آهن بنادر چین',
-        value: v,
-        wowChange: ch,
-        unit: 'هزار تن',
-        source: 'custeel-indicator',
-      }
-  }
-  let bfRate = null
-  if (bf) {
-    const rate = num(String(bf[1]).replace('%', ''))
-    const ch = num(String(bf[2]).replace('%', '')) || 0
-    if (rate != null) bfRate = { rate, wowChangePct: ch, source: 'custeel-indicator' }
-  }
   let billetStocks = null
   if (bil) {
     const v = num(bil[1])
@@ -277,7 +394,34 @@ async function scrapeIndicators(cookie) {
         source: 'custeel-indicator',
       }
   }
-  return { ok: true, steelExtra, inventories, bfRate, billetStocks }
+
+  const [bf, ore] = await Promise.all([scrapeTangshanBf(cookie), scrapeOrePortStocks(cookie)])
+  return {
+    ok: true,
+    steelExtra,
+    inventories: ore.ok
+      ? {
+          label: ore.label,
+          value: ore.value,
+          wowChange: ore.wowChange,
+          unit: ore.unit,
+          asOf: ore.asOf,
+          source: ore.source,
+        }
+      : null,
+    bfRate: bf.ok
+      ? {
+          rate: bf.rate,
+          wowChangePct: bf.wowChangePct,
+          capacityRate: bf.capacityRate,
+          asOf: bf.asOf,
+          published: bf.published,
+          source: bf.source,
+          note: bf.note,
+        }
+      : null,
+    billetStocks,
+  }
 }
 
 function jalaliToday() {

@@ -178,6 +178,7 @@ export interface SteelQuote {
   region: 'china' | 'iran' | 'global'
   asOf?: string
   source?: string
+  basis?: string
   history?: { t: string; v: number }[]
 }
 
@@ -219,9 +220,17 @@ export interface DashboardData {
   commodities: CommodityQuote[]
   steel: SteelQuote[]
   imeChain: ImeSteelRow[]
-  inventories: { label: string; value: number; wowChange: number }
-  bfRate: { rate: number; wowChangePct: number }
-  billetStocks?: { label: string; value: number; wowChange: number }
+  inventories: { label: string; value: number; wowChange: number; asOf?: string }
+  bfRate: {
+    rate: number
+    wowChangePct: number
+    asOf?: string
+    published?: string
+    capacityRate?: number
+    note?: string
+    source?: string
+  }
+  billetStocks?: { label: string; value: number; wowChange: number; asOf?: string }
   periodic: PeriodicRow[]
   sources: SourceStatus[]
   updatedAt: string

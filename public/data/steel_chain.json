@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-07-28T17:47:10.056679+00:00",
+  "updatedAt": "2026-07-28T19:32:24.254943+00:00",
   "ok": true,
   "custeelOk": true,
   "imeOk": false,
@@ -9,12 +9,13 @@
     {
       "id": "seaborne62",
       "name": "CSI Seaborne Index Fe62%",
-      "nameFa": "شاخص سنگ‌آهن دریایی ۶۲٪",
+      "nameFa": "شاخص سنگ‌آهن دریایی ۶۲٪ (CSI)",
       "value": 98.9,
       "unit": "دلار/تن",
       "change": 0.0,
       "changePct": 0.0,
       "region": "global",
+      "basis": "index",
       "source": "custeel-indicator"
     },
     {
@@ -26,49 +27,53 @@
       "change": -0.07,
       "changePct": -0.08,
       "region": "china",
+      "basis": "portside",
       "source": "custeel-indicator"
     },
     {
       "id": "pb61",
       "name": "61.5% PB Fine (Foreign Quote)",
-      "nameFa": "نرمه استرالیا PB ۶۱.۵٪",
+      "nameFa": "نرمه استرالیا PB ۶۱.۵٪ FOB",
       "value": 98.9,
-      "unit": "دلار/تن",
+      "unit": "دلار/تن FOB",
       "change": 0.0,
       "changePct": 0.0,
       "region": "global",
+      "basis": "FOB",
       "nativeValue": 98.9,
-      "nativeUnit": "دلار/تن",
+      "nativeUnit": "دلار/تن FOB",
       "asOf": "2026-07-28",
-      "source": "custeel"
+      "source": "custeel-price-center"
     },
     {
       "id": "brbf",
       "name": "65% Carajas Fines (Foreign Quote)",
-      "nameFa": "نرمه کاراجاس برزیل ۶۵٪",
+      "nameFa": "نرمه کاراجاس برزیل ۶۵٪ FOB",
       "value": 113.8,
-      "unit": "دلار/تن",
+      "unit": "دلار/تن FOB",
       "change": -0.1,
       "changePct": -0.09,
       "region": "global",
+      "basis": "FOB",
       "nativeValue": 113.8,
-      "nativeUnit": "دلار/تن",
+      "nativeUnit": "دلار/تن FOB",
       "asOf": "2026-07-28",
-      "source": "custeel"
+      "source": "custeel-price-center"
     },
     {
       "id": "br_pellet",
       "name": "65% Brazilia Pellets (Foreign Quote)",
-      "nameFa": "گندله برزیل ۶۵٪",
+      "nameFa": "گندله برزیل ۶۵٪ FOB",
       "value": 128.0,
-      "unit": "دلار/تن",
+      "unit": "دلار/تن FOB",
       "change": 0.0,
       "changePct": 0.0,
       "region": "global",
+      "basis": "FOB",
       "nativeValue": 128.0,
-      "nativeUnit": "دلار/تن",
+      "nativeUnit": "دلار/تن FOB",
       "asOf": "2026-07-28",
-      "source": "custeel"
+      "source": "custeel-price-center"
     },
     {
       "id": "tangshan_billet",
@@ -79,10 +84,11 @@
       "change": -2.95,
       "changePct": -0.67,
       "region": "china",
+      "basis": "market",
       "nativeValue": 2940.0,
       "nativeUnit": "یوان/تن",
       "asOf": "2026-07-28",
-      "source": "custeel"
+      "source": "custeel-price-center"
     },
     {
       "id": "hr_shanghai",
@@ -93,10 +99,11 @@
       "change": -1.48,
       "changePct": -0.3,
       "region": "china",
+      "basis": "market",
       "nativeValue": 3310.0,
       "nativeUnit": "یوان/تن",
       "asOf": "2026-07-28",
-      "source": "custeel"
+      "source": "custeel-price-center"
     },
     {
       "id": "rebar_beijing",
@@ -107,24 +114,30 @@
       "change": -1.48,
       "changePct": -0.32,
       "region": "china",
+      "basis": "market",
       "nativeValue": 3080.0,
       "nativeUnit": "یوان/تن",
       "asOf": "2026-07-28",
-      "source": "custeel"
+      "source": "custeel-price-center"
     }
   ],
   "imeChain": [],
   "inventories": {
     "label": "موجودی انبار سنگ‌آهن بنادر چین",
-    "value": 162670.0,
-    "wowChange": -50.0,
+    "value": 170550.0,
+    "wowChange": 420.0,
     "unit": "هزار تن",
-    "source": "custeel-indicator"
+    "asOf": "2026-07-24",
+    "source": "custeel-port-stocks-article"
   },
   "bfRate": {
-    "rate": 78.57,
-    "wowChangePct": -0.36,
-    "source": "custeel-indicator"
+    "rate": 87.95,
+    "wowChangePct": -2.41,
+    "capacityRate": 90.91,
+    "asOf": "2026-07-23",
+    "published": "2026-07-24",
+    "source": "custeel-tangshan-bf-article",
+    "note": "by number of blast furnaces; asOf=session ending"
   },
   "billetStocks": {
     "label": "موجودی بیلت تانگشان",

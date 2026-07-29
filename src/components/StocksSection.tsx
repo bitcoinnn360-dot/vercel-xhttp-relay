@@ -208,7 +208,7 @@ export function StocksSection({ data }: { data: DashboardData }) {
                 قیمت پایانی
                 <div className="unit-row">ریال</div>
               </th>
-              <th colSpan={4}>بازدهی</th>
+              <th colSpan={4}>بازدهی تعدیل‌شده</th>
               <th rowSpan={2}>
                 ورود پول حقیقی
                 <div className="unit-row">میلیارد تومان</div>
@@ -297,7 +297,6 @@ function EquityTr({
         <span className="name-main">{s.name}</span>
         {s.symbol ? <span className="symbol-tag">{s.symbol}</span> : null}
         {s.halted ? <span className="halt-tag">متوقف</span> : null}
-        {s.returnsAdjusted ? <span className="adj-tag">تعدیل</span> : null}
       </td>
       <td className="num">{s.marketValueBr ? fmtInt(s.marketValueBr) : '—'}</td>
       <td className="num">{s.marketValueUsdM ? fmtInt(s.marketValueUsdM) : '—'}</td>

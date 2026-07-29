@@ -544,7 +544,7 @@ async function scrapeRahavardImpacts() {
   }
 }
 
-/** Farabourse movers from Rahavard «شاخص قیمت فرابورس» (index id 109) assets table. */
+/** Farabourse movers from Rahavard «شاخص قیمت فرابورس» (index id 109) — ستون تغییر. */
 const RAHAVARD_IFB_PRICE_INDEX_ID = 109
 
 async function scrapeRahavardIfbMovers() {
@@ -562,9 +562,10 @@ async function scrapeRahavardIfbMovers() {
     const scored = []
     for (const row of rows) {
       const symbol = String(row?.slug || row?.asset_name || '').trim()
-      const pct = parseNum(row?.real_close_price_change_percent)
-      if (!symbol || pct == null) continue
-      scored.push({ symbol, impact: Math.round(pct * 100 * 100) / 100 })
+      // ستون «تغییر» روی جدول دارایی‌های شاخص — نه درصد تغییر
+      const change = parseNum(row?.real_close_price_change)
+      if (!symbol || change == null) continue
+      scored.push({ symbol, impact: Math.round(change * 10) / 10 })
     }
     const pos = scored.filter((r) => r.impact > 0).sort((a, b) => b.impact - a.impact).slice(0, 5)
     const neg = scored.filter((r) => r.impact < 0).sort((a, b) => a.impact - b.impact).slice(0, 5)

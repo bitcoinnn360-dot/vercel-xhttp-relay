@@ -45,49 +45,49 @@
   ],
   "ifbPos": [
     {
+      "symbol": "سباقر",
+      "impact": 6200
+    },
+    {
+      "symbol": "فزر",
+      "impact": 4800
+    },
+    {
+      "symbol": "چخزر",
+      "impact": 4600
+    },
+    {
       "symbol": "زاگرس",
-      "impact": 3.0
+      "impact": 3240
     },
     {
-      "symbol": "سامان",
-      "impact": 3.0
-    },
-    {
-      "symbol": "وآوا",
-      "impact": 3.0
-    },
-    {
-      "symbol": "اتکای",
-      "impact": 3.0
-    },
-    {
-      "symbol": "بمولد",
-      "impact": 3.0
+      "symbol": "پاریز",
+      "impact": 1360
     }
   ],
   "ifbNeg": [
     {
-      "symbol": "میهن",
-      "impact": -3.0
+      "symbol": "کشرق",
+      "impact": -4200
     },
     {
-      "symbol": "فروسیل",
-      "impact": -3.0
+      "symbol": "دکپسول",
+      "impact": -2400
     },
     {
-      "symbol": "ناما",
-      "impact": -2.99
+      "symbol": "مارون",
+      "impact": -1550
     },
     {
-      "symbol": "بمپنا",
-      "impact": -2.99
+      "symbol": "ساروج",
+      "impact": -1330
     },
     {
-      "symbol": "حگهر",
-      "impact": -2.99
+      "symbol": "بالاس",
+      "impact": -1060
     }
   ],
-  "updatedAt": "2026-07-28T20:45:42.395090+00:00",
+  "updatedAt": "2026-07-29T07:56:21.763Z",
   "sources": [
     "rahavard365-ifb-index"
   ]

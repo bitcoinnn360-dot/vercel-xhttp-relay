@@ -124,7 +124,10 @@ export function clampPulseHistoryTime(hhmm) {
 
 export function pulsePointFromSnapshot(pulse) {
   if (!pulse) return null
-  const time = clampPulseHistoryTime(pulse.time) || PULSE_HIST_END
+  const time =
+    clampPulseHistoryTime(pulse.time) ||
+    clampPulseHistoryTime(jalaliTodayTehran().time) ||
+    PULSE_HIST_END
   return {
     time,
     positive: pulse.breadth?.positive,

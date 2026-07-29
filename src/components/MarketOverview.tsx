@@ -298,11 +298,11 @@ export function MarketOverview({
       <div>
         <h3 className="mb-1 text-sm font-bold">پالس لحظه‌ای بازار (الگوی TradersArena)</h3>
         <p className="mb-3 text-[10px] text-[var(--color-muted)]">
-          وضعیت نمادها و ورود پول حقیقی · منبع TradersArena
+          وضعیت نمادها و ورود پول حقیقی · منبع TradersArena (فقط اسنپ‌شات زنده؛ تاریخچهٔ روز از نمونه‌برداری انباشته می‌شود)
           {pulseSampleLabel ? ` · آخرین نمونه ${pulseSampleLabel}` : ''}
-          {pulseHist.length > 1 ? ` · ${pulseHist.length} نقطه از ${pulseHist[0]?.time || '۰۹:۰۰'}` : ''}
-          {` · نمودار ۰۹:۰۰ تا ${axisEnd}`}
-          {' · تا ۱۷:۰۰ به‌صورت خودکار ادامه می‌یابد'}
+          {pulseHist.length > 1 ? ` · ${pulseHist.length} نقطه واقعی از ${pulseHist[0]?.time || '—'}` : ''}
+          {` · محور ۰۹:۰۰ تا ${axisEnd}`}
+          {' · قبل از اولین نمونه = صفر'}
         </p>
         <div className="grid gap-3 lg:grid-cols-2">
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="panel p-4">
@@ -438,7 +438,7 @@ function ImpactPanel({
 }) {
   const src =
     sourceHint?.includes('rahavard365-ifb')
-      ? 'رهاورد · شاخص قیمت فرابورس · بیشترین ٪ تغییر · نمودار واگرا'
+      ? 'رهاورد · شاخص قیمت فرابورس · ستون تغییر · نمودار واگرا'
       : sourceHint?.includes('rahavard')
       ? 'رهاورد ۳۶۵ · تأثیر بر شاخص · نمودار واگرا'
       : sourceHint?.includes('shakhesban')

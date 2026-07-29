@@ -1006,10 +1006,10 @@ RAHAVARD_IFB_PRICE_INDEX_ID = 109
 
 
 def scrape_rahavard_ifb_movers() -> dict:
-    """Top IFB gainers/losers from Rahavard index-109 assets table (٪ تغییر).
+    """Top IFB movers from Rahavard index-109 assets table (ستون تغییر).
 
     Official home effect API is TSE-only; for Farabourse we rank constituents of
-    «شاخص قیمت فرابورس» by real_close_price_change_percent.
+    «شاخص قیمت فرابورس» by real_close_price_change (absolute «تغییر»), not %.
     """
     hdrs = {
         "Accept": "application/json, text/plain, */*",
@@ -1027,11 +1027,10 @@ def scrape_rahavard_ifb_movers() -> dict:
             if not isinstance(row, dict):
                 continue
             symbol = str(row.get("slug") or row.get("asset_name") or "").strip()
-            pct = num(row.get("real_close_price_change_percent"))
-            if not symbol or pct is None:
+            change = num(row.get("real_close_price_change"))
+            if not symbol or change is None:
                 continue
-            # Store as percentage points (e.g. +2.99) for the diverging chart scale.
-            scored.append({"symbol": symbol, "impact": round(float(pct) * 100, 2)})
+            scored.append({"symbol": symbol, "impact": round(float(change), 1)})
         pos = sorted([r for r in scored if r["impact"] > 0], key=lambda r: -r["impact"])[:5]
         neg = sorted([r for r in scored if r["impact"] < 0], key=lambda r: r["impact"])[:5]
         return {

@@ -133,6 +133,13 @@ export interface PortfolioHolding {
   costPerShare: number
   pricePerShare: number
   unrealizedMr: number
+  /** تعداد سهام تحت تملک (در صورت محاسبه زنده) */
+  shares?: number
+  outstandingShares?: number
+  ownershipSource?: string
+  live?: boolean
+  static?: boolean
+  asOf?: string | number | null
 }
 
 export interface NavSummary {

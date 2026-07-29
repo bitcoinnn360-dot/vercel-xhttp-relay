@@ -1051,6 +1051,8 @@ function applySteelChain(base: DashboardData, bundle: SteelChainBundle | null | 
   if (bundle.bfRate?.rate != null) base.bfRate = bundle.bfRate
   if (bundle.billetStocks?.value != null) base.billetStocks = bundle.billetStocks
 
+  syncPeriodicFromSteel(base, bundle)
+
   const custeelOk = Boolean(
     bundle.custeelOk ||
       bundle.source?.includes('custeel') ||
@@ -1082,6 +1084,105 @@ function applySteelChain(base: DashboardData, bundle: SteelChainBundle | null | 
     return s
   })
   return { custeelOk, imeOk }
+}
+
+/** Map live Custeel / IME quotes onto the periodic-changes table. */
+const PERIODIC_STEEL_MAP: { name: string; id: string; imeProduct?: string }[] = [
+  { name: 'کنسانتره شیلی', id: 'chile_conc' },
+  { name: 'گندله برزیل', id: 'br_pellet' },
+  { name: 'بیلت تانگشان', id: 'tangshan_billet' },
+  { name: 'میلگرد هبی', id: 'rebar_beijing' },
+  { name: 'ورق گرم شانگهای', id: 'hr_shanghai' },
+  { name: 'بیلت صادراتی ایران', id: 'iran_export_billet' },
+  { name: 'کنسانتره IME', id: 'ime_conc', imeProduct: 'کنسانتره' },
+  { name: 'گندله IME', id: 'ime_pellet', imeProduct: 'گندله' },
+  { name: 'آهن اسفنجی IME', id: 'ime_dri', imeProduct: 'اسفنج' },
+  { name: 'بیلت فخوز IME', id: 'ime_billet', imeProduct: 'بیلت' },
+  { name: 'میلگرد IME', id: 'ime_rebar', imeProduct: 'میلگرد' },
+  { name: 'ورق گرم IME', id: 'ime_hr', imeProduct: 'ورق گرم' },
+]
+
+function pctChange(from: number | null | undefined, to: number | null | undefined): number | null {
+  if (from == null || to == null || !(from > 0) || !Number.isFinite(to)) return null
+  return Math.round((to / from - 1) * 1000) / 10
+}
+
+function valueOnOrBefore(
+  pts: { date: string; value: number }[],
+  isoDay: string,
+): number | null {
+  let best: number | null = null
+  for (const p of pts) {
+    if (!p?.date || p.value == null) continue
+    if (p.date <= isoDay) best = p.value
+  }
+  return best
+}
+
+function daysAgoIso(days: number, now = new Date()): string {
+  const d = new Date(now.getTime() - days * 86400000)
+  return d.toISOString().slice(0, 10)
+}
+
+function syncPeriodicFromSteel(base: DashboardData, bundle: SteelChainBundle) {
+  const byId = new Map((bundle.steel || []).map((s) => [s.id, s]))
+  const hist = bundle.histories || {}
+  for (const map of PERIODIC_STEEL_MAP) {
+    const row = base.periodic.find((p) => p.name === map.name)
+    if (!row) continue
+    const steel = byId.get(map.id)
+    let price = steel?.value
+    if (price == null && map.imeProduct && bundle.imeChain?.length) {
+      const ime = bundle.imeChain.find((r) => String(r.product || '').includes(map.imeProduct!))
+      if (ime?.priceRialKg != null) price = ime.priceRialKg
+    }
+    if (price != null && Number.isFinite(price)) row.price = price
+
+    const pts = hist[map.id] || []
+    if (pts.length >= 2) {
+      const last = pts[pts.length - 1]?.value
+      const w = pctChange(valueOnOrBefore(pts, daysAgoIso(7)), last)
+      const m = pctChange(valueOnOrBefore(pts, daysAgoIso(30)), last)
+      const y = pctChange(valueOnOrBefore(pts, daysAgoIso(365)), last)
+      if (w != null) row.weeklyPct = w
+      if (m != null) row.monthlyPct = m
+      if (y != null) row.yoyPct = y
+    } else if (steel?.changePct != null && Number.isFinite(steel.changePct)) {
+      // at least refresh daily-ish move into weekly slot when history is thin
+      row.weeklyPct = Math.round(steel.changePct * 10) / 10
+    }
+  }
+}
+
+type NavApiBundle = {
+  ok?: boolean
+  holdings?: DashboardData['holdings']
+  nav?: DashboardData['nav']
+  source?: string
+  ownershipNote?: string
+}
+
+async function fetchNavApi(): Promise<NavApiBundle | null> {
+  try {
+    const res = await fetch('/api/nav', { cache: 'no-store' })
+    if (!res.ok) return null
+    const json = (await res.json()) as NavApiBundle
+    if (!json?.ok || !json.holdings?.length || !json.nav) return null
+    return json
+  } catch {
+    return null
+  }
+}
+
+function applyNavLive(base: DashboardData, bundle: NavApiBundle | null | undefined) {
+  if (!bundle?.ok || !bundle.holdings?.length || !bundle.nav) return false
+  base.holdings = bundle.holdings
+  base.nav = { ...base.nav, ...bundle.nav, prev: bundle.nav.prev || base.nav.prev }
+  base.overview.fieldSources = {
+    ...(base.overview.fieldSources || {}),
+    nav: bundle.source || 'bourseview',
+  }
+  return true
 }
 
 async function fetchMineralStocksApi(): Promise<MineralStockSnap[] | null> {
@@ -1234,7 +1335,7 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   const base: DashboardData = structuredClone(seedDashboard)
   const now = new Date().toISOString()
 
-  const [current, histEntries, candleEntries, fredEntries, scraped, overviewApi, intradayFallback, stocksApi, steelApi] =
+  const [current, histEntries, candleEntries, fredEntries, scraped, overviewApi, intradayFallback, stocksApi, steelApi, navApi] =
     await Promise.all([
       fetchTgjuAjax(),
       Promise.all(HIST_KEYS.map(async (k) => [k, await fetchTgjuHistory(k)] as const)),
@@ -1245,6 +1346,7 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
       fetchTgjuIntraday(),
       fetchMineralStocksApi(),
       fetchSteelChainApi(),
+      fetchNavApi(),
     ])
 
   const liveCount = applyLiveQuotes(base, current)
@@ -1252,6 +1354,7 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   const freshOk = applyFreshOverview(base, overviewApi, intradayFallback)
   applyMineralStockReturns(base, stocksApi || scraped?.mineralStocks)
   const steelStatus = applySteelChain(base, steelApi)
+  applyNavLive(base, navApi)
   const apiImpacts = normalizeImpacts(overviewApi?.impacts)
   if (apiImpacts && (overviewApi?.impactsFromSourceArena || overviewApi?.impactsFromRahavard || overviewApi?.impactsSource)) {
     base.impacts = apiImpacts

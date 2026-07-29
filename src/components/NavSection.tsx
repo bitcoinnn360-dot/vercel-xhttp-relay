@@ -3,22 +3,33 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import type { DashboardData } from '../data/types'
 import { changeClass, fmtInt, fmtNum, fmtPct } from '../lib/format'
 
-const COLORS = ['#b86b2e', '#2f5d7a', '#1f7a4d', '#8f4e1c', '#4a7a96', '#c87941', '#3d4f5f', '#6b7c8a', '#15202b']
+const COLORS = ['#b86b2e', '#2f5d7a', '#1f7a4d', '#8f4e1c', '#4a7a96', '#c87941', '#3d4f5f', '#6b7c8a', '#15202b', '#7a5c3a', '#2a6f6f', '#8a3a4a']
 
 export function NavSection({ data }: { data: DashboardData }) {
   const { nav, holdings } = data
-  const pie = holdings.map((h) => ({
-    name: h.symbol,
-    value: h.portfolioPct,
-  }))
+  const pie = holdings
+    .filter((h) => h.portfolioPct > 0.05)
+    .map((h) => ({
+      name: h.symbol,
+      value: h.portfolioPct,
+    }))
   const navDelta = nav.navPerShare - nav.prev.navPerShare
   const navDeltaPct = (navDelta / nav.prev.navPerShare) * 100
+  const liveCount = holdings.filter((h) => h.live).length
+  const totalCost = holdings.reduce((s, h) => s + (h.costMr || 0), 0)
+  const totalMv = holdings.reduce((s, h) => s + (h.marketValueMr || 0), 0)
+  const totalUnreal = holdings.reduce((s, h) => s + (h.unrealizedMr || 0), 0)
 
   return (
     <section id="nav" className="scroll-mt-28 space-y-4">
       <div>
         <h2 className="section-title">ارزش روز خالص دارایی‌های بورسی (NAV)</h2>
-        <p className="section-sub">پرتفوی شرکت سرمایه‌گذاری توسعه معادن و فلزات</p>
+        <p className="section-sub">
+          پرتفوی شرکت سرمایه‌گذاری توسعه معادن و فلزات
+          {liveCount
+            ? ` · قیمت و تعداد سهام از بورس‌ویو (${liveCount} نماد) · بهای تمام‌شده از گزارش روزانه`
+            : ' · در انتظار داده زنده بورس‌ویو'}
+        </p>
       </div>
 
       <div className="grid gap-3 lg:grid-cols-3">
@@ -83,7 +94,7 @@ export function NavSection({ data }: { data: DashboardData }) {
             </ResponsiveContainer>
           </div>
           <div className="flex flex-wrap justify-center gap-2">
-            {pie.slice(0, 6).map((p, i) => (
+            {pie.slice(0, 8).map((p, i) => (
               <span key={p.name} className="inline-flex items-center gap-1 text-[0.7rem] text-[var(--color-muted)]">
                 <i className="inline-block h-2 w-2 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />
                 {p.name}
@@ -103,32 +114,66 @@ export function NavSection({ data }: { data: DashboardData }) {
       </div>
 
       <div className="panel overflow-x-auto p-2 sm:p-3">
-        <table className="data-table min-w-[900px]">
+        <table className="data-table min-w-[1100px]">
           <thead>
             <tr>
               <th>نماد</th>
+              <th>
+                سرمایه
+                <div className="unit-row">میلیون ریال</div>
+              </th>
               <th>درصد مالکیت</th>
               <th>درصد از پورتفو</th>
-              <th>بهای تمام‌شده</th>
-              <th>ارزش بازار</th>
-              <th>بهای هر سهم</th>
-              <th>ارزش هر سهم</th>
-              <th>ارزش افزوده</th>
+              <th>
+                بهای تمام‌شده
+                <div className="unit-row">میلیون ریال</div>
+              </th>
+              <th>
+                ارزش بازار
+                <div className="unit-row">میلیون ریال</div>
+              </th>
+              <th>
+                بهای هر سهم
+                <div className="unit-row">ریال</div>
+              </th>
+              <th>
+                ارزش هر سهم
+                <div className="unit-row">ریال</div>
+              </th>
+              <th>
+                ارزش افزوده
+                <div className="unit-row">میلیون ریال</div>
+              </th>
             </tr>
           </thead>
           <tbody>
             {holdings.map((h) => (
-              <tr key={h.symbol}>
-                <td className="font-bold">{h.symbol}</td>
-                <td className="num">{fmtNum(h.ownershipPct, 2)}</td>
+              <tr key={h.symbol} className={h.static ? 'totals' : undefined}>
+                <td className="font-bold">
+                  {h.symbol}
+                  {h.live ? <span className="symbol-tag">زنده</span> : null}
+                </td>
+                <td className="num">{h.capitalMr ? fmtInt(h.capitalMr) : '—'}</td>
+                <td className="num">{h.ownershipPct ? fmtNum(h.ownershipPct, 2) : '—'}</td>
                 <td className="num">{fmtNum(h.portfolioPct, 1)}</td>
                 <td className="num">{fmtInt(h.costMr)}</td>
                 <td className="num">{fmtInt(h.marketValueMr)}</td>
-                <td className="num">{fmtInt(h.costPerShare)}</td>
-                <td className="num">{fmtInt(h.pricePerShare)}</td>
-                <td className="num pos font-semibold">{fmtInt(h.unrealizedMr)}</td>
+                <td className="num">{h.costPerShare ? fmtInt(h.costPerShare) : '—'}</td>
+                <td className="num">{h.pricePerShare ? fmtInt(h.pricePerShare) : '—'}</td>
+                <td className={`num font-semibold ${changeClass(h.unrealizedMr)}`}>{fmtInt(h.unrealizedMr)}</td>
               </tr>
             ))}
+            <tr className="totals">
+              <td className="font-bold">جمع</td>
+              <td className="num">—</td>
+              <td className="num">—</td>
+              <td className="num">۱۰۰</td>
+              <td className="num font-bold">{fmtInt(totalCost)}</td>
+              <td className="num font-bold">{fmtInt(totalMv)}</td>
+              <td className="num">—</td>
+              <td className="num">—</td>
+              <td className={`num font-bold ${changeClass(totalUnreal)}`}>{fmtInt(totalUnreal)}</td>
+            </tr>
           </tbody>
         </table>
       </div>

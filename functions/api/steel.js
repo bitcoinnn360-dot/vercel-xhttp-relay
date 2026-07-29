@@ -207,6 +207,7 @@ function gradeMatches(cell, want) {
 
 function fobFromRows(rows, descNeedles, grade) {
   let fobI, chgI, descI, gradeI
+  let best = null
   for (const row of rows) {
     const low = row.map((c) => c.toLowerCase())
     if (low.includes('fob') && (low.includes('description') || low.includes('grade'))) {
@@ -222,9 +223,11 @@ function fobFromRows(rows, descNeedles, grade) {
     if (gradeI != null && row[gradeI] != null && !gradeMatches(row[gradeI], grade)) continue
     const fob = num(row[fobI])
     if (fob == null) continue
-    return { fob, change: chgI >= 0 ? num(row[chgI]) : null }
+    const hit = { fob, change: chgI >= 0 ? num(row[chgI]) : null }
+    // Prefer the higher FOB quote when multiple matching rows exist (e.g. pellets).
+    if (!best || hit.fob > best.fob) best = hit
   }
-  return null
+  return best
 }
 
 function isSize16(size) {

@@ -546,6 +546,16 @@ export function pulseChartEndLabel(now = new Date()): string {
   return t
 }
 
+/** Cash-board breadth chart (مثبت/منفی): 09:00 → now, capped at 13:00. */
+export const PULSE_BREADTH_END = '13:00'
+
+export function pulseBreadthChartEndLabel(now = new Date()): string {
+  const t = tehranNowHhmm(now)
+  if (t < PULSE_HIST_START) return PULSE_HIST_START
+  if (t > PULSE_BREADTH_END) return PULSE_BREADTH_END
+  return t
+}
+
 function hhmmToMinutes(hhmm: string): number {
   const [h, m] = hhmm.split(':').map(Number)
   return h * 60 + m

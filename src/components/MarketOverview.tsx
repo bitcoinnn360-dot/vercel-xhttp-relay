@@ -2,7 +2,13 @@ import { motion } from 'framer-motion'
 import type { DashboardData } from '../data/types'
 import type { HistoryPoint } from '../data/fetchers'
 import { changeClass, fmtChange, fmtInt, fmtNum, fmtPct } from '../lib/format'
-import { densifyFlowSeries, clampPulseHistoryTime, pulseChartEndLabel } from '../data/fetchers'
+import {
+  densifyFlowSeries,
+  clampPulseHistoryTime,
+  pulseChartEndLabel,
+  pulseBreadthChartEndLabel,
+  PULSE_BREADTH_END,
+} from '../data/fetchers'
 import { BreadthBarChart, CandlestickChart, DualLineChart, FlowBarChart, ImpactDivergingChart, TripleLineChart, PriceAreaChart } from './charts/Charts'
 import { TopTrades } from './StocksSection'
 
@@ -63,21 +69,32 @@ export function MarketOverview({
   const pulse = o.marketPulse
   const pulseHist = o.marketPulseHistory || []
   const hasHist = pulseHist.length > 0
-  const breadthSeries = hasHist
+  const breadthSeriesRaw = hasHist
     ? pulseHist.map((p) => ({
         label: p.time,
-        positive: p.positive ?? 0,
-        negative: p.negative ?? 0,
+        positive: p.positive ?? null,
+        negative: p.negative ?? null,
       }))
-    : pulse?.breadth
-      ? [
-          {
-            label: pulse.time || 'الان',
-            positive: pulse.breadth.positive,
-            negative: pulse.breadth.negative,
-          },
-        ]
-      : []
+    : []
+  // stamp current breadth onto the series (same densify path as money-flow)
+  if (pulse?.breadth) {
+    let curLabel = clampPulseHistoryTime(pulse.time) || pulseBreadthChartEndLabel()
+    if (curLabel > PULSE_BREADTH_END) curLabel = PULSE_BREADTH_END
+    const curPoint = {
+      label: curLabel,
+      positive: pulse.breadth.positive,
+      negative: pulse.breadth.negative,
+    }
+    const idx = breadthSeriesRaw.findIndex((p) => p.label === curLabel)
+    if (idx >= 0) breadthSeriesRaw[idx] = { ...breadthSeriesRaw[idx], ...curPoint }
+    else breadthSeriesRaw.push(curPoint)
+  }
+  const breadthEnd = pulseBreadthChartEndLabel()
+  const breadthSeries = densifyFlowSeries(
+    breadthSeriesRaw as Record<string, string | number | null | undefined>[],
+    ['positive', 'negative'],
+    breadthEnd,
+  )
   const flowKeys = ['stocks', 'equityFunds', 'fixedIncome', 'basicMetals', 'metalOres', 'goldFunds'] as const
   const flowSeriesRaw = hasHist
     ? pulseHist.map((p) => ({
@@ -114,6 +131,7 @@ export function MarketOverview({
   )
   const pulseSampleLabel = clampPulseHistoryTime(pulse?.time) || pulse?.time
   const axisEnd = String(flowSeriesClean[flowSeriesClean.length - 1]?.label || chartEnd)
+  const breadthAxisEnd = String(breadthSeries[breadthSeries.length - 1]?.label || breadthEnd)
   return (
     <section id="overview" className="scroll-mt-8 space-y-4">
       <div>
@@ -310,6 +328,7 @@ export function MarketOverview({
             <p className="mb-2 text-[10px] text-[var(--color-muted)]">
               مثبت {fmtInt(pulse?.breadth?.positive ?? 0)} · منفی {fmtInt(pulse?.breadth?.negative ?? 0)}
               {pulse?.breadth?.flat ? ` · بدون تغییر ${fmtInt(pulse.breadth.flat)}` : ''}
+              {` · نمودار ۰۹:۰۰ تا ${breadthAxisEnd}`}
             </p>
             {pulse?.breadth ? (
               <BreadthBarChart
@@ -317,18 +336,9 @@ export function MarketOverview({
                 negative={pulse.breadth.negative}
                 flat={pulse.breadth.flat}
               />
-            ) : (
-              <DualLineChart
-                data={breadthSeries}
-                aKey="positive"
-                bKey="negative"
-                aLabel="مثبت"
-                bLabel="منفی"
-                unit="نماد"
-              />
-            )}
+            ) : null}
             {breadthSeries.length > 1 ? (
-              <div className="mt-2">
+              <div className={pulse?.breadth ? 'mt-2' : undefined}>
                 <DualLineChart
                   data={breadthSeries}
                   aKey="positive"
@@ -339,6 +349,15 @@ export function MarketOverview({
                   unit="نماد"
                 />
               </div>
+            ) : !pulse?.breadth ? (
+              <DualLineChart
+                data={breadthSeries}
+                aKey="positive"
+                bKey="negative"
+                aLabel="مثبت"
+                bLabel="منفی"
+                unit="نماد"
+              />
             ) : null}
           </motion.div>
 

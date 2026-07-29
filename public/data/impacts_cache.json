@@ -2,94 +2,93 @@
   "boursePos": [
     {
       "symbol": "شپنا",
-      "impact": 6743.3
-    },
-    {
-      "symbol": "شبندر",
-      "impact": 4973.5
+      "impact": 6321.7
     },
     {
       "symbol": "وپاسار",
-      "impact": 4233.2
+      "impact": 4405.4
     },
     {
-      "symbol": "بوعلی",
-      "impact": 3825.0
+      "symbol": "شبندر",
+      "impact": 4129.7
     },
     {
-      "symbol": "شستا",
-      "impact": 3574.4
+      "symbol": "نوری",
+      "impact": 3065.3
+    },
+    {
+      "symbol": "پارسان",
+      "impact": 3040.3
     }
   ],
   "bourseNeg": [
     {
-      "symbol": "وبملت",
-      "impact": -3635.9
-    },
-    {
-      "symbol": "شپدیس",
-      "impact": -2187.1
-    },
-    {
-      "symbol": "وامید",
-      "impact": -1430.5
-    },
-    {
-      "symbol": "افق",
-      "impact": -1290.1
-    },
-    {
       "symbol": "دعبید",
-      "impact": -1204.1
+      "impact": -1167.7
+    },
+    {
+      "symbol": "غکورش",
+      "impact": -856.3
+    },
+    {
+      "symbol": "وبملت",
+      "impact": -822.8
+    },
+    {
+      "symbol": "سیستم",
+      "impact": -503.9
+    },
+    {
+      "symbol": "کالا",
+      "impact": -495.6
     }
   ],
   "ifbPos": [
     {
-      "symbol": "شگویا",
-      "impact": 123.6
-    },
-    {
       "symbol": "زاگرس",
-      "impact": 107.8
+      "impact": 3.0
     },
     {
-      "symbol": "فغدیر",
-      "impact": 73.8
+      "symbol": "سامان",
+      "impact": 3.0
     },
     {
-      "symbol": "تجلی",
-      "impact": 62.1
+      "symbol": "وآوا",
+      "impact": 3.0
     },
     {
-      "symbol": "فصبا",
-      "impact": 54.8
+      "symbol": "اتکای",
+      "impact": 3.0
+    },
+    {
+      "symbol": "بمولد",
+      "impact": 3.0
     }
   ],
   "ifbNeg": [
     {
-      "symbol": "کگهر",
-      "impact": -405.9
+      "symbol": "میهن",
+      "impact": -3.0
     },
     {
-      "symbol": "فجهان",
-      "impact": -78.0
+      "symbol": "فروسیل",
+      "impact": -3.0
     },
     {
-      "symbol": "شرانل",
-      "impact": -58.7
+      "symbol": "ناما",
+      "impact": -2.99
     },
     {
-      "symbol": "مادیرا",
-      "impact": -26.6
+      "symbol": "بمپنا",
+      "impact": -2.99
     },
     {
-      "symbol": "تماوند",
-      "impact": -22.5
+      "symbol": "حگهر",
+      "impact": -2.99
     }
   ],
-  "updatedAt": "2026-07-27T08:00:49.226507+00:00",
+  "updatedAt": "2026-07-28T20:45:42.395090+00:00",
   "sources": [
-    "rahavard365",
-    "shakhesban-board"
+    "rahavard365-ifb-index"
   ]
 }

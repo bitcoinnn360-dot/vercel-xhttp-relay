@@ -544,6 +544,42 @@ async function scrapeRahavardImpacts() {
   }
 }
 
+/** Farabourse movers from Rahavard «شاخص قیمت فرابورس» (index id 109) assets table. */
+const RAHAVARD_IFB_PRICE_INDEX_ID = 109
+
+async function scrapeRahavardIfbMovers() {
+  const hdrs = {
+    Accept: 'application/json, text/plain, */*',
+    'User-Agent': UA,
+    Referer: `https://rahavard365.com/index/${RAHAVARD_IFB_PRICE_INDEX_ID}/assets`,
+    Origin: 'https://rahavard365.com',
+  }
+  try {
+    const res = await fetch(`${RAHAVARD_API}/index/${RAHAVARD_IFB_PRICE_INDEX_ID}/assets`, { headers: hdrs })
+    if (!res.ok) throw new Error(`rahavard ifb ${res.status}`)
+    const payload = await res.json()
+    const rows = Array.isArray(payload?.data) ? payload.data : []
+    const scored = []
+    for (const row of rows) {
+      const symbol = String(row?.slug || row?.asset_name || '').trim()
+      const pct = parseNum(row?.real_close_price_change_percent)
+      if (!symbol || pct == null) continue
+      scored.push({ symbol, impact: Math.round(pct * 100 * 100) / 100 })
+    }
+    const pos = scored.filter((r) => r.impact > 0).sort((a, b) => b.impact - a.impact).slice(0, 5)
+    const neg = scored.filter((r) => r.impact < 0).sort((a, b) => a.impact - b.impact).slice(0, 5)
+    return {
+      ok: Boolean(pos.length || neg.length),
+      source: 'rahavard365-ifb-index',
+      ifbPos: pos,
+      ifbNeg: neg,
+      universe: scored.length,
+    }
+  } catch (e) {
+    return { ok: false, source: 'rahavard365-ifb-index', error: String(e), ifbPos: [], ifbNeg: [] }
+  }
+}
+
 async function scrapeSourceArena(token) {
   const tok = (token || '').trim()
   if (!tok) return { ok: false, error: 'SOURCEARENA_TOKEN missing' }
@@ -781,7 +817,7 @@ function resolveMarketStats({
   }
 }
 
-function mergeImpacts(rahavard, board, arena) {
+function mergeImpacts(rahavard, board, arena, rahavardIfb) {
   const out = { boursePos: [], bourseNeg: [], ifbPos: [], ifbNeg: [] }
   const sources = []
   if (rahavard?.ok) {
@@ -789,11 +825,16 @@ function mergeImpacts(rahavard, board, arena) {
     out.bourseNeg = rahavard.bourseNeg || []
     sources.push('rahavard365')
   }
+  if (rahavardIfb?.ok) {
+    out.ifbPos = rahavardIfb.ifbPos || []
+    out.ifbNeg = rahavardIfb.ifbNeg || []
+    sources.push('rahavard365-ifb-index')
+  }
   if (arena?.impacts) {
     if (!out.boursePos.length) out.boursePos = arena.impacts.boursePos || []
     if (!out.bourseNeg.length) out.bourseNeg = arena.impacts.bourseNeg || []
-    out.ifbPos = arena.impacts.ifbPos || []
-    out.ifbNeg = arena.impacts.ifbNeg || []
+    if (!out.ifbPos.length) out.ifbPos = arena.impacts.ifbPos || []
+    if (!out.ifbNeg.length) out.ifbNeg = arena.impacts.ifbNeg || []
     sources.push('sourcearena')
   }
   if (board) {
@@ -1024,8 +1065,7 @@ export async function onRequestGet(context) {
     fetchTradersArenaPulse(),
     fetchJson(`${origin}/data/market.json`).catch(() => null),
     fetchEquityFundSymbolSet(),
-    // placeholder slot kept for Promise index stability — live top trades built below
-    Promise.resolve(null),
+    scrapeRahavardIfbMovers(),
   ])
 
   if (tasks[0].status === 'fulfilled') {
@@ -1073,6 +1113,14 @@ export async function onRequestGet(context) {
     errors.push(`rahavard: ${tasks[6].reason}`)
   }
 
+  let rahavardIfb = { ok: false }
+  if (tasks[13].status === 'fulfilled') {
+    rahavardIfb = tasks[13].value
+    if (!rahavardIfb.ok) errors.push(`rahavard-ifb: ${rahavardIfb.error || 'empty'}`)
+  } else if (tasks[13].status === 'rejected') {
+    errors.push(`rahavard-ifb: ${tasks[13].reason}`)
+  }
+
   let boardRows = []
   if (tasks[7].status === 'fulfilled') {
     boardRows = tasks[7].value || []
@@ -1115,7 +1163,7 @@ export async function onRequestGet(context) {
   }
 
   const boardImpacts = boardRows.length ? computeBoardImpacts(boardRows, indices) : null
-  const mergedImpacts = mergeImpacts(rahavard, boardImpacts, sourcearena)
+  const mergedImpacts = mergeImpacts(rahavard, boardImpacts, sourcearena, rahavardIfb)
   // fill gaps from deployed cache
   if (mergedImpacts.impacts && impactsCache) {
     for (const k of ['boursePos', 'bourseNeg', 'ifbPos', 'ifbNeg']) {

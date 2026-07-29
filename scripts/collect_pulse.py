@@ -22,7 +22,7 @@ TA_MARKET = "https://tradersarena.ir/data/market"
 TA_INDUSTRIES = "https://tradersarena.ir/data/industries"
 UA = "Mozilla/5.0 (compatible; midco-pulse-collector/1.0)"
 RIAL_PER_BT = 1e10
-PULSE_START = "08:45"
+PULSE_START = "09:00"
 PULSE_CASH_END = "12:30"
 # Gold commodity ETFs (صندوق طلا) continue until ~17:00.
 PULSE_END = "17:00"

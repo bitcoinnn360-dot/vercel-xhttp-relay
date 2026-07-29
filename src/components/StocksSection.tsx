@@ -193,21 +193,34 @@ export function StocksSection({ data }: { data: DashboardData }) {
         <table className="data-table stocks-table min-w-[1100px]">
           <thead>
             <tr>
-              <th>صنعت</th>
-              <th>نام / نماد</th>
-              <th>
-                ارزش بازار
-                <span className="unit-hint"> (میلیارد ریال)</span>
+              <th rowSpan={2}>صنعت</th>
+              <th rowSpan={2}>نام / نماد</th>
+              <th colSpan={2}>ارزش بازار</th>
+              <th rowSpan={2}>
+                حجم
+                <div className="unit-row">تعداد سهم</div>
               </th>
-              <th>دلاری (m$)</th>
-              <th>حجم</th>
-              <th>ارزش معاملات</th>
-              <th>پایانی</th>
-              <th>روز</th>
-              <th>هفته</th>
-              <th>ماه</th>
-              <th>سال</th>
-              <th>ورود پول حقیقی</th>
+              <th rowSpan={2}>
+                ارزش معاملات
+                <div className="unit-row">میلیون ریال</div>
+              </th>
+              <th rowSpan={2}>
+                قیمت پایانی
+                <div className="unit-row">ریال</div>
+              </th>
+              <th colSpan={4}>بازدهی</th>
+              <th rowSpan={2}>
+                ورود پول حقیقی
+                <div className="unit-row">میلیارد تومان</div>
+              </th>
+            </tr>
+            <tr className="unit-subhead">
+              <th>میلیارد ریال</th>
+              <th>میلیون دلار</th>
+              <th>روزانه</th>
+              <th>هفتگی</th>
+              <th>ماهانه</th>
+              <th>سالانه</th>
             </tr>
           </thead>
           <tbody>

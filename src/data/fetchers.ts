@@ -508,9 +508,10 @@ async function fetchOverviewApi(): Promise<OverviewApi | null> {
   }
 }
 
-const PULSE_SESSION_KEY = 'midco-pulse-history-v6'
+const PULSE_SESSION_KEY = 'midco-pulse-history-v7'
 export const PULSE_REFRESH_MS = 30 * 1000
-export const PULSE_HIST_START = '08:45'
+/** Cash session chart starts at 09:00 Tehran (user-facing axis). */
+export const PULSE_HIST_START = '09:00'
 /** Cash equities / bond / equity-ETF board close. */
 export const PULSE_CASH_END = '12:30'
 /** Gold commodity ETFs keep trading into the afternoon (~17:00). */
@@ -522,6 +523,38 @@ export function clampPulseHistoryTime(hhmm: string | undefined | null): string |
   if (t < PULSE_HIST_START) return null
   if (t > PULSE_HIST_END) return PULSE_HIST_END
   return t
+}
+
+/** Current Tehran wall-clock HH:MM (no seconds). */
+export function tehranNowHhmm(now = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Tehran',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(now)
+  const hh = parts.find((p) => p.type === 'hour')?.value || '00'
+  const mm = parts.find((p) => p.type === 'minute')?.value || '00'
+  return `${hh}:${mm}`
+}
+
+/** Axis end for live pulse charts: now, never past 17:00, never before 09:00. */
+export function pulseChartEndLabel(now = new Date()): string {
+  const t = tehranNowHhmm(now)
+  if (t < PULSE_HIST_START) return PULSE_HIST_START
+  if (t > PULSE_HIST_END) return PULSE_HIST_END
+  return t
+}
+
+function hhmmToMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number)
+  return h * 60 + m
+}
+
+function minutesToHhmm(total: number): string {
+  const h = Math.floor(total / 60)
+  const m = total % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
 type PulseApi = {
@@ -589,52 +622,37 @@ function mergePulsePoints(
   return [...byTime.values()].sort((a, b) => String(a.time).localeCompare(String(b.time))).slice(-720)
 }
 
-/** Forward-fill series values. Optional endLabel draws a flat tail and drops later points. */
+/** Build a continuous HH:MM series from 09:00 → end (usually «now»), forward-filling known samples. */
 export function densifyFlowSeries(
   points: Record<string, string | number | null | undefined>[],
   keys: string[],
   endLabel?: string,
 ): Record<string, string | number>[] {
-  if (!points.length) return []
-  const end = endLabel ? String(endLabel) : undefined
-  const sorted = [...points]
-    .map((p) => {
-      const label = String(p.label || '')
-      const clamped = clampPulseHistoryTime(label) || (end && label > end ? end : label)
-      return { ...p, label: clamped }
-    })
-    .filter((p) => {
-      const label = String(p.label || '')
-      if (!/^\d{2}:\d{2}$/.test(label)) return false
-      if (label < PULSE_HIST_START) return false
-      if (end && label > end) return false
-      return true
-    })
-    .sort((a, b) => String(a.label).localeCompare(String(b.label)))
-
-  // collapse duplicate labels after clamp (e.g. 17:05+17:20 → 17:00)
+  const end = clampPulseHistoryTime(endLabel) || pulseChartEndLabel()
+  const start = PULSE_HIST_START
   const byLabel = new Map<string, Record<string, string | number | null | undefined>>()
-  for (const p of sorted) byLabel.set(String(p.label), p)
-  const unique = [...byLabel.values()].sort((a, b) => String(a.label).localeCompare(String(b.label)))
+  for (const p of points || []) {
+    const label = clampPulseHistoryTime(String(p.label || ''))
+    if (!label || label > end) continue
+    byLabel.set(label, { ...byLabel.get(label), ...p, label })
+  }
+
+  const startMin = hhmmToMinutes(start)
+  const endMin = hhmmToMinutes(end)
+  if (endMin < startMin) return []
 
   const last: Record<string, number> = {}
   const out: Record<string, string | number>[] = []
-  for (const p of unique) {
-    const next: Record<string, string | number> = { label: String(p.label) }
+  for (let mins = startMin; mins <= endMin; mins += 1) {
+    const label = minutesToHhmm(mins)
+    const sample = byLabel.get(label)
+    const next: Record<string, string | number> = { label }
     for (const k of keys) {
-      const raw = p[k]
+      const raw = sample?.[k]
       if (raw != null && raw !== '' && Number.isFinite(Number(raw))) last[k] = Number(raw)
       next[k] = last[k] ?? 0
     }
     out.push(next)
-  }
-  if (end) {
-    const lastPoint = out[out.length - 1]
-    if (lastPoint && String(lastPoint.label) < end) {
-      const tail: Record<string, string | number> = { label: end }
-      for (const k of keys) tail[k] = lastPoint[k] ?? 0
-      out.push(tail)
-    }
   }
   return out
 }

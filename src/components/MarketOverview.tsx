@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import type { DashboardData } from '../data/types'
 import type { HistoryPoint } from '../data/fetchers'
 import { changeClass, fmtChange, fmtInt, fmtNum, fmtPct } from '../lib/format'
-import { densifyFlowSeries, clampPulseHistoryTime, PULSE_HIST_END } from '../data/fetchers'
+import { densifyFlowSeries, clampPulseHistoryTime, pulseChartEndLabel } from '../data/fetchers'
 import { BreadthBarChart, CandlestickChart, DualLineChart, FlowBarChart, ImpactDivergingChart, TripleLineChart, PriceAreaChart } from './charts/Charts'
 import { TopTrades } from './StocksSection'
 
@@ -90,9 +90,9 @@ export function MarketOverview({
         goldFunds: p.flowGoldFunds,
       }))
     : []
-  // merge current snapshot — clamp to session end so axis never past 17:00
+  // merge current snapshot — stamp with live Tehran time (never invent 17:00 early)
   if (pulse) {
-    const curLabel = clampPulseHistoryTime(pulse.time) || PULSE_HIST_END
+    const curLabel = clampPulseHistoryTime(pulse.time) || pulseChartEndLabel()
     const curPoint = {
       label: curLabel,
       stocks: pulse.flowStocksBillionToman,
@@ -106,13 +106,14 @@ export function MarketOverview({
     if (idx >= 0) flowSeriesRaw[idx] = { ...flowSeriesRaw[idx], ...curPoint }
     else flowSeriesRaw.push(curPoint)
   }
+  const chartEnd = pulseChartEndLabel()
   const flowSeriesClean = densifyFlowSeries(
     flowSeriesRaw as Record<string, string | number | null | undefined>[],
     [...flowKeys],
-    PULSE_HIST_END,
+    chartEnd,
   )
   const pulseSampleLabel = clampPulseHistoryTime(pulse?.time) || pulse?.time
-  const axisEnd = String(flowSeriesClean[flowSeriesClean.length - 1]?.label || PULSE_HIST_END)
+  const axisEnd = String(flowSeriesClean[flowSeriesClean.length - 1]?.label || chartEnd)
   return (
     <section id="overview" className="scroll-mt-8 space-y-4">
       <div>
@@ -285,7 +286,11 @@ export function MarketOverview({
           pos={data.impacts?.ifbPos || []}
           neg={data.impacts?.ifbNeg || []}
           live={Boolean(o.impactsLive)}
-          sourceHint={o.fieldSources?.impacts}
+          sourceHint={
+            (o.fieldSources?.impacts || '').includes('rahavard365-ifb')
+              ? 'rahavard365-ifb'
+              : o.fieldSources?.impacts
+          }
         />
         <TopTrades data={data} />
       </div>
@@ -295,9 +300,9 @@ export function MarketOverview({
         <p className="mb-3 text-[10px] text-[var(--color-muted)]">
           وضعیت نمادها و ورود پول حقیقی · منبع TradersArena
           {pulseSampleLabel ? ` · آخرین نمونه ${pulseSampleLabel}` : ''}
-          {pulseHist.length > 1 ? ` · ${pulseHist.length} نقطه از ${pulseHist[0]?.time || '۰۸:۴۵'}` : ''}
-          {` · محور تا ${axisEnd}`}
-          {' · تاریخچه سرور از ابتدای جلسه'}
+          {pulseHist.length > 1 ? ` · ${pulseHist.length} نقطه از ${pulseHist[0]?.time || '۰۹:۰۰'}` : ''}
+          {` · نمودار ۰۹:۰۰ تا ${axisEnd}`}
+          {' · تا ۱۷:۰۰ به‌صورت خودکار ادامه می‌یابد'}
         </p>
         <div className="grid gap-3 lg:grid-cols-2">
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="panel p-4">
@@ -432,7 +437,9 @@ function ImpactPanel({
   sourceHint?: string
 }) {
   const src =
-    sourceHint?.includes('rahavard')
+    sourceHint?.includes('rahavard365-ifb')
+      ? 'رهاورد · شاخص قیمت فرابورس · بیشترین ٪ تغییر · نمودار واگرا'
+      : sourceHint?.includes('rahavard')
       ? 'رهاورد ۳۶۵ · تأثیر بر شاخص · نمودار واگرا'
       : sourceHint?.includes('shakhesban')
         ? 'محاسبه از تابلو · قیمت پایانی · نمودار واگرا'

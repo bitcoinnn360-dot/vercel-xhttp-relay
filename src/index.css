@@ -220,6 +220,22 @@
     color: var(--color-muted);
     font-size: 0.68rem;
   }
+  .data-table th .unit-row {
+    display: block;
+    margin-top: 0.15rem;
+    font-weight: 500;
+    font-size: 0.65rem;
+    color: var(--color-muted);
+    line-height: 1.2;
+  }
+  .data-table thead tr.unit-subhead th {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--color-muted);
+    background: color-mix(in oklab, var(--color-brand-2) 5%, white);
+    padding-top: 0.25rem;
+    padding-bottom: 0.35rem;
+  }
   .data-table td {
     padding: 0.5rem 0.45rem;
     border-bottom: 1px solid #f1f5f9;

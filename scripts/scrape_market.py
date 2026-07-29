@@ -1001,6 +1001,57 @@ def scrape_rahavard_tedpix_impacts() -> dict:
         return {"ok": False, "source": "rahavard365", "error": str(exc), "boursePos": [], "bourseNeg": []}
 
 
+# Rahavard «شاخص قیمت فرابورس» — نمادهای شاخص (ادامه جدول)
+RAHAVARD_IFB_PRICE_INDEX_ID = 109
+
+
+def scrape_rahavard_ifb_movers() -> dict:
+    """Top IFB gainers/losers from Rahavard index-109 assets table (٪ تغییر).
+
+    Official home effect API is TSE-only; for Farabourse we rank constituents of
+    «شاخص قیمت فرابورس» by real_close_price_change_percent.
+    """
+    hdrs = {
+        "Accept": "application/json, text/plain, */*",
+        "Referer": f"https://rahavard365.com/index/{RAHAVARD_IFB_PRICE_INDEX_ID}/assets",
+        "Origin": "https://rahavard365.com",
+    }
+    url = f"{RAHAVARD_API}/index/{RAHAVARD_IFB_PRICE_INDEX_ID}/assets"
+    try:
+        payload = fetch_json_retry(url, headers=hdrs, insecure=True, attempts=5)
+        rows = payload.get("data") if isinstance(payload, dict) else None
+        if not isinstance(rows, list) or not rows:
+            return {"ok": False, "source": "rahavard365-ifb-index", "error": "empty", "ifbPos": [], "ifbNeg": []}
+        scored: list[dict] = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            symbol = str(row.get("slug") or row.get("asset_name") or "").strip()
+            pct = num(row.get("real_close_price_change_percent"))
+            if not symbol or pct is None:
+                continue
+            # Store as percentage points (e.g. +2.99) for the diverging chart scale.
+            scored.append({"symbol": symbol, "impact": round(float(pct) * 100, 2)})
+        pos = sorted([r for r in scored if r["impact"] > 0], key=lambda r: -r["impact"])[:5]
+        neg = sorted([r for r in scored if r["impact"] < 0], key=lambda r: r["impact"])[:5]
+        return {
+            "ok": bool(pos or neg),
+            "source": "rahavard365-ifb-index",
+            "ifbPos": pos,
+            "ifbNeg": neg,
+            "indexId": RAHAVARD_IFB_PRICE_INDEX_ID,
+            "universe": len(scored),
+        }
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "ok": False,
+            "source": "rahavard365-ifb-index",
+            "error": str(exc),
+            "ifbPos": [],
+            "ifbNeg": [],
+        }
+
+
 def compute_impacts_from_board(stocks: list[dict], indices: dict, max_move: float = 0.22) -> dict:
     """Index impact ≈ index × (mv/total) × (change/yesterday).
 
@@ -1267,7 +1318,7 @@ def append_pulse_history(pulse: dict) -> dict:
     if slot:
         hist = [h for h in hist if h.get("time") != slot]
         hist.append(point)
-    hist = [h for h in hist if str(h.get("time") or "") >= "08:45" and str(h.get("time") or "") <= "17:00"]
+    hist = [h for h in hist if str(h.get("time") or "") >= "09:00" and str(h.get("time") or "") <= "17:00"]
     hist = sorted(hist, key=lambda h: str(h.get("time") or ""))[-720:]
     store = {"dateJalali": today, "history": hist, "current": pulse, "updatedAt": datetime.now(timezone.utc).isoformat()}
     save_pulse_store(store)
@@ -1278,8 +1329,9 @@ def merge_impacts(
     rahavard: dict | None,
     board: dict | None,
     arena: dict | None,
+    rahavard_ifb: dict | None = None,
 ) -> tuple[dict | None, str | None]:
-    """TSE from Rahavard; IFB from board/SourceArena (final-price based)."""
+    """TSE from Rahavard home effect; IFB from Rahavard index-109 movers, then board/SA."""
     out = {"boursePos": [], "bourseNeg": [], "ifbPos": [], "ifbNeg": []}
     sources: list[str] = []
 
@@ -1288,14 +1340,21 @@ def merge_impacts(
         out["bourseNeg"] = list(rahavard.get("bourseNeg") or [])
         sources.append("rahavard365")
 
+    if rahavard_ifb and rahavard_ifb.get("ok"):
+        out["ifbPos"] = list(rahavard_ifb.get("ifbPos") or [])
+        out["ifbNeg"] = list(rahavard_ifb.get("ifbNeg") or [])
+        sources.append("rahavard365-ifb-index")
+
     arena_imp = (arena or {}).get("impacts") if (arena or {}).get("ok") else None
     if arena_imp:
         if not out["boursePos"]:
             out["boursePos"] = list(arena_imp.get("boursePos") or [])
         if not out["bourseNeg"]:
             out["bourseNeg"] = list(arena_imp.get("bourseNeg") or [])
-        out["ifbPos"] = list(arena_imp.get("ifbPos") or [])
-        out["ifbNeg"] = list(arena_imp.get("ifbNeg") or [])
+        if not out["ifbPos"]:
+            out["ifbPos"] = list(arena_imp.get("ifbPos") or [])
+        if not out["ifbNeg"]:
+            out["ifbNeg"] = list(arena_imp.get("ifbNeg") or [])
         sources.append("sourcearena")
 
     if board:
@@ -2240,6 +2299,18 @@ def main() -> int:
             "error": rahavard.get("error"),
         },
     )
+    print("Rahavard365 IFB price-index movers…")
+    rahavard_ifb = scrape_rahavard_ifb_movers()
+    print(
+        "rahavardIfb",
+        {
+            "ok": rahavard_ifb.get("ok"),
+            "pos": [x["symbol"] for x in (rahavard_ifb.get("ifbPos") or [])],
+            "neg": [x["symbol"] for x in (rahavard_ifb.get("ifbNeg") or [])],
+            "universe": rahavard_ifb.get("universe"),
+            "error": rahavard_ifb.get("error"),
+        },
+    )
 
     print("board impacts (IFB/TSE fallback)…")
     board_impacts = compute_impacts_from_board(board, indices)
@@ -2279,7 +2350,7 @@ def main() -> int:
         },
     )
 
-    impacts, impacts_source = merge_impacts(rahavard, board_impacts, glance)
+    impacts, impacts_source = merge_impacts(rahavard, board_impacts, glance, rahavard_ifb)
     impacts_bundle = {"impacts": impacts, "source": impacts_source}
     print("impactsSource", impacts_source, "bourseNeg", [x["symbol"] for x in ((impacts or {}).get("bourseNeg") or [])])
 

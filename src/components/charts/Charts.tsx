@@ -274,10 +274,10 @@ export function TopTradesBarChart({
 
   const colors = data.map((_, i) => {
     const t = data.length <= 1 ? 0 : i / (data.length - 1)
-    // copper → steel → brand (no purple)
-    const a = { r: 194, g: 65, b: 12 } // #c2410c
-    const b = { r: 26, g: 95, b: 158 } // #1a5f9e
-    const c = { r: 11, g: 61, b: 110 } // #0b3d6e
+    // darkest brand blue → mid teal → light sky (rank 1 = strongest)
+    const a = { r: 11, g: 61, b: 110 } // #0b3d6e
+    const b = { r: 14, g: 116, b: 144 } // #0e7490
+    const c = { r: 56, g: 189, b: 248 } // #38bdf8
     const mix = (x: { r: number; g: number; b: number }, y: { r: number; g: number; b: number }, p: number) => ({
       r: Math.round(x.r + (y.r - x.r) * p),
       g: Math.round(x.g + (y.g - x.g) * p),

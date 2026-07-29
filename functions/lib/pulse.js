@@ -19,7 +19,7 @@ const PULSE_CACHE_URL_LEGACY = [
   'https://pulse-cache.internal/market-pulse-v2',
 ]
 /** Cash market ends ~12:30; commodity gold ETFs keep trading into the afternoon (≈17:00). */
-export const PULSE_HIST_START = '08:45'
+export const PULSE_HIST_START = '09:00'
 export const PULSE_CASH_END = '12:30'
 export const PULSE_HIST_END = '17:00'
 const MAX_DAY_ARCHIVE = 45

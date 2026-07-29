@@ -16,30 +16,37 @@ type PieLabelProps = {
   index?: number
 }
 
-/** Excel-style callout: thin leader line from slice → symbol name. */
+/** Excel-style callout: thin leader line from slice → symbol name (gap before text). */
 function PieCalloutLabel({ cx = 0, cy = 0, midAngle = 0, outerRadius = 0, name = '', percent = 0, index = 0 }: PieLabelProps) {
   if (!name || percent < 0.008) return null
   const cos = Math.cos(-midAngle * RADIAN)
   const sin = Math.sin(-midAngle * RADIAN)
-  const sx = cx + (outerRadius + 2) * cos
-  const sy = cy + (outerRadius + 2) * sin
-  const mx = cx + (outerRadius + 14) * cos
-  const my = cy + (outerRadius + 14) * sin
-  const ex = mx + (cos >= 0 ? 12 : -12)
+  const right = cos >= 0
+  // radial stub from rim → elbow
+  const sx = cx + (outerRadius + 4) * cos
+  const sy = cy + (outerRadius + 4) * sin
+  const mx = cx + (outerRadius + 18) * cos
+  const my = cy + (outerRadius + 18) * sin
+  // horizontal arm ends at the dot; label starts after a clear gap (LTR box so RTL page
+  // direction doesn't pull the glyph into the stroke)
+  const arm = 12
+  const gap = 10
+  const ex = mx + (right ? arm : -arm)
   const ey = my
-  const anchor = cos >= 0 ? 'start' : 'end'
+  const tx = ex + (right ? gap : -gap)
   const color = COLORS[index % COLORS.length]
   return (
     <g>
-      <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={color} strokeWidth={1} fill="none" opacity={0.75} />
-      <circle cx={ex} cy={ey} r={1.5} fill={color} />
+      <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={color} strokeWidth={1.1} fill="none" opacity={0.8} />
+      <circle cx={ex} cy={ey} r={1.4} fill={color} />
       <text
-        x={ex + (cos >= 0 ? 4 : -4)}
+        x={tx}
         y={ey}
-        textAnchor={anchor}
+        textAnchor={right ? 'start' : 'end'}
         dominantBaseline="central"
+        direction="ltr"
         className="fill-[var(--color-ink)]"
-        style={{ fontSize: 11, fontWeight: 700 }}
+        style={{ fontSize: 11, fontWeight: 700, unicodeBidi: 'isolate' }}
       >
         {name}
       </text>
@@ -114,13 +121,13 @@ export function NavSection({ data }: { data: DashboardData }) {
           <h3 className="mb-2 text-sm font-bold">ترکیب پرتفو (درصد از پورتفو)</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart margin={{ top: 8, right: 28, bottom: 8, left: 28 }}>
+              <PieChart margin={{ top: 12, right: 40, bottom: 12, left: 40 }}>
                 <Pie
                   data={pie}
                   dataKey="value"
                   nameKey="name"
-                  innerRadius={48}
-                  outerRadius={68}
+                  innerRadius={44}
+                  outerRadius={62}
                   paddingAngle={2}
                   label={PieCalloutLabel}
                   labelLine={false}

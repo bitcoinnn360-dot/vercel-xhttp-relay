@@ -11,7 +11,6 @@ const NAV = [
   { id: 'commodities', label: 'کامودیتی' },
   { id: 'steel', label: 'زنجیره فولاد' },
   { id: 'periodic', label: 'تغییرات دوره‌ای' },
-  { id: 'macro', label: 'کلان FRED' },
 ]
 
 interface Props {

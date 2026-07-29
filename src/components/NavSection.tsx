@@ -4,6 +4,48 @@ import type { DashboardData } from '../data/types'
 import { changeClass, fmtInt, fmtNum, fmtPct } from '../lib/format'
 
 const COLORS = ['#b86b2e', '#2f5d7a', '#1f7a4d', '#8f4e1c', '#4a7a96', '#c87941', '#3d4f5f', '#6b7c8a', '#15202b', '#7a5c3a', '#2a6f6f', '#8a3a4a']
+const RADIAN = Math.PI / 180
+
+type PieLabelProps = {
+  cx?: number
+  cy?: number
+  midAngle?: number
+  outerRadius?: number
+  name?: string
+  percent?: number
+  index?: number
+}
+
+/** Excel-style callout: thin leader line from slice → symbol name. */
+function PieCalloutLabel({ cx = 0, cy = 0, midAngle = 0, outerRadius = 0, name = '', percent = 0, index = 0 }: PieLabelProps) {
+  if (!name || percent < 0.008) return null
+  const cos = Math.cos(-midAngle * RADIAN)
+  const sin = Math.sin(-midAngle * RADIAN)
+  const sx = cx + (outerRadius + 2) * cos
+  const sy = cy + (outerRadius + 2) * sin
+  const mx = cx + (outerRadius + 14) * cos
+  const my = cy + (outerRadius + 14) * sin
+  const ex = mx + (cos >= 0 ? 12 : -12)
+  const ey = my
+  const anchor = cos >= 0 ? 'start' : 'end'
+  const color = COLORS[index % COLORS.length]
+  return (
+    <g>
+      <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={color} strokeWidth={1} fill="none" opacity={0.75} />
+      <circle cx={ex} cy={ey} r={1.5} fill={color} />
+      <text
+        x={ex + (cos >= 0 ? 4 : -4)}
+        y={ey}
+        textAnchor={anchor}
+        dominantBaseline="central"
+        className="fill-[var(--color-ink)]"
+        style={{ fontSize: 11, fontWeight: 700 }}
+      >
+        {name}
+      </text>
+    </g>
+  )
+}
 
 export function NavSection({ data }: { data: DashboardData }) {
   const { nav, holdings } = data
@@ -70,10 +112,20 @@ export function NavSection({ data }: { data: DashboardData }) {
 
         <div className="panel p-4 lg:col-span-1">
           <h3 className="mb-2 text-sm font-bold">ترکیب پرتفو (درصد از پورتفو)</h3>
-          <div className="h-56">
+          <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={pie} dataKey="value" nameKey="name" innerRadius={52} outerRadius={78} paddingAngle={2}>
+              <PieChart margin={{ top: 8, right: 28, bottom: 8, left: 28 }}>
+                <Pie
+                  data={pie}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={48}
+                  outerRadius={68}
+                  paddingAngle={2}
+                  label={PieCalloutLabel}
+                  labelLine={false}
+                  isAnimationActive={false}
+                >
                   {pie.map((entry, i) => (
                     <Cell key={entry.name} fill={COLORS[i % COLORS.length]} />
                   ))}
@@ -92,14 +144,6 @@ export function NavSection({ data }: { data: DashboardData }) {
                 />
               </PieChart>
             </ResponsiveContainer>
-          </div>
-          <div className="flex flex-wrap justify-center gap-2">
-            {pie.slice(0, 8).map((p, i) => (
-              <span key={p.name} className="inline-flex items-center gap-1 text-[0.7rem] text-[var(--color-muted)]">
-                <i className="inline-block h-2 w-2 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />
-                {p.name}
-              </span>
-            ))}
           </div>
         </div>
 
@@ -149,10 +193,7 @@ export function NavSection({ data }: { data: DashboardData }) {
           <tbody>
             {holdings.map((h) => (
               <tr key={h.symbol} className={h.static ? 'totals' : undefined}>
-                <td className="font-bold">
-                  {h.symbol}
-                  {h.live ? <span className="symbol-tag">زنده</span> : null}
-                </td>
+                <td className="font-bold">{h.symbol}</td>
                 <td className="num">{h.capitalMr ? fmtInt(h.capitalMr) : '—'}</td>
                 <td className="num">{h.ownershipPct ? fmtNum(h.ownershipPct, 2) : '—'}</td>
                 <td className="num">{fmtNum(h.portfolioPct, 1)}</td>

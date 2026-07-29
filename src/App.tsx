@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { MobileNav, Sidebar, TopBar } from './components/layout/Shell'
 import { SourceBar } from './components/SourceBar'
 import { MarketOverview } from './components/MarketOverview'
-import { ChartsHub, FredMacroSection } from './components/ChartsHub'
+import { ChartsHub } from './components/ChartsHub'
 import { StocksSection } from './components/StocksSection'
 import { NavSection } from './components/NavSection'
 import { CommoditiesSection } from './components/CommoditiesSection'
@@ -11,7 +11,7 @@ import { PeriodicSection } from './components/PeriodicSection'
 import { GuruMarketTabs } from './components/GuruMarketTabs'
 import { useMarketData } from './hooks/useMarketData'
 
-const SECTION_IDS = ['overview', 'market-asia', 'charts', 'stocks', 'nav', 'commodities', 'steel', 'periodic', 'macro']
+const SECTION_IDS = ['overview', 'market-asia', 'charts', 'stocks', 'nav', 'commodities', 'steel', 'periodic']
 
 function useActiveSection() {
   const [active, setActive] = useState('overview')
@@ -70,7 +70,6 @@ export default function App() {
             <CommoditiesSection data={data} />
             <SteelSection data={data} histories={histories} />
             <PeriodicSection data={data} />
-            <FredMacroSection fred={fred} />
             <footer className="border-t border-[var(--color-line)] pt-5 text-center text-xs text-[var(--color-muted)]">
               <p>معاونت مالی و اقتصادی — واحد سرمایه‌گذاری · توسعه معادن و فلزات</p>
               <p className="mt-1">

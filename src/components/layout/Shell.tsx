@@ -7,6 +7,7 @@ const NAV = [
   { id: 'market-asia', label: 'مرکز بازارها' },
   { id: 'charts', label: 'نمودار قیمت‌ها' },
   { id: 'stocks', label: 'سهام معدنی' },
+  { id: 'global', label: 'بازار جهانی' },
   { id: 'nav', label: 'NAV پرتفو' },
   { id: 'commodities', label: 'کامودیتی' },
   { id: 'steel', label: 'زنجیره فولاد' },

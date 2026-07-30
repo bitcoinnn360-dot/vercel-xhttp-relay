@@ -1202,6 +1202,13 @@ export const seedDashboard: DashboardData = {
       group: 'macro',
     },
   ],
+  globalMarkets: {
+    stocks: [],
+    industries: [],
+    news: [],
+    source: 'seed',
+    note: 'GuruFocus با Cloudflare بسته است — Yahoo Finance + RSS خبری Mining/Kitco',
+  },
   sources: [
     {
       id: 'tgju',
@@ -1232,6 +1239,12 @@ export const seedDashboard: DashboardData = {
       name: 'بورس کالا',
       status: 'seed',
       note: 'آمار معاملات فیزیکی offer-stat (نیاز به IP ایران)',
+    },
+    {
+      id: 'yahoo',
+      name: 'Yahoo / Mining RSS',
+      status: 'seed',
+      note: 'بازار جهانی معادن + اخبار صنعت (معادل GuruFocus)',
     },
   ],
   updatedAt: new Date().toISOString(),

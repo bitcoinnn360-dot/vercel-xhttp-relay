@@ -216,6 +216,45 @@ export interface PeriodicRow {
   group: 'steel' | 'macro'
 }
 
+/** نماد/ETF بازار جهانی (معادل صنایع معدنی داخلی) — Yahoo Finance */
+export interface GlobalMarketRow {
+  symbol: string
+  name: string
+  nameFa: string
+  group: string
+  kind?: 'etf' | 'equity' | 'index'
+  price?: number | null
+  currency?: string
+  dailyPct?: number | null
+  weekPct?: number | null
+  monthPct?: number | null
+  ytdPct?: number | null
+  volume?: number | null
+  asOf?: string
+  source?: string
+  isIndustry?: boolean
+  count?: number
+}
+
+export interface GlobalNewsItem {
+  title: string
+  titleFa?: string | null
+  link: string
+  pubDate?: string
+  summary?: string
+  source: string
+}
+
+export interface GlobalMarketsBundle {
+  stocks: GlobalMarketRow[]
+  industries: GlobalMarketRow[]
+  news: GlobalNewsItem[]
+  updatedAt?: string
+  source?: string
+  note?: string
+  served?: string
+}
+
 export interface SourceStatus {
   id: string
   name: string
@@ -246,6 +285,8 @@ export interface DashboardData {
   }
   billetStocks?: { label: string; value: number; wowChange: number; asOf?: string }
   periodic: PeriodicRow[]
+  /** صنایع معدنی/مواد جهانی + اخبار (معادل GuruFocus؛ منبع Yahoo + RSS) */
+  globalMarkets: GlobalMarketsBundle
   sources: SourceStatus[]
   updatedAt: string
 }

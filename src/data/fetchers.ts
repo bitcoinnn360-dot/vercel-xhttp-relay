@@ -1,4 +1,11 @@
-import type { CandlePoint, CommodityQuote, DashboardData, SourceStatus, StockRow } from './types'
+import type {
+  CandlePoint,
+  CommodityQuote,
+  DashboardData,
+  GlobalMarketsBundle,
+  SourceStatus,
+  StockRow,
+} from './types'
 import { seedDashboard } from './seed'
 import { MINERAL_SYMBOL_BY_NAME } from './mineralUniverse'
 
@@ -1231,6 +1238,54 @@ function applyNavLive(base: DashboardData, bundle: NavApiBundle | null | undefin
   return true
 }
 
+async function fetchGlobalMarketsApi(): Promise<GlobalMarketsBundle | null> {
+  const read = async (url: string, ms: number): Promise<GlobalMarketsBundle | null> => {
+    const res = await fetchWithTimeout(url, ms, { cache: 'no-store' })
+    if (!res.ok) return null
+    const json = (await res.json()) as GlobalMarketsBundle & { ok?: boolean }
+    if (!json?.stocks?.length) return null
+    return {
+      stocks: json.stocks,
+      industries: json.industries || [],
+      news: json.news || [],
+      updatedAt: json.updatedAt,
+      source: json.source,
+      note: json.note,
+      served: json.served,
+    }
+  }
+
+  // Static first — never block SPA on Yahoo/RSS scrape.
+  let staticBundle: GlobalMarketsBundle | null = null
+  try {
+    staticBundle = await read('/data/global_markets.json', 4000)
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    const live = await read('/api/global', 4000)
+    if (live && live.stocks.length >= (staticBundle?.stocks.length || 0)) return live
+  } catch {
+    /* fall through */
+  }
+  return staticBundle
+}
+
+function applyGlobalMarkets(base: DashboardData, bundle: GlobalMarketsBundle | null | undefined) {
+  if (!bundle?.stocks?.length) return false
+  base.globalMarkets = {
+    stocks: bundle.stocks,
+    industries: bundle.industries || [],
+    news: bundle.news || [],
+    updatedAt: bundle.updatedAt,
+    source: bundle.source || 'yahoo-finance+rss',
+    note: bundle.note,
+    served: bundle.served,
+  }
+  return true
+}
+
 async function fetchMineralStocksApi(): Promise<MineralStockSnap[] | null> {
   const score = (stocks: MineralStockSnap[]) => {
     let n = 0
@@ -1415,7 +1470,7 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   const base: DashboardData = structuredClone(seedDashboard)
   const now = new Date().toISOString()
 
-  const [current, histEntries, candleEntries, fredEntries, scraped, overviewApi, intradayFallback, stocksApi, steelApi, navApi] =
+  const [current, histEntries, candleEntries, fredEntries, scraped, overviewApi, intradayFallback, stocksApi, steelApi, navApi, globalApi] =
     await Promise.all([
       fetchTgjuAjax(),
       Promise.all(HIST_KEYS.map(async (k) => [k, await fetchTgjuHistory(k)] as const)),
@@ -1427,6 +1482,7 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
       fetchMineralStocksApi(),
       fetchSteelChainApi(),
       fetchNavApi(),
+      fetchGlobalMarketsApi(),
     ])
 
   const liveCount = applyLiveQuotes(base, current)
@@ -1435,6 +1491,7 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   applyMineralStockReturns(base, stocksApi || scraped?.mineralStocks)
   const steelStatus = applySteelChain(base, steelApi)
   applyNavLive(base, navApi)
+  const globalOk = applyGlobalMarkets(base, globalApi)
   const apiImpacts = normalizeImpacts(overviewApi?.impacts)
   if (apiImpacts && (overviewApi?.impactsFromSourceArena || overviewApi?.impactsFromRahavard || overviewApi?.impactsSource)) {
     base.impacts = apiImpacts
@@ -1608,9 +1665,21 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
           : 'IME از این محیط در دسترس نیست — اسکرپر با IP ایران',
       }
     }
+    if (s.id === 'yahoo') {
+      const n = base.globalMarkets.stocks.length
+      const newsN = base.globalMarkets.news.length
+      return {
+        ...s,
+        status: globalOk ? 'live' : 'seed',
+        note: globalOk
+          ? `${n} نماد جهانی · ${newsN} خبر · ${base.globalMarkets.source || 'yahoo+rss'}`
+          : 'Yahoo Finance / RSS هنوز لود نشده',
+        lastOk: globalOk ? base.globalMarkets.updatedAt || now : s.lastOk,
+      }
+    }
     return s
   })
-  base.updatedAt = overviewApi?.updatedAt || steelApi?.updatedAt || now
+  base.updatedAt = overviewApi?.updatedAt || steelApi?.updatedAt || base.globalMarkets.updatedAt || now
 
   return {
     data: base,

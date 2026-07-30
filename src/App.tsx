@@ -8,10 +8,11 @@ import { NavSection } from './components/NavSection'
 import { CommoditiesSection } from './components/CommoditiesSection'
 import { SteelSection } from './components/SteelSection'
 import { PeriodicSection } from './components/PeriodicSection'
+import { GlobalMarketsSection } from './components/GlobalMarketsSection'
 import { GuruMarketTabs } from './components/GuruMarketTabs'
 import { useMarketData } from './hooks/useMarketData'
 
-const SECTION_IDS = ['overview', 'market-asia', 'charts', 'stocks', 'nav', 'commodities', 'steel', 'periodic']
+const SECTION_IDS = ['overview', 'market-asia', 'charts', 'stocks', 'global', 'nav', 'commodities', 'steel', 'periodic']
 
 function useActiveSection() {
   const [active, setActive] = useState('overview')
@@ -66,6 +67,7 @@ export default function App() {
             <GuruMarketTabs data={data} histories={histories} fred={fred} sectors={sectors} />
             <ChartsHub data={data} histories={histories} candles={candles} fred={fred} />
             <StocksSection data={data} />
+            <GlobalMarketsSection data={data} />
             <NavSection data={data} />
             <CommoditiesSection data={data} />
             <SteelSection data={data} histories={histories} />

@@ -206,7 +206,7 @@ export function StocksSection({ data }: { data: DashboardData }) {
               </th>
               <th rowSpan={2}>
                 ارزش معاملات
-                <div className="unit-row">میلیون ریال</div>
+                <div className="unit-row">میلیارد ریال</div>
               </th>
               <th rowSpan={2}>
                 قیمت پایانی
@@ -240,6 +240,16 @@ export function StocksSection({ data }: { data: DashboardData }) {
       </div>
     </section>
   )
+}
+
+function tradeValueBillionRial(mr?: number) {
+  if (mr == null || !Number.isFinite(mr) || mr === 0) return null
+  return Math.round(mr / 1000)
+}
+
+function fmtTradeValueBr(mr?: number) {
+  const v = tradeValueBillionRial(mr)
+  return v != null ? fmtInt(v) : '—'
 }
 
 function colorMix(hex: string) {
@@ -338,7 +348,7 @@ function EquityTr({
       <td className="num">
         {s.volumeToFloatPct != null && Number.isFinite(s.volumeToFloatPct) ? fmtNum(s.volumeToFloatPct, 2) : '—'}
       </td>
-      <td className="num">{s.tradeValueMr ? fmtInt(s.tradeValueMr) : '—'}</td>
+      <td className="num">{fmtTradeValueBr(s.tradeValueMr)}</td>
       <td className="num">{s.closePrice ? fmtInt(s.closePrice) : '—'}</td>
       <PctPill value={s.dailyPct} />
       <PctPill value={s.weekPct} />
@@ -376,7 +386,7 @@ function IndustryTr({
       <td className="num">{s.marketValueUsdM ? fmtInt(s.marketValueUsdM) : '—'}</td>
       <td className="num">{volMillion(s.volume)}</td>
       <td className="num">—</td>
-      <td className="num">{s.tradeValueMr ? fmtInt(s.tradeValueMr) : '—'}</td>
+      <td className="num">{fmtTradeValueBr(s.tradeValueMr)}</td>
       <td className="num">—</td>
       <PctPill value={s.dailyPct} />
       <PctPill value={s.weekPct} />
@@ -421,7 +431,7 @@ function TotalsTr({
       <td className="num">{fmtInt(totals.marketValueUsdM)}</td>
       <td className="num">{volMillion(totals.volume)}</td>
       <td className="num">—</td>
-      <td className="num">{fmtInt(totals.tradeValueMr)}</td>
+      <td className="num">{fmtTradeValueBr(totals.tradeValueMr)}</td>
       <td className="num">—</td>
       <PctPill value={totals.dailyPct} />
       <PctPill value={totals.weekPct} />

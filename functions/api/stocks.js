@@ -52,11 +52,16 @@ const MINERAL_STOCKS = [
 ]
 
 const CACHE_TTL_MS = 20 * 60 * 1000
-const CACHE_KEY = 'https://cache.local/mineral-stocks-bv-v6'
+const CACHE_KEY = 'https://cache.local/mineral-stocks-bv-v7'
 
 /** Manual share-count overrides when quote history lags capital-increase filings. */
 const OUTSTANDING_SHARES = {
   فملی: 1_440_000_000_000,
+}
+
+/** Pre-increase / post-increase share bases for price adjustment (last trade still pre-split). */
+const PRICE_ADJUST_SHARES = {
+  فملی: { from: 1_050_000_000_000, to: 1_440_000_000_000 },
 }
 
 function num(raw) {
@@ -388,9 +393,15 @@ function snapFromBv(meta, items, stockMeta = null) {
   const overrideShares = OUTSTANDING_SHARES[meta.symbol]
   if (overrideShares) outstanding = overrideShares
 
-  // Quote marketCap often lags capital-increase filings — recompute from price × shares.
-  if (closePrice != null && outstanding != null && outstanding > 0) {
-    marketValueBr = Math.round((closePrice * outstanding) / 1e9)
+  // Quote marketCap / last price often lag capital-increase filings.
+  // Adjust price by old/new share base, then MV = adjPrice × shares.
+  let priceForMv = closePrice
+  const adj = PRICE_ADJUST_SHARES[meta.symbol]
+  if (closePrice != null && adj?.from > 0 && adj?.to > 0) {
+    priceForMv = closePrice * (adj.from / adj.to)
+  }
+  if (priceForMv != null && outstanding != null && outstanding > 0) {
+    marketValueBr = Math.round((priceForMv * outstanding) / 1e9)
   }
 
   // BV freeFloat is a fraction (e.g. 0.23); volume / (float×shares) × 100

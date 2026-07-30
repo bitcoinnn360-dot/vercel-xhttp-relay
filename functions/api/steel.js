@@ -933,41 +933,48 @@ export async function onRequestGet(context) {
     let staticBundle = null
     try {
       const origin = new URL(request.url).origin
-      const sres = await fetch(`${origin}/data/steel_chain.json`, { cf: { cacheTtl: 60 } })
+      const sres = await fetch(`${origin}/data/steel_chain.json`, {
+        cf: { cacheTtl: 0, cacheEverything: false },
+      })
       if (sres.ok) staticBundle = await sres.json()
     } catch {
       /* ignore */
     }
 
-    const cnyUsd = await withTimeout(fetchCnyUsd(), 4000, 'cnyUsd').catch(() => staticBundle?.cnyUsd ?? null)
-    const usdIrr = await withTimeout(fetchUsdIrr(), 4000, 'usdIrr').catch(() => staticBundle?.usdIrr ?? null)
+    const [cnyUsd, usdIrr, sessionRes] = await Promise.all([
+      withTimeout(fetchCnyUsd(), 3000, 'cnyUsd').catch(() => staticBundle?.cnyUsd ?? null),
+      withTimeout(fetchUsdIrr(), 3000, 'usdIrr').catch(() => staticBundle?.usdIrr ?? null),
+      withTimeout(custeelSession(env), 8000, 'custeel-login').then(
+        (cookie) => ({ cookie, err: null }),
+        (e) => ({ cookie: '', err: String(e?.message || e) }),
+      ),
+    ])
 
-    let cookie = ''
-    let custeelErr = null
-    try {
-      cookie = await withTimeout(custeelSession(env), 10000, 'custeel-login')
-    } catch (e) {
-      custeelErr = String(e?.message || e)
+    let cookie = sessionRes.cookie || ''
+    let custeelErr = sessionRes.err
+    if (!cookie && !custeelErr) {
+      const user = String(env?.CUSTEEL_USER || '').trim()
+      const pass = String(env?.CUSTEEL_PASS || '').trim()
+      const cookieSecret = String(env?.CUSTEEL_COOKIE || '').trim()
+      if (!user && !pass && !cookieSecret) custeelErr = 'missing CUSTEEL_USER/PASS or CUSTEEL_COOKIE'
     }
 
     let series = { steel: [], histories: {}, ok: 0 }
     let indicators = { ok: false }
     if (cookie) {
       const [indRes, seriesRes] = await Promise.allSettled([
-        withTimeout(scrapeIndicators(cookie), 14000, 'custeel-indicators'),
-        withTimeout(scrapeCusteel(cookie, cnyUsd), 28000, 'custeel-scrape'),
+        withTimeout(scrapeIndicators(cookie), 12000, 'custeel-indicators'),
+        withTimeout(scrapeCusteel(cookie, cnyUsd), 18000, 'custeel-scrape'),
       ])
       if (indRes.status === 'fulfilled') indicators = indRes.value
       else custeelErr = String(indRes.reason?.message || indRes.reason)
       if (seriesRes.status === 'fulfilled') series = seriesRes.value
       else custeelErr = String(seriesRes.reason?.message || seriesRes.reason)
-    } else if (!custeelErr) {
-      custeelErr = 'missing CUSTEEL_USER/PASS or CUSTEEL_COOKIE'
     }
 
     let ime = { ok: false }
     try {
-      ime = await withTimeout(scrapeIme(usdIrr), 8000, 'ime')
+      ime = await withTimeout(scrapeIme(usdIrr), 5000, 'ime')
     } catch (e) {
       ime = { ok: false, error: String(e?.message || e) }
     }

@@ -1016,7 +1016,7 @@ async function fetchSteelChainApi(): Promise<SteelChainBundle | null> {
   }
 
   try {
-    const res = await fetchWithTimeout('/api/steel', 4000, { cache: 'no-store' })
+    const res = await fetchWithTimeout('/api/steel', 20000, { cache: 'no-store' })
     if (res.ok) {
       const json = (await res.json()) as SteelChainBundle
       if (json?.ok || json?.steel?.length || json?.imeChain?.length) return json

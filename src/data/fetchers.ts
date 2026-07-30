@@ -515,7 +515,7 @@ type OverviewApi = {
 
 async function fetchOverviewApi(): Promise<OverviewApi | null> {
   try {
-    const res = await fetchWithTimeout('/api/overview', 20000, { cache: 'no-store' })
+    const res = await fetchWithTimeout('/api/overview', 10000, { cache: 'no-store' })
     if (!res.ok) return null
     return (await res.json()) as OverviewApi
   } catch {
@@ -1002,11 +1002,11 @@ type SteelChainBundle = {
 }
 
 async function fetchSteelChainApi(): Promise<SteelChainBundle | null> {
-  // Static first (always fast). Live scrape is best-effort with a short timeout so the
-  // dashboard never sits blank while Custeel hangs.
+  // Static first (always fast). Live /api/steel can take 15–30s on Custeel — never block the
+  // dashboard Promise.all on that; a short race is enough to pick up a warm edge cache.
   let staticBundle: SteelChainBundle | null = null
   try {
-    const res = await fetchWithTimeout('/data/steel_chain.json', 8000, { cache: 'no-store' })
+    const res = await fetchWithTimeout('/data/steel_chain.json', 5000, { cache: 'no-store' })
     if (res.ok) {
       const json = (await res.json()) as SteelChainBundle
       if (json?.ok || json?.steel?.length || json?.imeChain?.length) staticBundle = json
@@ -1016,10 +1016,17 @@ async function fetchSteelChainApi(): Promise<SteelChainBundle | null> {
   }
 
   try {
-    const res = await fetchWithTimeout('/api/steel', 20000, { cache: 'no-store' })
+    const res = await fetchWithTimeout('/api/steel', 2500, { cache: 'no-store' })
     if (res.ok) {
       const json = (await res.json()) as SteelChainBundle
-      if (json?.ok || json?.steel?.length || json?.imeChain?.length) return json
+      if (json?.ok || json?.steel?.length || json?.imeChain?.length) {
+        // Prefer live only when it actually beat the short budget (warm CF cache / fast path).
+        if (json.custeelOk || !staticBundle) return json
+        // If live fell back to static itself, keep whichever has the newer asOf on FOB rows.
+        const liveAsOf = (json.steel || []).find((s) => s.asOf)?.asOf
+        const staticAsOf = (staticBundle.steel || []).find((s) => s.asOf)?.asOf
+        if (liveAsOf && (!staticAsOf || liveAsOf >= staticAsOf)) return json
+      }
     }
   } catch {
     /* fall through to static */
@@ -1201,7 +1208,7 @@ type NavApiBundle = {
 
 async function fetchNavApi(): Promise<NavApiBundle | null> {
   try {
-    const res = await fetchWithTimeout('/api/nav', 15000, { cache: 'no-store' })
+    const res = await fetchWithTimeout('/api/nav', 8000, { cache: 'no-store' })
     if (!res.ok) return null
     const json = (await res.json()) as NavApiBundle
     if (!json?.ok || !json.holdings?.length || !json.nav) return null
@@ -1238,7 +1245,7 @@ async function fetchMineralStocksApi(): Promise<MineralStockSnap[] | null> {
 
   for (const endpoint of endpoints) {
     try {
-      const ms = endpoint.startsWith('/api/') ? 18000 : 8000
+      const ms = endpoint.startsWith('/api/') ? 10000 : 5000
       const res = await fetchWithTimeout(endpoint, ms, { cache: 'no-store' })
       if (!res.ok) continue
       const json = (await res.json()) as { ok?: boolean; stocks?: MineralStockSnap[] } | MineralStockSnap[]

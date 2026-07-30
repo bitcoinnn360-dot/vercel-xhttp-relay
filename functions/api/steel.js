@@ -928,6 +928,29 @@ export async function onRequestGet(context) {
     }
   }
 
+  const staticPayload = (bundle, extra = {}) => {
+    if (!bundle) return null
+    return {
+      ok: Boolean(bundle.ok || bundle.steel?.length),
+      updatedAt: new Date().toISOString(),
+      custeelOk: Boolean(bundle.custeelOk),
+      imeOk: Boolean(bundle.imeOk),
+      custeelError: null,
+      imeError: null,
+      cnyUsd: bundle.cnyUsd ?? null,
+      usdIrr: bundle.usdIrr ?? null,
+      steel: bundle.steel || [],
+      imeChain: bundle.imeChain || [],
+      inventories: bundle.inventories || null,
+      bfRate: bundle.bfRate || null,
+      billetStocks: bundle.billetStocks || null,
+      histories: bundle.histories || {},
+      source: bundle.source || 'static',
+      imeMeta: bundle.imeMeta || null,
+      ...extra,
+    }
+  }
+
   try {
     // Static first so a hung Custeel scrape never leaves the client waiting forever.
     let staticBundle = null
@@ -939,6 +962,25 @@ export async function onRequestGet(context) {
       if (sres.ok) staticBundle = await sres.json()
     } catch {
       /* ignore */
+    }
+
+    const url = new URL(request.url)
+    const wantFresh = url.searchParams.has('fresh') || url.searchParams.get('live') === '1'
+    const asOfs = (staticBundle?.steel || []).map((s) => s.asOf).filter(Boolean).sort()
+    const newestAsOf = asOfs.length ? asOfs[asOfs.length - 1] : null
+    const yday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+    const staticFreshEnough = Boolean(
+      staticBundle?.steel?.length && newestAsOf && newestAsOf >= yday,
+    )
+
+    // Fast path: serve bundled snapshot so the SPA never waits on Custeel.
+    if (!wantFresh && staticFreshEnough) {
+      const fast = staticPayload(staticBundle, {
+        custeelOk: true,
+        source: 'static',
+        note: `static-fast asOf=${newestAsOf}`,
+      })
+      return new Response(JSON.stringify(fast), { headers })
     }
 
     const [cnyUsd, usdIrr, sessionRes] = await Promise.all([

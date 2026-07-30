@@ -1593,4 +1593,4 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   }
 }
 
-export const REFRESH_MS = 2 * 60 * 1000
+export const REFRESH_MS = 60 * 1000

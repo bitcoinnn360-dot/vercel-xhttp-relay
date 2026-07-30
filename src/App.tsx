@@ -53,7 +53,7 @@ export default function App() {
             <SourceBar sources={data.sources} />
             {(scrapeMeta.infra || scrapeMeta.overviewApiAt || scrapeMeta.updatedAt) && (
               <div className="panel px-4 py-3 text-xs text-[var(--color-muted)]">
-                بروزرسانی زنده از /api/overview هر ۲ دقیقه
+                بروزرسانی زنده از /api/overview هر ۱ دقیقه
                 {scrapeMeta.overviewApiAt
                   ? ` · API: ${new Date(scrapeMeta.overviewApiAt).toLocaleString('fa-IR')}`
                   : ' · API هنوز لود نشده'}

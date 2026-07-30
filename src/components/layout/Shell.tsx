@@ -56,7 +56,7 @@ export function Sidebar({ active }: { active: string }) {
       <div className="mt-auto px-2 pt-4 text-[0.65rem] leading-5 text-slate-400">
         سبک الهام‌گرفته از ترمینال‌های تحلیلی مثل GuruFocus
         <br />
-        بروزرسانی خودکار هر ۳ دقیقه
+        بروزرسانی خودکار هر ۱ دقیقه
       </div>
     </aside>
   )
@@ -110,7 +110,7 @@ export function TopBar({ data, refreshing, onRefresh }: Omit<Props, 'active'>) {
           className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-brand)] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-          تازه‌سازی
+          بروزرسانی
         </button>
       </div>
     </div>

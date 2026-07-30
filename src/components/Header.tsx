@@ -58,7 +58,7 @@ export function Header({ data, refreshing, onRefresh, active }: Props) {
             className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line)] bg-white/70 px-3 py-1.5 text-xs font-semibold text-[var(--color-ink)] transition hover:border-[var(--color-copper)] hover:text-[var(--color-copper-deep)] disabled:opacity-60"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-            تازه‌سازی
+            بروزرسانی
           </button>
         </div>
       </div>

@@ -48,6 +48,17 @@ function parseFaNumber(raw: string | number | null | undefined): number {
   return Number(cleaned)
 }
 
+/** Abortable fetch so a hung Pages Function cannot block the whole dashboard. */
+async function fetchWithTimeout(url: string, ms: number, init?: RequestInit): Promise<Response> {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), ms)
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal })
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 export interface HistoryPoint {
   date: string
   dateJalali?: string
@@ -504,7 +515,7 @@ type OverviewApi = {
 
 async function fetchOverviewApi(): Promise<OverviewApi | null> {
   try {
-    const res = await fetch('/api/overview', { cache: 'no-store' })
+    const res = await fetchWithTimeout('/api/overview', 20000, { cache: 'no-store' })
     if (!res.ok) return null
     return (await res.json()) as OverviewApi
   } catch {
@@ -991,17 +1002,28 @@ type SteelChainBundle = {
 }
 
 async function fetchSteelChainApi(): Promise<SteelChainBundle | null> {
-  for (const endpoint of ['/api/steel', '/data/steel_chain.json']) {
-    try {
-      const res = await fetch(endpoint, { cache: 'no-store' })
-      if (!res.ok) continue
+  // Static first (always fast). Live /api/steel is optional and must not hang the UI.
+  let staticBundle: SteelChainBundle | null = null
+  try {
+    const res = await fetchWithTimeout('/data/steel_chain.json', 8000, { cache: 'no-store' })
+    if (res.ok) {
+      const json = (await res.json()) as SteelChainBundle
+      if (json?.ok || json?.steel?.length || json?.imeChain?.length) staticBundle = json
+    }
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    const res = await fetchWithTimeout('/api/steel', 12000, { cache: 'no-store' })
+    if (res.ok) {
       const json = (await res.json()) as SteelChainBundle
       if (json?.ok || json?.steel?.length || json?.imeChain?.length) return json
-    } catch {
-      // try next
     }
+  } catch {
+    /* fall through to static */
   }
-  return null
+  return staticBundle
 }
 
 function applySteelChain(base: DashboardData, bundle: SteelChainBundle | null | undefined) {
@@ -1178,7 +1200,7 @@ type NavApiBundle = {
 
 async function fetchNavApi(): Promise<NavApiBundle | null> {
   try {
-    const res = await fetch('/api/nav', { cache: 'no-store' })
+    const res = await fetchWithTimeout('/api/nav', 15000, { cache: 'no-store' })
     if (!res.ok) return null
     const json = (await res.json()) as NavApiBundle
     if (!json?.ok || !json.holdings?.length || !json.nav) return null
@@ -1215,7 +1237,8 @@ async function fetchMineralStocksApi(): Promise<MineralStockSnap[] | null> {
 
   for (const endpoint of endpoints) {
     try {
-      const res = await fetch(endpoint, { cache: 'no-store' })
+      const ms = endpoint.startsWith('/api/') ? 18000 : 8000
+      const res = await fetchWithTimeout(endpoint, ms, { cache: 'no-store' })
       if (!res.ok) continue
       const json = (await res.json()) as { ok?: boolean; stocks?: MineralStockSnap[] } | MineralStockSnap[]
       const stocks = Array.isArray(json) ? json : json.stocks

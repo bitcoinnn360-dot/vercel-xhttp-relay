@@ -847,38 +847,22 @@ export async function onRequestGet(context) {
     'access-control-allow-origin': '*',
   }
 
+  const withTimeout = async (promise, ms, label) => {
+    let timer
+    try {
+      return await Promise.race([
+        promise,
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error(`${label} timeout ${ms}ms`)), ms)
+        }),
+      ])
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
   try {
-    const cnyUsd = await fetchCnyUsd()
-    const usdIrr = await fetchUsdIrr()
-    let cookie = ''
-    let custeelErr = null
-    try {
-      cookie = await custeelSession(env)
-    } catch (e) {
-      custeelErr = String(e?.message || e)
-    }
-
-    let series = { steel: [], histories: {}, ok: 0 }
-    let indicators = { ok: false }
-    if (cookie) {
-      try {
-        indicators = await scrapeIndicators(cookie)
-        series = await scrapeCusteel(cookie, cnyUsd)
-      } catch (e) {
-        custeelErr = String(e?.message || e)
-      }
-    } else if (!custeelErr) {
-      custeelErr = 'missing CUSTEEL_USER/PASS or CUSTEEL_COOKIE'
-    }
-
-    let ime = { ok: false }
-    try {
-      ime = await scrapeIme(usdIrr)
-    } catch (e) {
-      ime = { ok: false, error: String(e?.message || e) }
-    }
-
-    // Fallback to static bundle when live thin
+    // Static first so a hung Custeel scrape never leaves the client waiting forever.
     let staticBundle = null
     try {
       const origin = new URL(request.url).origin
@@ -888,16 +872,51 @@ export async function onRequestGet(context) {
       /* ignore */
     }
 
+    const cnyUsd = await withTimeout(fetchCnyUsd(), 4000, 'cnyUsd').catch(() => staticBundle?.cnyUsd ?? null)
+    const usdIrr = await withTimeout(fetchUsdIrr(), 4000, 'usdIrr').catch(() => staticBundle?.usdIrr ?? null)
+
+    let cookie = ''
+    let custeelErr = null
+    try {
+      cookie = await withTimeout(custeelSession(env), 6000, 'custeel-login')
+    } catch (e) {
+      custeelErr = String(e?.message || e)
+    }
+
+    let series = { steel: [], histories: {}, ok: 0 }
+    let indicators = { ok: false }
+    if (cookie) {
+      try {
+        indicators = await withTimeout(scrapeIndicators(cookie), 10000, 'custeel-indicators')
+      } catch (e) {
+        custeelErr = String(e?.message || e)
+      }
+      try {
+        series = await withTimeout(scrapeCusteel(cookie, cnyUsd), 15000, 'custeel-scrape')
+      } catch (e) {
+        custeelErr = String(e?.message || e)
+      }
+    } else if (!custeelErr) {
+      custeelErr = 'missing CUSTEEL_USER/PASS or CUSTEEL_COOKIE'
+    }
+
+    let ime = { ok: false }
+    try {
+      ime = await withTimeout(scrapeIme(usdIrr), 8000, 'ime')
+    } catch (e) {
+      ime = { ok: false, error: String(e?.message || e) }
+    }
+
     const steel = mergeSteel(
       series.steel,
       indicators.steelExtra,
       ime.steel,
-      !series.ok && staticBundle?.steel ? staticBundle.steel : [],
+      !(series.ok > 0) && staticBundle?.steel ? staticBundle.steel : [],
     )
     const imeChain = ime.ok ? ime.imeChain : staticBundle?.imeChain || []
     const custeelOk = series.ok > 0
     const payload = {
-      ok: custeelOk || ime.ok || Boolean(staticBundle?.ok),
+      ok: custeelOk || ime.ok || Boolean(staticBundle?.ok || staticBundle?.steel?.length),
       updatedAt: new Date().toISOString(),
       custeelOk,
       imeOk: Boolean(ime.ok),

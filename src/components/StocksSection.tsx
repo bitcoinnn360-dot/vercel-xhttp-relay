@@ -319,12 +319,14 @@ function EquityTr({
 }) {
   const { s, sector, rowSpan, showSector } = row
   const tone = SECTOR_TONE[sector] || SECTOR_TONE.فلزات
+  const isVamaaden = s.symbol === 'ومعادن' || s.name === 'ومعادن' || s.name === 'توسعه معادن و فلزات'
+  const rowClass = [s.halted ? 'halted' : '', isVamaaden ? 'flagship-vamaaden' : ''].filter(Boolean).join(' ') || undefined
   return (
     <motion.tr
       layout
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className={s.halted ? 'halted' : undefined}
+      className={rowClass}
     >
       {showSector ? (
         <td className="sector-cell" rowSpan={rowSpan} style={{ background: tone.soft }}>

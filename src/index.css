@@ -294,6 +294,15 @@
   .data-table tr.halted td {
     opacity: 0.72;
   }
+  .stocks-table tr.flagship-vamaaden td:not(.sector-cell) {
+    background: #f6e9ed;
+  }
+  .stocks-table tr.flagship-vamaaden .name-main {
+    color: #7f1d3a;
+  }
+  .stocks-table tr.flagship-vamaaden:hover td:not(.sector-cell) {
+    background: #f0dde4;
+  }
   .stocks-table .name-cell {
     text-align: center;
     min-width: 4.25rem;

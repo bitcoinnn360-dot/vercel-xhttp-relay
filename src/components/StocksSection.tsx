@@ -190,15 +190,19 @@ export function StocksSection({ data }: { data: DashboardData }) {
       </div>
 
       <div className="panel overflow-x-auto p-2 sm:p-3">
-        <table className="data-table stocks-table min-w-[1100px]">
+        <table className="data-table stocks-table min-w-[1280px]">
           <thead>
             <tr>
               <th rowSpan={2}>صنعت</th>
               <th rowSpan={2}>نام / نماد</th>
               <th colSpan={2}>ارزش بازار</th>
               <th rowSpan={2}>
-                حجم
-                <div className="unit-row">تعداد سهم</div>
+                حجم معاملات
+                <div className="unit-row">میلیون سهم</div>
+              </th>
+              <th rowSpan={2}>
+                نسبت حجم به شناوری
+                <div className="unit-row">درصد</div>
               </th>
               <th rowSpan={2}>
                 ارزش معاملات
@@ -209,10 +213,7 @@ export function StocksSection({ data }: { data: DashboardData }) {
                 <div className="unit-row">ریال</div>
               </th>
               <th colSpan={4}>بازدهی تعدیل‌شده</th>
-              <th rowSpan={2}>
-                ورود پول حقیقی
-                <div className="unit-row">میلیارد تومان</div>
-              </th>
+              <th colSpan={2}>ورود پول حقیقی</th>
             </tr>
             <tr className="unit-subhead">
               <th>میلیارد ریال</th>
@@ -221,6 +222,8 @@ export function StocksSection({ data }: { data: DashboardData }) {
               <th>هفتگی</th>
               <th>ماهانه</th>
               <th>سالانه</th>
+              <th>امروز (میلیارد تومان)</th>
+              <th>۷ روز معاملاتی</th>
             </tr>
           </thead>
           <tbody>
@@ -259,6 +262,30 @@ function FlowCell({ value }: { value?: number }) {
       <span className="relative z-[1] font-semibold">{fmtNum(value, 1)}</span>
     </td>
   )
+}
+
+/** Mini bar sparkline for last 7 trading-day retail flows (billion toman). */
+function FlowSparkCell({ values }: { values?: number[] }) {
+  if (!values?.length) return <td className="num flow-spark-cell">—</td>
+  const max = Math.max(...values.map((v) => Math.abs(v)), 0.01)
+  return (
+    <td className="flow-spark-cell">
+      <div className="flow-spark" title={values.map((v) => fmtNum(v, 1)).join(' · ')} aria-label="ورود پول ۷ روز">
+        {values.map((v, i) => (
+          <span
+            key={i}
+            className={`flow-spark-bar ${v >= 0 ? 'in' : 'out'}`}
+            style={{ height: `${Math.max(10, Math.round((Math.abs(v) / max) * 100))}%` }}
+          />
+        ))}
+      </div>
+    </td>
+  )
+}
+
+function volMillion(volume?: number) {
+  if (volume == null || !Number.isFinite(volume)) return '—'
+  return fmtNum(volume / 1_000_000, 1)
 }
 
 function PctPill({ value }: { value: number }) {
@@ -300,7 +327,10 @@ function EquityTr({
       </td>
       <td className="num">{s.marketValueBr ? fmtInt(s.marketValueBr) : '—'}</td>
       <td className="num">{s.marketValueUsdM ? fmtInt(s.marketValueUsdM) : '—'}</td>
-      <td className="num">{s.volume != null ? fmtInt(s.volume) : '—'}</td>
+      <td className="num">{volMillion(s.volume)}</td>
+      <td className="num">
+        {s.volumeToFloatPct != null && Number.isFinite(s.volumeToFloatPct) ? fmtNum(s.volumeToFloatPct, 2) : '—'}
+      </td>
       <td className="num">{s.tradeValueMr ? fmtInt(s.tradeValueMr) : '—'}</td>
       <td className="num">{s.closePrice ? fmtInt(s.closePrice) : '—'}</td>
       <PctPill value={s.dailyPct} />
@@ -308,6 +338,7 @@ function EquityTr({
       <PctPill value={s.monthPct} />
       <PctPill value={s.ytdPct} />
       <FlowCell value={s.netIndividualBt} />
+      <FlowSparkCell values={s.netIndividualWeekBt} />
     </motion.tr>
   )
 }
@@ -336,7 +367,8 @@ function IndustryTr({
       <td className="font-semibold name-cell">{s.name}</td>
       <td className="num">{s.marketValueBr ? fmtInt(s.marketValueBr) : '—'}</td>
       <td className="num">{s.marketValueUsdM ? fmtInt(s.marketValueUsdM) : '—'}</td>
-      <td className="num">{s.volume ? fmtInt(s.volume) : '—'}</td>
+      <td className="num">{volMillion(s.volume)}</td>
+      <td className="num">—</td>
       <td className="num">{s.tradeValueMr ? fmtInt(s.tradeValueMr) : '—'}</td>
       <td className="num">—</td>
       <PctPill value={s.dailyPct} />
@@ -344,6 +376,7 @@ function IndustryTr({
       <PctPill value={s.monthPct} />
       <PctPill value={s.ytdPct} />
       <FlowCell value={s.netIndividualBt} />
+      <td className="num">—</td>
     </tr>
   )
 }
@@ -379,7 +412,8 @@ function TotalsTr({
       </td>
       <td className="num">{fmtInt(totals.marketValueBr)}</td>
       <td className="num">{fmtInt(totals.marketValueUsdM)}</td>
-      <td className="num">{fmtInt(totals.volume)}</td>
+      <td className="num">{volMillion(totals.volume)}</td>
+      <td className="num">—</td>
       <td className="num">{fmtInt(totals.tradeValueMr)}</td>
       <td className="num">—</td>
       <PctPill value={totals.dailyPct} />
@@ -387,6 +421,7 @@ function TotalsTr({
       <PctPill value={totals.monthPct} />
       <PctPill value={totals.ytdPct} />
       <FlowCell value={totals.netIndividualBt} />
+      <td className="num">—</td>
     </tr>
   )
 }

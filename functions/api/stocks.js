@@ -52,7 +52,7 @@ const MINERAL_STOCKS = [
 ]
 
 const CACHE_TTL_MS = 20 * 60 * 1000
-const CACHE_KEY = 'https://cache.local/mineral-stocks-bv-v4'
+const CACHE_KEY = 'https://cache.local/mineral-stocks-bv-v5'
 
 function num(raw) {
   if (raw == null) return null
@@ -325,6 +325,16 @@ function snapFromBv(meta, items) {
   const netIndividualBt =
     netIndRial != null ? Math.round((netIndRial / 1e10) * 100) / 100 : null
 
+  // Last 7 trading days of net individual flow (oldest → newest), billion toman
+  const tradedDays = items.filter((r) => num(r?.close) != null && num(r.close) > 0)
+  const weekSlice = tradedDays.slice(0, 7).reverse()
+  const netIndividualWeekBt = weekSlice
+    .map((r) => {
+      const v = detailValue(r, 'netIndividual')
+      return v != null ? Math.round((v / 1e10) * 100) / 100 : null
+    })
+    .filter((v) => v != null)
+
   let dailyPct = null
   let volume = 0
   let tradeValueMr = 0
@@ -347,6 +357,19 @@ function snapFromBv(meta, items) {
     marketValueBr = mv != null ? Math.round(mv / 1e9) : undefined
   }
 
+  const freeFloat =
+    num(halted ? tradedHead?.freeFloat : head.freeFloat) ?? num(tradedHead?.freeFloat) ?? null
+  const outstanding =
+    num(halted ? tradedHead?.numberOfOutstandingShares : head.numberOfOutstandingShares) ??
+    num(tradedHead?.numberOfOutstandingShares) ??
+    null
+  // BV freeFloat is a fraction (e.g. 0.23); volume / (float×shares) × 100
+  let volumeToFloatPct = null
+  if (volume > 0 && freeFloat != null && freeFloat > 0 && outstanding != null && outstanding > 0) {
+    const floatShares = freeFloat * outstanding
+    if (floatShares > 0) volumeToFloatPct = Math.round((volume / floatShares) * 10000) / 100
+  }
+
   return {
     symbol: meta.symbol,
     closePrice,
@@ -359,6 +382,10 @@ function snapFromBv(meta, items) {
     volume,
     tradeValueMr,
     netIndividualBt: halted ? 0 : netIndividualBt,
+    netIndividualWeekBt,
+    freeFloatPct: freeFloat != null ? Math.round(freeFloat * 10000) / 100 : null,
+    outstandingShares: outstanding,
+    volumeToFloatPct: halted ? 0 : volumeToFloatPct,
     returnsAdjusted: true,
     returnsSource: 'bourseview-adjusted',
     historyCount: rets.historyCount || 0,

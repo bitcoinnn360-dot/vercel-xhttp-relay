@@ -398,6 +398,32 @@
   .stocks-table .flow-bar.out {
     background: color-mix(in oklab, #b91c1c 50%, white);
   }
+  .stocks-table .flow-spark-cell {
+    min-width: 88px;
+    padding-block: 6px;
+  }
+  .stocks-table .flow-spark {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 2px;
+    height: 28px;
+    width: 84px;
+    margin-inline: auto;
+  }
+  .stocks-table .flow-spark-bar {
+    flex: 1 1 0;
+    min-width: 4px;
+    max-width: 8px;
+    border-radius: 2px 2px 0 0;
+    align-self: flex-end;
+  }
+  .stocks-table .flow-spark-bar.in {
+    background: color-mix(in oklab, #15803d 78%, white);
+  }
+  .stocks-table .flow-spark-bar.out {
+    background: color-mix(in oklab, #b91c1c 78%, white);
+  }
   .sector-chip {
     position: relative;
     overflow: hidden;

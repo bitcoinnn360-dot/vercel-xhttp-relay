@@ -77,6 +77,10 @@ export interface MineralStockSnap {
   tradeValueMr?: number
   /** خالص خرید حقیقی — میلیارد تومان */
   netIndividualBt?: number
+  netIndividualWeekBt?: number[]
+  freeFloatPct?: number
+  outstandingShares?: number
+  volumeToFloatPct?: number
   returnsAdjusted?: boolean
   returnsSource?: string
   candleCount?: number
@@ -1332,6 +1336,14 @@ function applyMineralStockReturns(base: DashboardData, snaps: MineralStockSnap[]
     if (snap.tradeValueMr != null) s.tradeValueMr = snap.tradeValueMr
     if (snap.netIndividualBt != null && Number.isFinite(snap.netIndividualBt)) {
       s.netIndividualBt = snap.netIndividualBt
+    }
+    if (Array.isArray(snap.netIndividualWeekBt) && snap.netIndividualWeekBt.length) {
+      s.netIndividualWeekBt = snap.netIndividualWeekBt
+    }
+    if (snap.freeFloatPct != null && Number.isFinite(snap.freeFloatPct)) s.freeFloatPct = snap.freeFloatPct
+    if (snap.outstandingShares != null) s.outstandingShares = snap.outstandingShares
+    if (snap.volumeToFloatPct != null && Number.isFinite(snap.volumeToFloatPct)) {
+      s.volumeToFloatPct = snap.volumeToFloatPct
     }
     if (snap.marketValueBr != null && snap.marketValueBr > 0) {
       s.marketValueBr = snap.marketValueBr

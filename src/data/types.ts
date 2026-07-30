@@ -120,6 +120,13 @@ export interface StockRow {
   returnsSource?: string
   /** خالص خرید حقیقی امروز — میلیارد تومان (بورس‌ویو) */
   netIndividualBt?: number
+  /** آخرین ۷ روز معاملاتی خالص حقیقی — میلیارد تومان (قدیمی→جدید) */
+  netIndividualWeekBt?: number[]
+  /** درصد شناوری از بورس‌ویو */
+  freeFloatPct?: number
+  outstandingShares?: number
+  /** نسبت حجم معاملات امروز به سهام شناور — درصد */
+  volumeToFloatPct?: number
   halted?: boolean
 }
 

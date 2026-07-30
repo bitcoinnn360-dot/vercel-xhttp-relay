@@ -5,6 +5,8 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  LabelList,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -260,22 +262,39 @@ function SectorPerformanceBlock({
   period: PeriodKey
   onPeriod: (k: PeriodKey) => void
 }) {
-  const chartData = useMemo(() => {
-    return [...sectors]
-      .map((s) => ({
-        name: s.nameFa,
-        value: Number(s[period]) || 0,
-      }))
-      .sort((a, b) => a.value - b.value)
-  }, [sectors, period])
+  const countryMaterials = useMemo(() => aggregateMaterialsByCountry(materials), [materials])
+
+  const sectorChart = useMemo(
+    () =>
+      [...sectors]
+        .map((s) => ({
+          name: s.nameFa,
+          value: Number(s[period]) || 0,
+          fill: (Number(s[period]) || 0) >= 0 ? '#0f766e' : '#b91c1c',
+        }))
+        .sort((a, b) => a.value - b.value),
+    [sectors, period],
+  )
+
+  const materialsChart = useMemo(
+    () =>
+      [...countryMaterials]
+        .map((s) => ({
+          name: s.countryFa,
+          value: Number(s[period]) || 0,
+          fill: (Number(s[period]) || 0) >= 0 ? '#9a3412' : '#b91c1c',
+        }))
+        .sort((a, b) => a.value - b.value),
+    [countryMaterials, period],
+  )
 
   const sortedSectors = useMemo(
     () => [...sectors].sort((a, b) => (Number(b[period]) || 0) - (Number(a[period]) || 0)),
     [sectors, period],
   )
   const sortedMats = useMemo(
-    () => [...materials].sort((a, b) => (Number(b[period]) || 0) - (Number(a[period]) || 0)),
-    [materials, period],
+    () => [...countryMaterials].sort((a, b) => (Number(b[period]) || 0) - (Number(a[period]) || 0)),
+    [countryMaterials, period],
   )
 
   if (!sectors.length && !materials.length) return null
@@ -286,10 +305,10 @@ function SectorPerformanceBlock({
         <div>
           <h3 className="text-sm font-bold">Major Global Stock Markets — Sector & Industry Performance</h3>
           <p className="text-[0.7rem] text-[var(--color-muted)]">
-            نمای تجمیعی سکتورها (Select Sector SPDR) + جدول مواد پایه به تفکیک کشور — معادل GuruFocus
+            دو نمودار و دو جدول تجمیعی · سکتورهای عمده + مواد پایه کشورها (وزنی)
           </p>
         </div>
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-1 rounded-lg border border-[var(--color-line)] bg-white p-1">
           {(
             [
               ['dailyPct', '۱روز'],
@@ -304,10 +323,10 @@ function SectorPerformanceBlock({
               key={k}
               type="button"
               onClick={() => onPeriod(k)}
-              className={`rounded-md border px-2 py-0.5 text-[0.65rem] font-semibold ${
+              className={`rounded-md px-2.5 py-1 text-[0.68rem] font-bold transition ${
                 period === k
-                  ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white'
-                  : 'border-[var(--color-line)] text-[var(--color-muted)]'
+                  ? 'bg-[var(--color-brand)] text-white shadow-sm'
+                  : 'text-[var(--color-muted)] hover:bg-slate-50'
               }`}
             >
               {label}
@@ -316,33 +335,19 @@ function SectorPerformanceBlock({
         </div>
       </div>
 
-      <div className="panel p-3 sm:p-4">
-        <h4 className="mb-2 text-xs font-bold text-[var(--color-muted)]">Performance Comparison</h4>
-        <div className="h-[320px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 16 }}>
-              <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 10, fill: '#64748b' }} unit="%" />
-              <YAxis
-                type="category"
-                dataKey="name"
-                width={120}
-                tick={{ fontSize: 10, fill: '#334155' }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <Tooltip
-                contentStyle={{ background: '#15202b', border: 'none', borderRadius: 10, color: '#fff', fontSize: 12 }}
-                formatter={(v) => [`${fmtPct(Number(v))}`, 'بازدهی']}
-              />
-              <Bar dataKey="value" radius={[0, 5, 5, 0]} barSize={14}>
-                {chartData.map((d) => (
-                  <Cell key={d.name} fill={d.value >= 0 ? '#15803d' : '#b91c1c'} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+      <div className="grid gap-3 xl:grid-cols-2">
+        <PerfChart
+          title="Performance Comparison — سکتورهای تجمیعی"
+          subtitle="Select Sector SPDR · بازدهی نسبی سکتورها"
+          data={sectorChart}
+          accent="#0f766e"
+        />
+        <PerfChart
+          title="Performance Comparison — Basic Materials"
+          subtitle="تجمیع وزنی ETF مواد/معادن هر کشور"
+          data={materialsChart}
+          accent="#9a3412"
+        />
       </div>
 
       <div className="grid gap-3 xl:grid-cols-2">
@@ -364,13 +369,13 @@ function SectorPerformanceBlock({
           }))}
         />
         <PerfTable
-          title="Basic Materials — به تفکیک کشور"
-          subtitle="همان نمای کلیک روی مواد پایه در GuruFocus"
+          title="Basic Materials — کشورها (تجمیع‌شده)"
+          subtitle="چند نماد یک کشور با وزن AUM ادغام شده‌اند"
           rows={sortedMats.map((s) => ({
-            key: `${s.country}-${s.symbol}`,
-            label: `${s.countryFa} · ${s.sectorFa}`,
-            sub: s.symbol,
-            cap: s.marketCapUsd || s.aumUsd,
+            key: s.country,
+            label: s.countryFa,
+            sub: s.symbols,
+            cap: s.marketCapUsd,
             weight: s.weightPct,
             dailyPct: s.dailyPct,
             weekPct: s.weekPct,
@@ -380,6 +385,166 @@ function SectorPerformanceBlock({
             year3Pct: s.year3Pct,
           }))}
         />
+      </div>
+    </div>
+  )
+}
+
+type AggCountryRow = {
+  country: string
+  countryFa: string
+  symbols: string
+  marketCapUsd: number | null
+  weightPct: number | null
+  dailyPct: number | null
+  weekPct: number | null
+  monthPct: number | null
+  ytdPct: number | null
+  year1Pct: number | null
+  year3Pct: number | null
+}
+
+function aggregateMaterialsByCountry(materials: CountrySectorRow[]): AggCountryRow[] {
+  const buckets = new Map<string, CountrySectorRow[]>()
+  for (const m of materials) {
+    const key = m.country || m.countryFa
+    if (!buckets.has(key)) buckets.set(key, [])
+    buckets.get(key)!.push(m)
+  }
+
+  const rows: AggCountryRow[] = []
+  for (const [, list] of buckets) {
+    const capSum = list.reduce((a, r) => a + (r.aumUsd || r.marketCapUsd || 0), 0)
+    const wAvg = (key: PeriodKey) => {
+      let num = 0
+      let den = 0
+      let plain = 0
+      let n = 0
+      for (const r of list) {
+        const v = r[key]
+        if (v == null || !Number.isFinite(v)) continue
+        const w = r.aumUsd || r.marketCapUsd || 0
+        if (w > 0) {
+          num += w * v
+          den += w
+        } else {
+          plain += v
+          n += 1
+        }
+      }
+      if (den > 0) return Math.round((num / den) * 100) / 100
+      if (n > 0) return Math.round((plain / n) * 100) / 100
+      return null
+    }
+    rows.push({
+      country: list[0].country,
+      countryFa: list[0].countryFa,
+      symbols: list.map((r) => r.symbol).join(' · '),
+      marketCapUsd: capSum > 0 ? capSum : null,
+      weightPct: null,
+      dailyPct: wAvg('dailyPct'),
+      weekPct: wAvg('weekPct'),
+      monthPct: wAvg('monthPct'),
+      ytdPct: wAvg('ytdPct'),
+      year1Pct: wAvg('year1Pct'),
+      year3Pct: wAvg('year3Pct'),
+    })
+  }
+
+  const total = rows.reduce((a, r) => a + (r.marketCapUsd || 0), 0)
+  for (const r of rows) {
+    r.weightPct =
+      total > 0 && r.marketCapUsd ? Math.round((r.marketCapUsd / total) * 10000) / 100 : null
+  }
+  return rows
+}
+
+function PerfChart({
+  title,
+  subtitle,
+  data,
+  accent,
+}: {
+  title: string
+  subtitle: string
+  data: { name: string; value: number; fill: string }[]
+  accent: string
+}) {
+  const values = data.map((d) => d.value)
+  const minV = Math.min(0, ...values)
+  const maxV = Math.max(0, ...values)
+  const pad = Math.max(Math.abs(maxV - minV) * 0.12, 2)
+  const domain: [number, number] = [minV - (minV < 0 ? pad : 0), maxV + pad]
+  const height = Math.max(280, data.length * 28 + 48)
+
+  return (
+    <div
+      className="panel overflow-hidden p-3 sm:p-4"
+      style={{
+        background: `linear-gradient(160deg, color-mix(in oklab, ${accent} 7%, white) 0%, white 55%)`,
+      }}
+    >
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <div>
+          <h4 className="text-xs font-extrabold tracking-tight text-[var(--color-ink)]">{title}</h4>
+          <p className="text-[0.65rem] text-[var(--color-muted)]">{subtitle}</p>
+        </div>
+        <span
+          className="rounded-full px-2 py-0.5 text-[0.6rem] font-bold text-white"
+          style={{ background: accent }}
+        >
+          {data.length} مورد
+        </span>
+      </div>
+      <div className="chart-ltr" style={{ direction: 'ltr', height }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={data}
+            layout="vertical"
+            margin={{ top: 4, right: 52, left: 4, bottom: 4 }}
+            barCategoryGap="18%"
+          >
+            <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" horizontal={false} />
+            <XAxis
+              type="number"
+              domain={domain}
+              tick={{ fontSize: 10, fill: '#64748b' }}
+              tickFormatter={(v) => `${Number(v).toFixed(0)}%`}
+              axisLine={{ stroke: '#cbd5e1' }}
+            />
+            <YAxis
+              type="category"
+              dataKey="name"
+              width={108}
+              tick={{ fontSize: 11, fill: '#1e293b', fontWeight: 600 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <ReferenceLine x={0} stroke="#94a3b8" strokeWidth={1.5} />
+            <Tooltip
+              cursor={{ fill: 'rgba(15, 23, 42, 0.04)' }}
+              contentStyle={{
+                background: '#0f172a',
+                border: 'none',
+                borderRadius: 10,
+                color: '#fff',
+                fontSize: 12,
+              }}
+              formatter={(v) => [`${fmtPct(Number(v))}`, 'بازدهی']}
+            />
+            <Bar dataKey="value" radius={[0, 7, 7, 0]} barSize={16} isAnimationActive>
+              {data.map((d) => (
+                <Cell key={d.name} fill={d.fill} />
+              ))}
+              <LabelList
+                dataKey="value"
+                position="right"
+                formatter={(v) => fmtPct(Number(v ?? 0))}
+                style={{ fill: '#334155', fontSize: 10, fontWeight: 700 }}
+              />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
       </div>
     </div>
   )
@@ -408,7 +573,7 @@ function PerfTable({
 }) {
   return (
     <div className="panel overflow-x-auto p-2 sm:p-3">
-      <h4 className="px-2 pt-2 text-xs font-bold">{title}</h4>
+      <h4 className="px-2 pt-2 text-xs font-extrabold">{title}</h4>
       <p className="mb-2 px-2 text-[0.65rem] text-[var(--color-muted)]">{subtitle}</p>
       <table className="data-table min-w-[640px]">
         <thead>

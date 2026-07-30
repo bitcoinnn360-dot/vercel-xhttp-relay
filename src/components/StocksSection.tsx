@@ -194,7 +194,7 @@ export function StocksSection({ data }: { data: DashboardData }) {
           <thead>
             <tr>
               <th rowSpan={2}>صنعت</th>
-              <th rowSpan={2}>نام / نماد</th>
+              <th rowSpan={2}>نماد</th>
               <th colSpan={2}>ارزش بازار</th>
               <th rowSpan={2}>
                 حجم معاملات
@@ -264,20 +264,26 @@ function FlowCell({ value }: { value?: number }) {
   )
 }
 
-/** Mini bar sparkline for last 7 trading-day retail flows (billion toman). */
+/** Mini bipolar sparkline: positive up / negative down from mid baseline. */
 function FlowSparkCell({ values }: { values?: number[] }) {
   if (!values?.length) return <td className="num flow-spark-cell">—</td>
   const max = Math.max(...values.map((v) => Math.abs(v)), 0.01)
   return (
     <td className="flow-spark-cell">
       <div className="flow-spark" title={values.map((v) => fmtNum(v, 1)).join(' · ')} aria-label="ورود پول ۷ روز">
-        {values.map((v, i) => (
-          <span
-            key={i}
-            className={`flow-spark-bar ${v >= 0 ? 'in' : 'out'}`}
-            style={{ height: `${Math.max(10, Math.round((Math.abs(v) / max) * 100))}%` }}
-          />
-        ))}
+        {values.map((v, i) => {
+          const h = Math.max(8, Math.round((Math.abs(v) / max) * 100))
+          return (
+            <span key={i} className="flow-spark-col">
+              <span className="flow-spark-half up">
+                {v >= 0 ? <i className="flow-spark-bar in" style={{ height: `${h}%` }} /> : null}
+              </span>
+              <span className="flow-spark-half down">
+                {v < 0 ? <i className="flow-spark-bar out" style={{ height: `${h}%` }} /> : null}
+              </span>
+            </span>
+          )
+        })}
       </div>
     </td>
   )
@@ -321,8 +327,9 @@ function EquityTr({
         </td>
       ) : null}
       <td className="font-semibold name-cell">
-        <span className="name-main">{s.name}</span>
-        {s.symbol ? <span className="symbol-tag">{s.symbol}</span> : null}
+        <span className="name-main" title={s.name}>
+          {s.symbol || s.name}
+        </span>
         {s.halted ? <span className="halt-tag">متوقف</span> : null}
       </td>
       <td className="num">{s.marketValueBr ? fmtInt(s.marketValueBr) : '—'}</td>

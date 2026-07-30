@@ -399,30 +399,64 @@
     background: color-mix(in oklab, #b91c1c 50%, white);
   }
   .stocks-table .flow-spark-cell {
-    min-width: 88px;
-    padding-block: 6px;
+    min-width: 96px;
+    padding-block: 4px;
   }
   .stocks-table .flow-spark {
     display: flex;
-    align-items: flex-end;
+    align-items: stretch;
     justify-content: center;
     gap: 2px;
-    height: 28px;
-    width: 84px;
+    height: 36px;
+    width: 90px;
     margin-inline: auto;
+    position: relative;
   }
-  .stocks-table .flow-spark-bar {
+  .stocks-table .flow-spark::before {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    top: 50%;
+    height: 1px;
+    background: color-mix(in oklab, var(--color-line) 80%, transparent);
+    pointer-events: none;
+  }
+  .stocks-table .flow-spark-col {
     flex: 1 1 0;
     min-width: 4px;
-    max-width: 8px;
-    border-radius: 2px 2px 0 0;
-    align-self: flex-end;
+    max-width: 9px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  .stocks-table .flow-spark-half {
+    flex: 1 1 0;
+    display: flex;
+    min-height: 0;
+  }
+  .stocks-table .flow-spark-half.up {
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .stocks-table .flow-spark-half.down {
+    align-items: flex-start;
+    justify-content: center;
+  }
+  .stocks-table .flow-spark-bar {
+    display: block;
+    width: 100%;
+    min-height: 2px;
   }
   .stocks-table .flow-spark-bar.in {
     background: color-mix(in oklab, #15803d 78%, white);
+    border-radius: 2px 2px 0 0;
   }
   .stocks-table .flow-spark-bar.out {
     background: color-mix(in oklab, #b91c1c 78%, white);
+    border-radius: 0 0 2px 2px;
+  }
+  .stocks-table .name-cell .name-main {
+    cursor: help;
   }
   .sector-chip {
     position: relative;

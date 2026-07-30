@@ -65,7 +65,7 @@ export function StocksSection({ data }: { data: DashboardData }) {
     const vol = equities.reduce((a, s) => a + (s.volume || 0), 0)
     const tv = equities.reduce((a, s) => a + (s.tradeValueMr || 0), 0)
     const net = equities.reduce((a, s) => a + (s.netIndividualBt || 0), 0)
-    const wAvg = (key: 'dailyPct' | 'weekPct' | 'monthPct' | 'ytdPct') => {
+    const wAvg = (key: 'dailyPct' | 'weekPct' | 'monthPct' | 'ytdPct' | 'year3Pct') => {
       let num = 0
       let den = 0
       for (const s of equities) {
@@ -89,6 +89,7 @@ export function StocksSection({ data }: { data: DashboardData }) {
       weekPct: wAvg('weekPct'),
       monthPct: wAvg('monthPct'),
       ytdPct: wAvg('ytdPct'),
+      year3Pct: wAvg('year3Pct'),
     }
   }, [equities])
 
@@ -114,7 +115,7 @@ export function StocksSection({ data }: { data: DashboardData }) {
     <section id="stocks" className="scroll-mt-28 space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="section-title">وضعیت معاملات سهام شرکت‌های معدنی و فلزی</h2>
+          <h2 className="section-title">وضعیت معاملات سهام معدنی و فلزی ایران</h2>
           <p className="section-sub">
             بورس‌ویو · پایانی / تعدیلی · فولادی+مس = فلزات
             {liveCount ? ` · ${liveCount} نماد · ورود پول حقیقی ${fmtNum(flowSum, 1)} م‌ت` : ' · در حال دریافت…'}
@@ -190,7 +191,7 @@ export function StocksSection({ data }: { data: DashboardData }) {
       </div>
 
       <div className="panel overflow-x-auto p-2 sm:p-3">
-        <table className="data-table stocks-table min-w-[980px]">
+        <table className="data-table stocks-table min-w-[1060px]">
           <thead>
             <tr>
               <th rowSpan={2}>صنعت</th>
@@ -212,7 +213,7 @@ export function StocksSection({ data }: { data: DashboardData }) {
                 قیمت پایانی
                 <div className="unit-row">ریال</div>
               </th>
-              <th colSpan={4}>بازدهی تعدیل‌شده</th>
+              <th colSpan={5}>بازدهی تعدیل‌شده</th>
               <th colSpan={2}>ورود پول حقیقی</th>
             </tr>
             <tr className="unit-subhead">
@@ -222,6 +223,7 @@ export function StocksSection({ data }: { data: DashboardData }) {
               <th>هفتگی</th>
               <th>ماهانه</th>
               <th>سالانه</th>
+              <th>سه‌ساله</th>
               <th>امروز (میلیارد تومان)</th>
               <th>۷ روز معاملاتی</th>
             </tr>
@@ -304,7 +306,10 @@ function volMillion(volume?: number) {
   return fmtNum(volume / 1_000_000, 1)
 }
 
-function PctPill({ value }: { value: number }) {
+function PctPill({ value }: { value?: number | null }) {
+  if (value == null || !Number.isFinite(value)) {
+    return <td className="num">—</td>
+  }
   return (
     <td className="num">
       <span className={`pct-pill ${changeClass(value)}`}>{fmtPct(value)}</span>
@@ -356,6 +361,7 @@ function EquityTr({
       <PctPill value={s.weekPct} />
       <PctPill value={s.monthPct} />
       <PctPill value={s.ytdPct} />
+      <PctPill value={s.year3Pct} />
       <FlowCell value={s.netIndividualBt} />
       <FlowSparkCell values={s.netIndividualWeekBt} />
     </motion.tr>
@@ -394,6 +400,7 @@ function IndustryTr({
       <PctPill value={s.weekPct} />
       <PctPill value={s.monthPct} />
       <PctPill value={s.ytdPct} />
+      <PctPill value={s.year3Pct} />
       <FlowCell value={s.netIndividualBt} />
       <FlowSparkCell values={s.netIndividualWeekBt} />
     </tr>
@@ -414,6 +421,7 @@ function TotalsTr({
     weekPct: number
     monthPct: number
     ytdPct: number
+    year3Pct: number
   }
 }) {
   return (
@@ -439,6 +447,7 @@ function TotalsTr({
       <PctPill value={totals.weekPct} />
       <PctPill value={totals.monthPct} />
       <PctPill value={totals.ytdPct} />
+      <PctPill value={totals.year3Pct} />
       <FlowCell value={totals.netIndividualBt} />
       <td className="num">—</td>
     </tr>

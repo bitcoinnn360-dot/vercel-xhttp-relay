@@ -1,6 +1,21 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import type { CountrySectorRow, DashboardData, GlobalMarketRow } from '../data/types'
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
+import type {
+  CountrySectorRow,
+  DashboardData,
+  GlobalMarketRow,
+  SectorPerformanceRow,
+} from '../data/types'
 import { changeClass, fmtNum, fmtPct } from '../lib/format'
 
 const GROUPS = [
@@ -28,7 +43,7 @@ type DisplayRow =
   | { kind: 'equity'; s: GlobalMarketRow; sector: string; rowSpan: number; showSector: boolean }
   | { kind: 'industry'; s: GlobalMarketRow; sector: string }
 
-type SortKey = 'ytdPct' | 'dailyPct' | 'weekPct' | 'monthPct'
+type PeriodKey = 'dailyPct' | 'weekPct' | 'monthPct' | 'ytdPct' | 'year1Pct' | 'year3Pct'
 
 function pctOrNull(v: number | null | undefined) {
   return v == null || !Number.isFinite(v) ? null : v
@@ -50,18 +65,17 @@ function MarginCell({ value }: { value: number | null | undefined }) {
   return <td className={`num font-semibold ${v >= 0 ? 'pos' : 'neg'}`}>{fmtPct(v)}</td>
 }
 
-function heatColor(pct: number | null | undefined) {
-  const v = pctOrNull(pct) ?? 0
-  const abs = Math.min(Math.abs(v), 20)
-  const a = 0.12 + (abs / 20) * 0.45
-  if (v > 0.15) return `color-mix(in oklab, #15803d ${Math.round(a * 100)}%, white)`
-  if (v < -0.15) return `color-mix(in oklab, #b91c1c ${Math.round(a * 100)}%, white)`
-  return '#f8fafc'
+function fmtCap(v?: number | null) {
+  if (v == null || !Number.isFinite(v) || v <= 0) return '—'
+  if (v >= 1e12) return `${fmtNum(v / 1e12, 2)}T`
+  if (v >= 1e9) return `${fmtNum(v / 1e9, 1)}B`
+  if (v >= 1e6) return `${fmtNum(v / 1e6, 0)}M`
+  return fmtNum(v, 0)
 }
 
 export function GlobalMarketsSection({ data }: { data: DashboardData }) {
   const [group, setGroup] = useState<(typeof GROUPS)[number]>('همه')
-  const [sectorSort, setSectorSort] = useState<SortKey>('ytdPct')
+  const [period, setPeriod] = useState<PeriodKey>('ytdPct')
   const gm = data.globalMarkets
 
   const displayRows = useMemo(() => {
@@ -69,28 +83,23 @@ export function GlobalMarketsSection({ data }: { data: DashboardData }) {
     const industries = gm.industries || []
     const filtered = group === 'همه' ? stocks : stocks.filter((s) => s.group === group)
     const indByGroup = new Map(industries.map((i) => [i.group, i]))
-
     const buckets = new Map<string, GlobalMarketRow[]>()
     for (const s of filtered) {
       const g = s.group || '—'
       if (!buckets.has(g)) buckets.set(g, [])
       buckets.get(g)!.push(s)
     }
-
     const order = GROUPS.filter((g) => g !== 'همه') as string[]
     const keys = [
       ...order.filter((g) => buckets.has(g)),
       ...[...buckets.keys()].filter((g) => !order.includes(g)),
     ]
-
     const out: DisplayRow[] = []
     for (const sector of keys) {
       const eq = (buckets.get(sector) || []).slice().sort((a, b) => (b.ytdPct || 0) - (a.ytdPct || 0))
       const ind = indByGroup.get(sector)
       const n = eq.length + (ind ? 1 : 0)
-      eq.forEach((s, i) => {
-        out.push({ kind: 'equity', s, sector, rowSpan: n, showSector: i === 0 })
-      })
+      eq.forEach((s, i) => out.push({ kind: 'equity', s, sector, rowSpan: n, showSector: i === 0 }))
       if (ind) {
         out.push({
           kind: 'industry',
@@ -113,34 +122,28 @@ export function GlobalMarketsSection({ data }: { data: DashboardData }) {
           count: i.count || stocks.filter((s) => s.group === i.group).length,
           daily: i.dailyPct ?? 0,
           ytd: i.ytdPct ?? 0,
-          gross: i.grossMarginPct,
+          y3: i.year3Pct,
           profit: i.profitMarginPct,
           tone,
         }
       })
   }, [gm.industries, gm.stocks, group])
 
-  const countryRows = useMemo(() => {
-    const rows = [...(gm.countrySectors || [])]
-    rows.sort((a, b) => (Number(b[sectorSort]) || 0) - (Number(a[sectorSort]) || 0))
-    return rows
-  }, [gm.countrySectors, sectorSort])
+  const sectors = gm.sectorPerformance || []
+  const materials = gm.materialsByCountry || gm.countrySectors || []
 
   return (
     <section id="global" className="scroll-mt-28 space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="section-title">بازار جهانی معادن و مواد</h2>
-          <p className="section-sub">
-            عملکرد سکتور کشورها · شرکت‌های معروف هر صنعت · حاشیه سود
-            {gm.updatedAt ? ` · ${new Date(gm.updatedAt).toLocaleString('fa-IR')}` : ''}
-          </p>
-        </div>
+      <div>
+        <h2 className="section-title">بازار جهانی معادن و مواد</h2>
+        <p className="section-sub">
+          سکتورهای تجمیعی بازارهای عمده · مواد پایه کشورها · شرکت‌های صنعت (میانگین وزنی)
+          {gm.updatedAt ? ` · ${new Date(gm.updatedAt).toLocaleString('fa-IR')}` : ''}
+        </p>
       </div>
-
       {gm.note ? <p className="text-[0.72rem] text-[var(--color-muted)]">{gm.note}</p> : null}
 
-      <CountrySectorBoard rows={countryRows} sortKey={sectorSort} onSort={setSectorSort} />
+      <SectorPerformanceBlock sectors={sectors} materials={materials} period={period} onPeriod={setPeriod} />
 
       <div className="flex flex-wrap gap-1.5">
         {GROUPS.map((g) => (
@@ -183,50 +186,41 @@ export function GlobalMarketsSection({ data }: { data: DashboardData }) {
             </div>
             <div className="mt-2 flex flex-wrap items-end justify-between gap-2">
               <div>
-                <div className="text-[9px] text-[var(--color-muted)]">روزانه / YTD</div>
-                <div className={`num text-sm font-bold ${changeClass(c.daily)}`}>
-                  {fmtPct(c.daily)}
-                  <span className={`ms-2 text-xs font-semibold ${changeClass(c.ytd)}`}>{fmtPct(c.ytd)}</span>
+                <div className="text-[9px] text-[var(--color-muted)]">YTD / ۳ساله (وزنی)</div>
+                <div className={`num text-sm font-bold ${changeClass(c.ytd)}`}>
+                  {fmtPct(c.ytd)}
+                  <span className={`ms-2 text-xs font-semibold ${changeClass(c.y3 ?? 0)}`}>
+                    {c.y3 != null ? fmtPct(c.y3) : '—'}
+                  </span>
                 </div>
               </div>
               <div className="text-left">
                 <div className="text-[9px] text-[var(--color-muted)]">حاشیه خالص*</div>
-                <div className="num text-sm font-semibold">
-                  {c.profit != null ? fmtPct(c.profit) : '—'}
-                </div>
+                <div className="num text-sm font-semibold">{c.profit != null ? fmtPct(c.profit) : '—'}</div>
               </div>
             </div>
           </motion.button>
         ))}
       </div>
-      <p className="text-[0.65rem] text-[var(--color-muted)]">* میانگین حاشیه سود خالص سهام‌های صنعت (بدون ETF)</p>
+      <p className="text-[0.65rem] text-[var(--color-muted)]">
+        * میانگین صنعت وزنی ارزش بازار (نه ساده) · حاشیه فقط روی سهام‌ها
+      </p>
 
       <div className="panel overflow-x-auto p-2 sm:p-3">
-        <table className="data-table stocks-table min-w-[920px]">
+        <table className="data-table stocks-table min-w-[980px]">
           <thead>
             <tr>
               <th>صنعت</th>
               <th>نماد</th>
               <th>نام</th>
-              <th>
-                قیمت
-                <div className="unit-row">محلی</div>
-              </th>
+              <th>قیمت</th>
               <th>روزانه</th>
               <th>هفتگی</th>
               <th>YTD</th>
-              <th>
-                حاشیه ناخالص
-                <div className="unit-row">٪</div>
-              </th>
-              <th>
-                حاشیه خالص
-                <div className="unit-row">٪</div>
-              </th>
-              <th>
-                P/B
-                <div className="unit-row">مرتبه</div>
-              </th>
+              <th>سه‌ساله</th>
+              <th>حاشیه ناخالص</th>
+              <th>حاشیه خالص</th>
+              <th>P/B</th>
             </tr>
           </thead>
           <tbody>
@@ -243,7 +237,7 @@ export function GlobalMarketsSection({ data }: { data: DashboardData }) {
             )}
             {!displayRows.length ? (
               <tr>
-                <td colSpan={10} className="py-8 text-center text-sm text-[var(--color-muted)]">
+                <td colSpan={11} className="py-8 text-center text-sm text-[var(--color-muted)]">
                   داده بازار جهانی هنوز بارگذاری نشده است.
                 </td>
               </tr>
@@ -255,42 +249,63 @@ export function GlobalMarketsSection({ data }: { data: DashboardData }) {
   )
 }
 
-function CountrySectorBoard({
-  rows,
-  sortKey,
-  onSort,
+function SectorPerformanceBlock({
+  sectors,
+  materials,
+  period,
+  onPeriod,
 }: {
-  rows: CountrySectorRow[]
-  sortKey: SortKey
-  onSort: (k: SortKey) => void
+  sectors: SectorPerformanceRow[]
+  materials: CountrySectorRow[]
+  period: PeriodKey
+  onPeriod: (k: PeriodKey) => void
 }) {
-  if (!rows.length) return null
-  const maxAbs = Math.max(...rows.map((r) => Math.abs(Number(r[sortKey]) || 0)), 1)
+  const chartData = useMemo(() => {
+    return [...sectors]
+      .map((s) => ({
+        name: s.nameFa,
+        value: Number(s[period]) || 0,
+      }))
+      .sort((a, b) => a.value - b.value)
+  }, [sectors, period])
+
+  const sortedSectors = useMemo(
+    () => [...sectors].sort((a, b) => (Number(b[period]) || 0) - (Number(a[period]) || 0)),
+    [sectors, period],
+  )
+  const sortedMats = useMemo(
+    () => [...materials].sort((a, b) => (Number(b[period]) || 0) - (Number(a[period]) || 0)),
+    [materials, period],
+  )
+
+  if (!sectors.length && !materials.length) return null
 
   return (
-    <div className="panel space-y-3 p-3 sm:p-4">
+    <div className="space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h3 className="text-sm font-bold">عملکرد سکتور و صنعت در کشورها</h3>
+          <h3 className="text-sm font-bold">Major Global Stock Markets — Sector & Industry Performance</h3>
           <p className="text-[0.7rem] text-[var(--color-muted)]">
-            شبیه Market → Sector & Industry Performance در GuruFocus — پروکسی ETF مواد پایه / فلزات و معادن
+            نمای تجمیعی سکتورها (Select Sector SPDR) + جدول مواد پایه به تفکیک کشور — معادل GuruFocus
           </p>
         </div>
         <div className="flex flex-wrap gap-1">
           {(
             [
-              ['dailyPct', 'روزانه'],
-              ['weekPct', 'هفتگی'],
-              ['monthPct', 'ماهانه'],
+              ['dailyPct', '۱روز'],
+              ['weekPct', '۱هفته'],
+              ['monthPct', '۱ماه'],
               ['ytdPct', 'YTD'],
+              ['year1Pct', '۱سال'],
+              ['year3Pct', '۳سال'],
             ] as const
           ).map(([k, label]) => (
             <button
               key={k}
               type="button"
-              onClick={() => onSort(k)}
+              onClick={() => onPeriod(k)}
               className={`rounded-md border px-2 py-0.5 text-[0.65rem] font-semibold ${
-                sortKey === k
+                period === k
                   ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white'
                   : 'border-[var(--color-line)] text-[var(--color-muted)]'
               }`}
@@ -301,47 +316,138 @@ function CountrySectorBoard({
         </div>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-        {rows.map((r, i) => {
-          const v = Number(r[sortKey]) || 0
-          const w = Math.max(8, Math.round((Math.abs(v) / maxAbs) * 100))
-          return (
-            <motion.div
-              key={`${r.country}-${r.sector}-${r.symbol}`}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: Math.min(i, 12) * 0.025 }}
-              className="rounded-lg border border-[var(--color-line)] px-3 py-2.5"
-              style={{ background: heatColor(v) }}
-            >
-              <div className="flex items-baseline justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-bold text-[var(--color-ink)]">{r.countryFa}</div>
-                  <div className="truncate text-[0.7rem] text-[var(--color-muted)]">
-                    {r.sectorFa}
-                    <span className="ms-1 opacity-70">· {r.symbol}</span>
-                  </div>
-                </div>
-                <div className={`num shrink-0 text-sm font-extrabold ${changeClass(v)}`}>{fmtPct(v)}</div>
-              </div>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/70">
-                <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: `${w}%`,
-                    background: v >= 0 ? '#15803d' : '#b91c1c',
-                    marginInlineStart: v >= 0 ? 0 : 'auto',
-                  }}
-                />
-              </div>
-              <div className="mt-1.5 flex justify-between text-[0.65rem] text-[var(--color-muted)]">
-                <span className={changeClass(r.dailyPct ?? 0)}>روز {r.dailyPct != null ? fmtPct(r.dailyPct) : '—'}</span>
-                <span className={changeClass(r.ytdPct ?? 0)}>YTD {r.ytdPct != null ? fmtPct(r.ytdPct) : '—'}</span>
-              </div>
-            </motion.div>
-          )
-        })}
+      <div className="panel p-3 sm:p-4">
+        <h4 className="mb-2 text-xs font-bold text-[var(--color-muted)]">Performance Comparison</h4>
+        <div className="h-[320px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 16 }}>
+              <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" horizontal={false} />
+              <XAxis type="number" tick={{ fontSize: 10, fill: '#64748b' }} unit="%" />
+              <YAxis
+                type="category"
+                dataKey="name"
+                width={120}
+                tick={{ fontSize: 10, fill: '#334155' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip
+                contentStyle={{ background: '#15202b', border: 'none', borderRadius: 10, color: '#fff', fontSize: 12 }}
+                formatter={(v) => [`${fmtPct(Number(v))}`, 'بازدهی']}
+              />
+              <Bar dataKey="value" radius={[0, 5, 5, 0]} barSize={14}>
+                {chartData.map((d) => (
+                  <Cell key={d.name} fill={d.value >= 0 ? '#15803d' : '#b91c1c'} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </div>
+
+      <div className="grid gap-3 xl:grid-cols-2">
+        <PerfTable
+          title="Market Cap Performance — سکتورهای تجمیعی"
+          subtitle="وزن ≈ AUM صندوق سکتوری"
+          rows={sortedSectors.map((s) => ({
+            key: s.symbol,
+            label: s.nameFa,
+            sub: s.symbol,
+            cap: s.marketCapUsd || s.aumUsd,
+            weight: s.weightPct,
+            dailyPct: s.dailyPct,
+            weekPct: s.weekPct,
+            monthPct: s.monthPct,
+            ytdPct: s.ytdPct,
+            year1Pct: s.year1Pct,
+            year3Pct: s.year3Pct,
+          }))}
+        />
+        <PerfTable
+          title="Basic Materials — به تفکیک کشور"
+          subtitle="همان نمای کلیک روی مواد پایه در GuruFocus"
+          rows={sortedMats.map((s) => ({
+            key: `${s.country}-${s.symbol}`,
+            label: `${s.countryFa} · ${s.sectorFa}`,
+            sub: s.symbol,
+            cap: s.marketCapUsd || s.aumUsd,
+            weight: s.weightPct,
+            dailyPct: s.dailyPct,
+            weekPct: s.weekPct,
+            monthPct: s.monthPct,
+            ytdPct: s.ytdPct,
+            year1Pct: s.year1Pct,
+            year3Pct: s.year3Pct,
+          }))}
+        />
+      </div>
+    </div>
+  )
+}
+
+function PerfTable({
+  title,
+  subtitle,
+  rows,
+}: {
+  title: string
+  subtitle: string
+  rows: {
+    key: string
+    label: string
+    sub: string
+    cap?: number | null
+    weight?: number | null
+    dailyPct?: number | null
+    weekPct?: number | null
+    monthPct?: number | null
+    ytdPct?: number | null
+    year1Pct?: number | null
+    year3Pct?: number | null
+  }[]
+}) {
+  return (
+    <div className="panel overflow-x-auto p-2 sm:p-3">
+      <h4 className="px-2 pt-2 text-xs font-bold">{title}</h4>
+      <p className="mb-2 px-2 text-[0.65rem] text-[var(--color-muted)]">{subtitle}</p>
+      <table className="data-table min-w-[640px]">
+        <thead>
+          <tr>
+            <th>سکتور / بازار</th>
+            <th>ارزش</th>
+            <th>وزن</th>
+            <th>۱روز</th>
+            <th>۱هفته</th>
+            <th>YTD</th>
+            <th>۱سال</th>
+            <th>۳سال</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.key}>
+              <td className="font-semibold">
+                {r.label}
+                <span className="mt-0.5 block text-[0.65rem] font-normal text-[var(--color-muted)]">{r.sub}</span>
+              </td>
+              <td className="num">{fmtCap(r.cap)}</td>
+              <td className="num">{r.weight != null ? `${fmtNum(r.weight, 1)}٪` : '—'}</td>
+              <PctPill value={r.dailyPct} />
+              <PctPill value={r.weekPct} />
+              <PctPill value={r.ytdPct} />
+              <PctPill value={r.year1Pct} />
+              <PctPill value={r.year3Pct} />
+            </tr>
+          ))}
+          {!rows.length ? (
+            <tr>
+              <td colSpan={8} className="py-6 text-center text-sm text-[var(--color-muted)]">
+                داده‌ای نیست
+              </td>
+            </tr>
+          ) : null}
+        </tbody>
+      </table>
     </div>
   )
 }
@@ -378,6 +484,7 @@ function EquityTr({ row }: { row: Extract<DisplayRow, { kind: 'equity' }> }) {
       <PctPill value={s.dailyPct} />
       <PctPill value={s.weekPct} />
       <PctPill value={s.ytdPct} />
+      <PctPill value={s.year3Pct} />
       <MarginCell value={s.grossMarginPct} />
       <MarginCell value={s.profitMarginPct} />
       <td className="num">{s.priceToBook != null ? fmtNum(s.priceToBook, 2) : '—'}</td>
@@ -407,13 +514,14 @@ function IndustryTr({
         </td>
       ) : null}
       <td className="font-semibold name-cell" colSpan={2}>
-        میانگین صنعت {sector}
+        میانگین وزنی صنعت {sector}
         {s.count ? <span className="symbol-tag">{s.count} نماد</span> : null}
       </td>
       <td className="num">—</td>
       <PctPill value={s.dailyPct} />
       <PctPill value={s.weekPct} />
       <PctPill value={s.ytdPct} />
+      <PctPill value={s.year3Pct} />
       <MarginCell value={s.grossMarginPct} />
       <MarginCell value={s.profitMarginPct} />
       <td className="num">—</td>

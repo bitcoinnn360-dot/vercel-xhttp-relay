@@ -1205,10 +1205,11 @@ export const seedDashboard: DashboardData = {
   globalMarkets: {
     stocks: [],
     industries: [],
-    countrySectors: [],
+    sectorPerformance: [],
+    materialsByCountry: [],
     news: [],
     source: 'seed',
-    note: 'GuruFocus بسته است — Yahoo Finance: قیمت، حاشیه سود، سکتور کشورها',
+    note: 'GuruFocus بسته است — سکتور تجمیعی + مواد پایه کشورها + میانگین وزنی صنعت',
   },
   sources: [
     {

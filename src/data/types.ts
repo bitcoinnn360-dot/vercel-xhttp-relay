@@ -114,6 +114,10 @@ export interface StockRow {
   ytdPct: number
   monthPct: number
   weekPct: number
+  /** بازدهی یک‌ساله */
+  year1Pct?: number
+  /** بازدهی سه‌ساله */
+  year3Pct?: number
   isIndustry?: boolean
   /** بازدهی از قیمت تعدیل‌شده (افزایش سرمایه / سود تقسیمی) */
   returnsAdjusted?: boolean
@@ -229,6 +233,8 @@ export interface GlobalMarketRow {
   weekPct?: number | null
   monthPct?: number | null
   ytdPct?: number | null
+  year1Pct?: number | null
+  year3Pct?: number | null
   volume?: number | null
   asOf?: string
   source?: string
@@ -243,9 +249,31 @@ export interface GlobalMarketRow {
   returnOnEquityPct?: number | null
   revenueGrowthPct?: number | null
   priceToBook?: number | null
+  marketCapUsd?: number | null
+  aumUsd?: number | null
+  weightPct?: number | null
 }
 
-/** عملکرد سکتور/صنعت در کشورها (پروکسی ETF — شبیه GuruFocus Sector Performance) */
+/** عملکرد سکتور تجمیعی بازارهای عمده (Select Sector SPDR) */
+export interface SectorPerformanceRow {
+  symbol: string
+  name: string
+  nameFa: string
+  price?: number | null
+  currency?: string
+  dailyPct?: number | null
+  weekPct?: number | null
+  monthPct?: number | null
+  ytdPct?: number | null
+  year1Pct?: number | null
+  year3Pct?: number | null
+  marketCapUsd?: number | null
+  aumUsd?: number | null
+  weightPct?: number | null
+  asOf?: string
+}
+
+/** مواد پایه / معادن به تفکیک کشور */
 export interface CountrySectorRow {
   country: string
   countryFa: string
@@ -258,6 +286,11 @@ export interface CountrySectorRow {
   weekPct?: number | null
   monthPct?: number | null
   ytdPct?: number | null
+  year1Pct?: number | null
+  year3Pct?: number | null
+  marketCapUsd?: number | null
+  aumUsd?: number | null
+  weightPct?: number | null
   asOf?: string
 }
 
@@ -273,6 +306,10 @@ export interface GlobalNewsItem {
 export interface GlobalMarketsBundle {
   stocks: GlobalMarketRow[]
   industries: GlobalMarketRow[]
+  /** Performance Comparison + Market Cap Performance (سکتورهای تجمیعی) */
+  sectorPerformance?: SectorPerformanceRow[]
+  /** Basic Materials به تفکیک کشور */
+  materialsByCountry?: CountrySectorRow[]
   countrySectors?: CountrySectorRow[]
   news?: GlobalNewsItem[]
   updatedAt?: string

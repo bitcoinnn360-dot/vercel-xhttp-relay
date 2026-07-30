@@ -1,14 +1,12 @@
-#!/usr/bin/env node
 /**
- * Generate public/data/global_markets.json (static-first snapshot).
- * Usage: node scripts/fetch_global.mjs
+ * Cloudflare Pages Function: global mineral / materials market snapshot.
+ *
+ * GuruFocus is Cloudflare-blocked. Public equivalents via Yahoo Finance:
+ *  - Chart API → period returns (incl. 1Y / 3Y)
+ *  - quoteSummary → margins, AUM / market-cap proxies
+ *  - Select Sector SPDRs → aggregated Major Markets sector performance
+ *  - Country materials ETFs → Basic Materials by country
  */
-import { writeFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'node:path'
-
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const root = join(__dirname, '..')
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
@@ -55,7 +53,23 @@ const UNIVERSE = [
   { symbol: 'REMX', name: 'VanEck Rare Earth/Strategic', nameFa: 'ETF خاک نادر', group: 'کامودیتی', kind: 'etf' },
 ]
 
-const COUNTRY_SECTORS = [
+/** GICS sectors — Select Sector SPDR (aggregated major-market sector view). */
+const GICS_SECTORS = [
+  { symbol: 'XLB', name: 'Basic Materials', nameFa: 'مواد پایه' },
+  { symbol: 'XLE', name: 'Energy', nameFa: 'انرژی' },
+  { symbol: 'XLF', name: 'Financials', nameFa: 'مالی' },
+  { symbol: 'XLI', name: 'Industrials', nameFa: 'صنعتی' },
+  { symbol: 'XLK', name: 'Technology', nameFa: 'فناوری' },
+  { symbol: 'XLP', name: 'Consumer Staples', nameFa: 'کالاهای مصرفی اساسی' },
+  { symbol: 'XLU', name: 'Utilities', nameFa: 'خدمات عمومی' },
+  { symbol: 'XLV', name: 'Health Care', nameFa: 'سلامت' },
+  { symbol: 'XLY', name: 'Consumer Discretionary', nameFa: 'کالاهای مصرفی اختیاری' },
+  { symbol: 'XLC', name: 'Communication Services', nameFa: 'ارتباطات' },
+  { symbol: 'XLRE', name: 'Real Estate', nameFa: 'املاک' },
+]
+
+/** Basic Materials / metals proxies by country (GuruFocus Basic Materials drill-down). */
+const MATERIALS_BY_COUNTRY = [
   { country: 'United States', countryFa: 'آمریکا', sector: 'Basic Materials', sectorFa: 'مواد پایه', symbol: 'XLB' },
   { country: 'United States', countryFa: 'آمریکا', sector: 'Metals & Mining', sectorFa: 'فلزات و معادن', symbol: 'XME' },
   { country: 'Canada', countryFa: 'کانادا', sector: 'Materials', sectorFa: 'مواد', symbol: 'XMA.TO' },
@@ -64,9 +78,6 @@ const COUNTRY_SECTORS = [
   { country: 'China', countryFa: 'چین', sector: 'Basic Materials', sectorFa: 'مواد پایه', symbol: '512400.SS' },
   { country: 'Global', countryFa: 'جهانی', sector: 'Materials', sectorFa: 'مواد پایه', symbol: 'MXI' },
   { country: 'Global', countryFa: 'جهانی', sector: 'Metals & Mining', sectorFa: 'فلزات و معادن', symbol: 'PICK' },
-  { country: 'Global', countryFa: 'جهانی', sector: 'Copper Miners', sectorFa: 'معدن‌کاران مس', symbol: 'COPX' },
-  { country: 'Global', countryFa: 'جهانی', sector: 'Steel', sectorFa: 'فولاد', symbol: 'SLX' },
-  { country: 'Global', countryFa: 'جهانی', sector: 'Gold Miners', sectorFa: 'معدن‌کاران طلا', symbol: 'GDX' },
   { country: 'Brazil', countryFa: 'برزیل', sector: 'Broad (materials-heavy)', sectorFa: 'بازار گسترده (موادمحور)', symbol: 'EWZ' },
   { country: 'Peru', countryFa: 'پرو', sector: 'Broad (mining-heavy)', sectorFa: 'بازار گسترده (معدن‌محور)', symbol: 'EPU' },
 ]
@@ -75,35 +86,67 @@ function pct(from, to) {
   if (!(from > 0) || to == null || !Number.isFinite(to)) return null
   return Math.round((to / from - 1) * 10000) / 100
 }
+
 function marginPct(raw) {
   const v = raw?.raw ?? raw
   if (v == null || !Number.isFinite(v)) return null
   return Math.round(v * 10000) / 100
 }
+
 function num(raw) {
   const v = raw?.raw ?? raw
   if (v == null || !Number.isFinite(v)) return null
   return Math.round(v * 100) / 100
 }
 
+function pickNear(valid, targetTs) {
+  let best = valid[0]
+  for (const x of valid) {
+    if (x.t >= targetTs) {
+      best = x
+      break
+    }
+  }
+  return best
+}
+
+async function withTimeout(promise, ms, label) {
+  let timer
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timeout ${ms}ms`)), ms)
+      }),
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 async function yahooAuth() {
-  const fc = await fetch('https://fc.yahoo.com/', { headers: { 'User-Agent': UA }, redirect: 'manual' })
+  const fc = await fetch('https://fc.yahoo.com/', {
+    headers: { 'User-Agent': UA },
+    redirect: 'manual',
+  })
   const set = fc.headers.getSetCookie?.() || []
   const cookie = (set[0] || '').split(';')[0]
-  if (!cookie) throw new Error('cookie missing')
+  if (!cookie) throw new Error('yahoo cookie missing')
   const cr = await fetch('https://query2.finance.yahoo.com/v1/test/getcrumb', {
     headers: { 'User-Agent': UA, Cookie: cookie },
   })
+  if (!cr.ok) throw new Error(`yahoo crumb ${cr.status}`)
   const crumb = (await cr.text()).trim()
+  if (!crumb || crumb.length > 40) throw new Error('yahoo crumb invalid')
   return { cookie, crumb }
 }
 
 async function yahooQuote(meta) {
-  const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(meta.symbol)}?interval=1d&range=1y`
+  const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(meta.symbol)}?interval=1d&range=5y`
   const res = await fetch(url, {
     headers: { 'User-Agent': UA, Accept: 'application/json', Referer: 'https://finance.yahoo.com/' },
   })
-  if (!res.ok) throw new Error(`${meta.symbol} ${res.status}`)
+  if (!res.ok) throw new Error(`yahoo ${meta.symbol} ${res.status}`)
   const j = await res.json()
   const r = j.chart?.result?.[0]
   const closes = r?.indicators?.quote?.[0]?.close || []
@@ -111,11 +154,13 @@ async function yahooQuote(meta) {
   const ts = r?.timestamp || []
   const valid = []
   for (let i = 0; i < closes.length; i++) {
-    if (closes[i] != null && Number.isFinite(closes[i])) valid.push({ c: closes[i], v: volumes[i] || 0, t: ts[i] })
+    if (closes[i] != null && Number.isFinite(closes[i])) {
+      valid.push({ c: closes[i], v: volumes[i] || 0, t: ts[i] })
+    }
   }
-  if (valid.length < 2) throw new Error(`${meta.symbol} thin`)
-  const last = valid.at(-1)
-  const prev = valid.at(-2)
+  if (valid.length < 2) throw new Error(`${meta.symbol} thin history`)
+  const last = valid[valid.length - 1]
+  const prev = valid[valid.length - 2]
   const week = valid[Math.max(0, valid.length - 6)]
   const month = valid[Math.max(0, valid.length - 22)]
   const year = new Date(last.t * 1000).getUTCFullYear()
@@ -126,6 +171,8 @@ async function yahooQuote(meta) {
       break
     }
   }
+  const year1 = pickNear(valid, last.t - 365.25 * 24 * 3600)
+  const year3 = pickNear(valid, last.t - 3 * 365.25 * 24 * 3600)
   return {
     ...meta,
     price: +last.c.toFixed(2),
@@ -134,6 +181,8 @@ async function yahooQuote(meta) {
     weekPct: pct(week.c, last.c),
     monthPct: pct(month.c, last.c),
     ytdPct: pct(ytd.c, last.c),
+    year1Pct: pct(year1.c, last.c),
+    year3Pct: pct(year3.c, last.c),
     volume: last.v || null,
     asOf: new Date(last.t * 1000).toISOString().slice(0, 10),
     source: 'yahoo-finance',
@@ -143,7 +192,7 @@ async function yahooQuote(meta) {
 async function yahooFundamentals(symbol, auth) {
   const url =
     `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}` +
-    `?modules=financialData,defaultKeyStatistics&crumb=${encodeURIComponent(auth.crumb)}`
+    `?modules=financialData,defaultKeyStatistics,price,summaryDetail&crumb=${encodeURIComponent(auth.crumb)}`
   const res = await fetch(url, {
     headers: {
       'User-Agent': UA,
@@ -157,6 +206,15 @@ async function yahooFundamentals(symbol, auth) {
   const row = j?.quoteSummary?.result?.[0] || {}
   const fd = row.financialData || {}
   const ks = row.defaultKeyStatistics || {}
+  const price = row.price || {}
+  const sd = row.summaryDetail || {}
+  const aum = ks.totalAssets?.raw ?? sd.totalAssets?.raw ?? null
+  const mcap =
+    price.marketCap?.raw ??
+    ks.enterpriseValue?.raw ??
+    (price.regularMarketPrice?.raw && ks.sharesOutstanding?.raw
+      ? price.regularMarketPrice.raw * ks.sharesOutstanding.raw
+      : null)
   return {
     grossMarginPct: marginPct(fd.grossMargins),
     operatingMarginPct: marginPct(fd.operatingMargins),
@@ -164,7 +222,36 @@ async function yahooFundamentals(symbol, auth) {
     returnOnEquityPct: marginPct(fd.returnOnEquity),
     revenueGrowthPct: marginPct(fd.revenueGrowth),
     priceToBook: num(ks.priceToBook),
+    marketCapUsd: mcap != null && Number.isFinite(mcap) ? Math.round(mcap) : null,
+    aumUsd: aum != null && Number.isFinite(aum) ? Math.round(aum) : null,
   }
+}
+
+function weightOf(s) {
+  const w = s.marketCapUsd || s.aumUsd
+  return w != null && w > 0 ? w : 0
+}
+
+function weightedAvg(members, key) {
+  let num = 0
+  let den = 0
+  let fallback = 0
+  let n = 0
+  for (const s of members) {
+    const v = s[key]
+    if (v == null || !Number.isFinite(v)) continue
+    const w = weightOf(s)
+    if (w > 0) {
+      num += w * v
+      den += w
+    } else {
+      fallback += v
+      n += 1
+    }
+  }
+  if (den > 0) return Math.round((num / den) * 100) / 100
+  if (n > 0) return Math.round((fallback / n) * 100) / 100
+  return null
 }
 
 function buildIndustries(stocks) {
@@ -177,130 +264,160 @@ function buildIndustries(stocks) {
   }
   return groups.map((g) => {
     const members = stocks.filter((s) => s.group === g)
-    const avg = (key) => {
-      let n = 0
-      let d = 0
-      for (const s of members) {
-        const v = s[key]
-        if (v != null && Number.isFinite(v)) {
-          n += v
-          d += 1
-        }
-      }
-      return d ? Math.round((n / d) * 100) / 100 : 0
-    }
-    const marginAvg = (key) => {
-      const eqs = members.filter((s) => s.kind === 'equity')
-      let n = 0
-      let d = 0
-      for (const s of eqs) {
-        const v = s[key]
-        if (v != null && Number.isFinite(v)) {
-          n += v
-          d += 1
-        }
-      }
-      return d ? Math.round((n / d) * 100) / 100 : null
-    }
+    const eqs = members.filter((s) => s.kind === 'equity')
     return {
       group: g,
       name: `صنعت ${g}`,
       nameFa: `صنعت ${g}`,
       isIndustry: true,
-      dailyPct: avg('dailyPct'),
-      weekPct: avg('weekPct'),
-      monthPct: avg('monthPct'),
-      ytdPct: avg('ytdPct'),
-      grossMarginPct: marginAvg('grossMarginPct'),
-      profitMarginPct: marginAvg('profitMarginPct'),
+      dailyPct: weightedAvg(members, 'dailyPct'),
+      weekPct: weightedAvg(members, 'weekPct'),
+      monthPct: weightedAvg(members, 'monthPct'),
+      ytdPct: weightedAvg(members, 'ytdPct'),
+      year1Pct: weightedAvg(members, 'year1Pct'),
+      year3Pct: weightedAvg(members, 'year3Pct'),
+      grossMarginPct: weightedAvg(eqs, 'grossMarginPct'),
+      profitMarginPct: weightedAvg(eqs, 'profitMarginPct'),
       count: members.length,
     }
   })
 }
 
-async function batch(items, size, fn, out, errors) {
-  for (let i = 0; i < items.length; i += size) {
-    const part = await Promise.allSettled(items.slice(i, i + size).map(fn))
-    part.forEach((r, j) => {
-      if (r.status === 'fulfilled') out.push(r.value)
-      else errors.push(`${items[i + j].symbol}: ${r.reason?.message || r.reason}`)
-    })
+function withWeights(rows) {
+  const total = rows.reduce((a, r) => a + (r.marketCapUsd || r.aumUsd || 0), 0)
+  return rows.map((r) => {
+    const cap = r.marketCapUsd || r.aumUsd || null
+    return {
+      ...r,
+      weightPct: total > 0 && cap ? Math.round((cap / total) * 10000) / 100 : null,
+    }
+  })
+}
+
+async function buildLiveBundle(errors) {
+  const stocks = []
+  const batch = async (items, size, fn, sink = stocks) => {
+    for (let i = 0; i < items.length; i += size) {
+      const part = await Promise.allSettled(items.slice(i, i + size).map(fn))
+      part.forEach((r, j) => {
+        if (r.status === 'fulfilled') sink.push(r.value)
+        else errors.push(`${items[i + j].symbol}: ${r.reason?.message || r.reason}`)
+      })
+    }
   }
-}
 
-const errors = []
-const stocks = []
-console.log('fetching quotes…')
-await batch(UNIVERSE, 6, yahooQuote, stocks, errors)
-console.log('quotes', stocks.length, 'errors', errors.length)
+  await withTimeout(batch(UNIVERSE, 6, (m) => yahooQuote(m)), 28000, 'yahoo-batch')
 
-let auth
-try {
-  auth = await yahooAuth()
-  console.log('auth ok')
-} catch (e) {
-  console.warn('auth fail', e.message)
-}
-
-if (auth) {
-  const equities = stocks.filter((s) => s.kind === 'equity')
-  console.log('fundamentals', equities.length)
-  for (let i = 0; i < equities.length; i += 4) {
-    const slice = equities.slice(i, i + 4)
-    await Promise.all(
-      slice.map(async (s) => {
-        try {
-          Object.assign(s, await yahooFundamentals(s.symbol, auth))
-        } catch (e) {
-          errors.push(`fund ${s.symbol}: ${e.message}`)
-        }
-      }),
-    )
-  }
-}
-
-const countrySectors = []
-const seen = new Map(stocks.map((s) => [s.symbol, s]))
-for (const meta of COUNTRY_SECTORS) {
+  let auth = null
   try {
-    let q = seen.get(meta.symbol)
-    if (!q) {
-      q = await yahooQuote({
+    auth = await withTimeout(yahooAuth(), 8000, 'yahoo-auth')
+  } catch (e) {
+    errors.push(`auth: ${e?.message || e}`)
+  }
+
+  const enrich = async (row) => {
+    if (!auth) return row
+    try {
+      Object.assign(row, await yahooFundamentals(row.symbol, auth))
+    } catch (e) {
+      errors.push(`fund ${row.symbol}: ${e?.message || e}`)
+    }
+    return row
+  }
+
+  if (auth) {
+    for (let i = 0; i < stocks.length; i += 4) {
+      const slice = stocks.slice(i, i + 4)
+      await Promise.all(slice.map((s) => enrich(s)))
+    }
+  }
+
+  const quoteCache = new Map(stocks.map((s) => [s.symbol, s]))
+  const ensureQuote = async (meta) => {
+    if (quoteCache.has(meta.symbol)) return quoteCache.get(meta.symbol)
+    const q = await yahooQuote(meta)
+    if (auth) await enrich(q)
+    quoteCache.set(meta.symbol, q)
+    return q
+  }
+
+  const sectorPerformance = []
+  for (const meta of GICS_SECTORS) {
+    try {
+      const q = await ensureQuote({ ...meta, group: 'gics', kind: 'etf', nameFa: meta.nameFa })
+      sectorPerformance.push({
+        symbol: meta.symbol,
+        name: meta.name,
+        nameFa: meta.nameFa,
+        price: q.price,
+        currency: q.currency,
+        dailyPct: q.dailyPct,
+        weekPct: q.weekPct,
+        monthPct: q.monthPct,
+        ytdPct: q.ytdPct,
+        year1Pct: q.year1Pct,
+        year3Pct: q.year3Pct,
+        marketCapUsd: q.aumUsd || q.marketCapUsd || null,
+        aumUsd: q.aumUsd || null,
+        asOf: q.asOf,
+      })
+    } catch (e) {
+      errors.push(`gics ${meta.symbol}: ${e?.message || e}`)
+    }
+  }
+
+  const materialsByCountry = []
+  for (const meta of MATERIALS_BY_COUNTRY) {
+    try {
+      const q = await ensureQuote({
         symbol: meta.symbol,
         name: meta.sector,
         nameFa: meta.sectorFa,
-        group: 'country-sector',
+        group: 'materials-country',
         kind: 'etf',
       })
+      materialsByCountry.push({
+        ...meta,
+        price: q.price,
+        currency: q.currency,
+        dailyPct: q.dailyPct,
+        weekPct: q.weekPct,
+        monthPct: q.monthPct,
+        ytdPct: q.ytdPct,
+        year1Pct: q.year1Pct,
+        year3Pct: q.year3Pct,
+        marketCapUsd: q.aumUsd || q.marketCapUsd || null,
+        aumUsd: q.aumUsd || null,
+        asOf: q.asOf,
+      })
+    } catch (e) {
+      errors.push(`materials ${meta.symbol}: ${e?.message || e}`)
     }
-    countrySectors.push({
-      ...meta,
-      price: q.price,
-      currency: q.currency,
-      dailyPct: q.dailyPct,
-      weekPct: q.weekPct,
-      monthPct: q.monthPct,
-      ytdPct: q.ytdPct,
-      asOf: q.asOf,
-    })
-  } catch (e) {
-    errors.push(`sector ${meta.symbol}: ${e.message}`)
+  }
+
+  return {
+    ok: stocks.length > 0,
+    updatedAt: new Date().toISOString(),
+    source: 'yahoo-finance',
+    note: 'GuruFocus بسته است؛ سکتورهای تجمیعی = Select Sector SPDR · مواد پایه کشورها = ETF مواد/معادن · میانگین صنعت وزنی ارزش بازار',
+    stocks,
+    industries: buildIndustries(stocks),
+    sectorPerformance: withWeights(sectorPerformance),
+    materialsByCountry: withWeights(materialsByCountry),
+    countrySectors: [],
+    news: [],
+    errors: errors.slice(0, 20),
   }
 }
 
-const payload = {
-  ok: stocks.length > 0,
-  updatedAt: new Date().toISOString(),
-  source: 'yahoo-finance',
-  note: 'GuruFocus بسته است؛ قیمت و حاشیه سود از Yahoo · عملکرد سکتور کشورها با ETFهای مواد/معادن',
-  stocks,
-  industries: buildIndustries(stocks),
-  countrySectors,
-  news: [],
-  errors: errors.slice(0, 20),
-}
 
-const out = join(root, 'public/data/global_markets.json')
+import { writeFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const errors = []
+const payload = await buildLiveBundle(errors)
+const out = join(__dirname, '../public/data/global_markets.json')
 writeFileSync(out, JSON.stringify(payload, null, 2))
-console.log('wrote', out, 'stocks', stocks.length, 'sectors', countrySectors.length, 'withMargins', stocks.filter((s) => s.profitMarginPct != null).length)
-if (errors.length) console.log('sample errors', errors.slice(0, 8))
+console.log('wrote', out, 'stocks', payload.stocks.length, 'sectors', payload.sectorPerformance?.length, 'materials', payload.materialsByCountry?.length, 'errors', errors.length)
+if (errors.length) console.log(errors.slice(0,8))

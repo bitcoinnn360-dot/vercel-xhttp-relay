@@ -20,8 +20,8 @@ const UA =
 const SOURCEARENA_API = 'https://apis.sourcearena.ir/api/'
 const DEMO_TOKEN = 'bba6d330a87bac533f18cc245d3baeaa'
 const BV_BASE = 'https://www.bourseview.com'
-const BV_HISTORY_N = 300
-const SA_HISTORY_DAYS = 280
+const BV_HISTORY_N = 900
+const SA_HISTORY_DAYS = 900
 
 const MINERAL_STOCKS = [
   { name: 'توسعه معادن و فلزات', symbol: 'ومعادن', isin: 'IRO1MADN0001', exchange: 'IRTSENO' },
@@ -52,7 +52,7 @@ const MINERAL_STOCKS = [
 ]
 
 const CACHE_TTL_MS = 20 * 60 * 1000
-const CACHE_KEY = 'https://cache.local/mineral-stocks-bv-v8'
+const CACHE_KEY = 'https://cache.local/mineral-stocks-bv-v9'
 
 /** Manual share-count overrides when quote history lags capital-increase filings. */
 const OUTSTANDING_SHARES = {
@@ -96,6 +96,16 @@ function jalaliParts(date = new Date()) {
   } catch {
     return { year: 1405, month: 1, day: 1, key: '1405/01/01' }
   }
+}
+
+function threeYearsAgoJalaliKey(date = new Date()) {
+  const j = jalaliParts(date)
+  return `${j.year - 3}/${String(j.month).padStart(2, '0')}/${String(j.day).padStart(2, '0')}`
+}
+
+function oneYearAgoJalaliKey(date = new Date()) {
+  const j = jalaliParts(date)
+  return `${j.year - 1}/${String(j.month).padStart(2, '0')}/${String(j.day).padStart(2, '0')}`
 }
 
 function tehranWeekdaySat0(date = new Date()) {
@@ -224,11 +234,19 @@ function returnsFromSaHistory(rows) {
   const yStart = jalaliYearStartKey()
   const ytdRows = closes.filter((c) => c.date >= yStart)
   const ytdBase = ytdRows.length ? ytdRows[ytdRows.length - 1].price : null
+  const y1Key = oneYearAgoJalaliKey()
+  const y3Key = threeYearsAgoJalaliKey()
+  const y1Rows = closes.filter((c) => c.date >= y1Key)
+  const y3Rows = closes.filter((c) => c.date >= y3Key)
+  const year1Base = y1Rows.length ? y1Rows[y1Rows.length - 1].price : closes[closes.length - 1]?.price
+  const year3Base = y3Rows.length ? y3Rows[y3Rows.length - 1].price : closes[closes.length - 1]?.price
 
   return {
     weekPct: pct(week, last),
     monthPct: pct(month, last),
     ytdPct: pct(ytdBase, last),
+    year1Pct: pct(year1Base, last),
+    year3Pct: pct(year3Base, last),
     lastPrice: last,
     historyCount: closes.length,
   }
@@ -258,19 +276,27 @@ function returnsFromBvItems(items, currentPayani) {
   const weekBase = adjOnOrBefore(traded, previousWednesdayKey())
   const monthBase = adjOnOrBefore(traded, lastDayPrevJalaliMonthKey())
   const ytdBase = adjOnOrBefore(traded, jalaliYearStartKey())
+  const year1Base = adjOnOrBefore(traded, oneYearAgoJalaliKey())
+  const year3Base = adjOnOrBefore(traded, threeYearsAgoJalaliKey())
 
   return {
     weekPct: pct(weekBase?.adj, currentPayani),
     monthPct: pct(monthBase?.adj, currentPayani),
     ytdPct: pct(ytdBase?.adj, currentPayani),
+    year1Pct: pct(year1Base?.adj, currentPayani),
+    year3Pct: pct(year3Base?.adj, currentPayani),
     historyCount: traded.length,
     anchors: {
       week: weekBase?.shamsi || null,
       month: monthBase?.shamsi || null,
       ytd: ytdBase?.shamsi || null,
+      year1: year1Base?.shamsi || null,
+      year3: year3Base?.shamsi || null,
       weekAdj: weekBase?.adj ?? null,
       monthAdj: monthBase?.adj ?? null,
       ytdAdj: ytdBase?.adj ?? null,
+      year1Adj: year1Base?.adj ?? null,
+      year3Adj: year3Base?.adj ?? null,
     },
   }
 }
@@ -419,6 +445,8 @@ function snapFromBv(meta, items, stockMeta = null) {
     weekPct: rets.weekPct,
     monthPct: rets.monthPct,
     ytdPct: rets.ytdPct,
+    year1Pct: rets.year1Pct,
+    year3Pct: rets.year3Pct,
     marketValueBr,
     volume,
     tradeValueMr,
@@ -465,6 +493,8 @@ async function scrapeSaSymbol(token, symbol, adjustedEnabled) {
     weekPct: rets.weekPct,
     monthPct: rets.monthPct,
     ytdPct: rets.ytdPct,
+    year1Pct: rets.year1Pct,
+    year3Pct: rets.year3Pct,
     marketValueBr: mv != null ? Math.round(mv / 1e9) : undefined,
     volume: vol ?? undefined,
     tradeValueMr: tv != null ? Math.round(tv / 1e6) : undefined,

@@ -90,6 +90,8 @@ export interface MineralStockSnap {
   weekPct?: number
   monthPct?: number
   ytdPct?: number
+  year1Pct?: number
+  year3Pct?: number
   marketValueBr?: number
   volume?: number
   tradeValueMr?: number
@@ -1247,7 +1249,9 @@ async function fetchGlobalMarketsApi(): Promise<GlobalMarketsBundle | null> {
     return {
       stocks: json.stocks,
       industries: json.industries || [],
-      countrySectors: json.countrySectors || [],
+      sectorPerformance: json.sectorPerformance || [],
+      materialsByCountry: json.materialsByCountry || json.countrySectors || [],
+      countrySectors: [],
       news: [],
       updatedAt: json.updatedAt,
       source: json.source,
@@ -1278,7 +1282,9 @@ function applyGlobalMarkets(base: DashboardData, bundle: GlobalMarketsBundle | n
   base.globalMarkets = {
     stocks: bundle.stocks,
     industries: bundle.industries || [],
-    countrySectors: bundle.countrySectors || [],
+    sectorPerformance: bundle.sectorPerformance || [],
+    materialsByCountry: bundle.materialsByCountry || bundle.countrySectors || [],
+    countrySectors: [],
     news: [],
     updatedAt: bundle.updatedAt,
     source: bundle.source || 'yahoo-finance',
@@ -1325,7 +1331,10 @@ async function fetchMineralStocksApi(): Promise<MineralStockSnap[] | null> {
   return staticStocks
 }
 
-function weightedPct(members: StockRow[], key: 'dailyPct' | 'weekPct' | 'monthPct' | 'ytdPct'): number {
+function weightedPct(
+  members: StockRow[],
+  key: 'dailyPct' | 'weekPct' | 'monthPct' | 'ytdPct' | 'year1Pct' | 'year3Pct',
+): number {
   let num = 0
   let den = 0
   for (const s of members) {
@@ -1401,6 +1410,8 @@ function rebuildIndustryRows(base: DashboardData) {
       weekPct: weightedPct(members, 'weekPct'),
       monthPct: weightedPct(members, 'monthPct'),
       ytdPct: weightedPct(members, 'ytdPct'),
+      year1Pct: weightedPct(members, 'year1Pct'),
+      year3Pct: weightedPct(members, 'year3Pct'),
       netIndividualBt: Math.round(net * 100) / 100,
       netIndividualWeekBt: weekFlow,
       returnsAdjusted: members.some((s) => s.returnsAdjusted),
@@ -1442,6 +1453,8 @@ function applyMineralStockReturns(base: DashboardData, snaps: MineralStockSnap[]
     if (snap.weekPct != null && Number.isFinite(snap.weekPct)) s.weekPct = snap.weekPct
     if (snap.monthPct != null && Number.isFinite(snap.monthPct)) s.monthPct = snap.monthPct
     if (snap.ytdPct != null && Number.isFinite(snap.ytdPct)) s.ytdPct = snap.ytdPct
+    if (snap.year1Pct != null && Number.isFinite(snap.year1Pct)) s.year1Pct = snap.year1Pct
+    if (snap.year3Pct != null && Number.isFinite(snap.year3Pct)) s.year3Pct = snap.year3Pct
     if (snap.returnsSource) {
       s.returnsAdjusted = Boolean(snap.returnsAdjusted)
       s.returnsSource = snap.returnsSource
@@ -1669,12 +1682,11 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
     }
     if (s.id === 'yahoo') {
       const n = base.globalMarkets.stocks.length
-      const sectors = base.globalMarkets.countrySectors?.length || 0
       return {
         ...s,
         status: globalOk ? 'live' : 'seed',
         note: globalOk
-          ? `${n} نماد · ${sectors} سکتور کشوری · ${base.globalMarkets.source || 'yahoo'}`
+          ? `${n} نماد · ${base.globalMarkets.sectorPerformance?.length || 0} سکتور · ${base.globalMarkets.materialsByCountry?.length || 0} مواد/کشور`
           : 'Yahoo Finance هنوز لود نشده',
         lastOk: globalOk ? base.globalMarkets.updatedAt || now : s.lastOk,
       }

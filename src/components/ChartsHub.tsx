@@ -60,7 +60,7 @@ export function ChartsHub({
   return (
     <section id="charts" className="scroll-mt-8 space-y-4">
       <div>
-        <h2 className="section-title">نمودار قیمت‌های گزارش روزانه</h2>
+        <h2 className="section-title">نمودار کامودیتی‌ها</h2>
         <p className="section-sub">
           کندل OHLC از TGJU از ۲۰۲۲ تا امروز (هفتگی برای خوانایی) · سری‌های کلان FRED به صورت خطی
         </p>

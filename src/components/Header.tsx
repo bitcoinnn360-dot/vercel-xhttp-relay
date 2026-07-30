@@ -5,7 +5,7 @@ import { jalaliTodayTehran, timeFa } from '../lib/format'
 
 const SECTIONS = [
   { id: 'overview', label: 'نمای بازار' },
-  { id: 'stocks', label: 'سهام معدنی' },
+  { id: 'stocks', label: 'سهام معدنی و فلزی ایران' },
   { id: 'nav', label: 'NAV پرتفو' },
   { id: 'commodities', label: 'کامودیتی' },
   { id: 'steel', label: 'زنجیره فولاد' },

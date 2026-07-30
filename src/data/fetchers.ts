@@ -1002,7 +1002,8 @@ type SteelChainBundle = {
 }
 
 async function fetchSteelChainApi(): Promise<SteelChainBundle | null> {
-  // Static first (always fast). Live /api/steel is optional and must not hang the UI.
+  // Static first (always fast). Live scrape is best-effort with a short timeout so the
+  // dashboard never sits blank while Custeel hangs.
   let staticBundle: SteelChainBundle | null = null
   try {
     const res = await fetchWithTimeout('/data/steel_chain.json', 8000, { cache: 'no-store' })
@@ -1015,7 +1016,7 @@ async function fetchSteelChainApi(): Promise<SteelChainBundle | null> {
   }
 
   try {
-    const res = await fetchWithTimeout('/api/steel', 12000, { cache: 'no-store' })
+    const res = await fetchWithTimeout('/api/steel', 4000, { cache: 'no-store' })
     if (res.ok) {
       const json = (await res.json()) as SteelChainBundle
       if (json?.ok || json?.steel?.length || json?.imeChain?.length) return json

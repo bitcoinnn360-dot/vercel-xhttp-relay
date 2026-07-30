@@ -886,23 +886,21 @@ export async function onRequestGet(context) {
     let series = { steel: [], histories: {}, ok: 0 }
     let indicators = { ok: false }
     if (cookie) {
-      try {
-        indicators = await withTimeout(scrapeIndicators(cookie), 10000, 'custeel-indicators')
-      } catch (e) {
-        custeelErr = String(e?.message || e)
-      }
-      try {
-        series = await withTimeout(scrapeCusteel(cookie, cnyUsd), 15000, 'custeel-scrape')
-      } catch (e) {
-        custeelErr = String(e?.message || e)
-      }
+      const [indRes, seriesRes] = await Promise.allSettled([
+        withTimeout(scrapeIndicators(cookie), 8000, 'custeel-indicators'),
+        withTimeout(scrapeCusteel(cookie, cnyUsd), 10000, 'custeel-scrape'),
+      ])
+      if (indRes.status === 'fulfilled') indicators = indRes.value
+      else custeelErr = String(indRes.reason?.message || indRes.reason)
+      if (seriesRes.status === 'fulfilled') series = seriesRes.value
+      else custeelErr = String(seriesRes.reason?.message || seriesRes.reason)
     } else if (!custeelErr) {
       custeelErr = 'missing CUSTEEL_USER/PASS or CUSTEEL_COOKIE'
     }
 
     let ime = { ok: false }
     try {
-      ime = await withTimeout(scrapeIme(usdIrr), 8000, 'ime')
+      ime = await withTimeout(scrapeIme(usdIrr), 6000, 'ime')
     } catch (e) {
       ime = { ok: false, error: String(e?.message || e) }
     }

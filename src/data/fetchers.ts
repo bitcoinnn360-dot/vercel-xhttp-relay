@@ -122,7 +122,7 @@ export interface LiveBundle {
 
 async function fetchTgjuAjax(): Promise<Record<string, { p: string; d: string; dp: string; dt: string; h?: string; l?: string; t?: string }>> {
   try {
-    const res = await fetch(TGJU_AJAX, { headers: { Accept: 'application/json' } })
+    const res = await fetchWithTimeout(TGJU_AJAX, 5000, { headers: { Accept: 'application/json' } })
     if (!res.ok) return {}
     const json = (await res.json()) as { current?: Record<string, { p: string; d: string; dp: string; dt: string; h?: string; l?: string; t?: string }> }
     return json.current || {}
@@ -133,7 +133,7 @@ async function fetchTgjuAjax(): Promise<Record<string, { p: string; d: string; d
 
 async function fetchTgjuHistory(key: string, limit = 90): Promise<HistoryPoint[]> {
   try {
-    const res = await fetch(`${TGJU_HIST}/${key}`, { headers: { Accept: 'application/json' } })
+    const res = await fetchWithTimeout(`${TGJU_HIST}/${key}`, 6000, { headers: { Accept: 'application/json' } })
     if (!res.ok) return []
     const json = (await res.json()) as { data?: string[][] }
     const rows = json.data || []
@@ -154,7 +154,7 @@ async function fetchTgjuHistory(key: string, limit = 90): Promise<HistoryPoint[]
 /** Full OHLC from TGJU, filtered from `fromGreg` (YYYY/MM/DD). Newest-first API → reverse. */
 async function fetchTgjuOhlc(key: string, fromGreg = '2022/01/01'): Promise<CandlePoint[]> {
   try {
-    const res = await fetch(`${TGJU_HIST}/${key}`, { headers: { Accept: 'application/json' } })
+    const res = await fetchWithTimeout(`${TGJU_HIST}/${key}`, 6000, { headers: { Accept: 'application/json' } })
     if (!res.ok) return []
     const json = (await res.json()) as { data?: string[][] }
     const out: CandlePoint[] = []
@@ -183,7 +183,7 @@ async function fetchFred(id: string, label: string): Promise<FredBundle | null> 
   ]
   for (const endpoint of endpoints) {
     try {
-      const res = await fetch(endpoint)
+      const res = await fetchWithTimeout(endpoint, 5000)
       if (!res.ok) continue
       const json = (await res.json()) as {
         ok?: boolean
@@ -367,7 +367,7 @@ async function fetchScrapedMarket(): Promise<{
   candles1401?: import('./types').CandlePoint[]
 } | null> {
   try {
-    const res = await fetch('/data/market.json', { cache: 'no-store' })
+    const res = await fetchWithTimeout('/data/market.json', 5000, { cache: 'no-store' })
     if (!res.ok) return null
     const json = (await res.json()) as {
       updatedAt?: string
@@ -452,9 +452,11 @@ async function fetchScrapedMarket(): Promise<{
 
 async function fetchTgjuIntraday(): Promise<IntradayPoint[]> {
   try {
-    const res = await fetch('https://api.tgju.org/v1/market/indicator/today-table-data/bourse?lang=fa', {
-      headers: { Accept: 'application/json' },
-    })
+    const res = await fetchWithTimeout(
+      'https://api.tgju.org/v1/market/indicator/today-table-data/bourse?lang=fa',
+      5000,
+      { headers: { Accept: 'application/json' } },
+    )
     if (!res.ok) return []
     const json = (await res.json()) as { data?: string[][] }
     const rows = json.data || []
@@ -515,7 +517,7 @@ type OverviewApi = {
 
 async function fetchOverviewApi(): Promise<OverviewApi | null> {
   try {
-    const res = await fetchWithTimeout('/api/overview', 10000, { cache: 'no-store' })
+    const res = await fetchWithTimeout('/api/overview', 6000, { cache: 'no-store' })
     if (!res.ok) return null
     return (await res.json()) as OverviewApi
   } catch {
@@ -687,7 +689,7 @@ export async function fetchPulseApi(): Promise<{
   marketPulseHistory: NonNullable<DashboardData['overview']['marketPulseHistory']>
 } | null> {
   try {
-    const res = await fetch('/api/pulse', { cache: 'no-store' })
+    const res = await fetchWithTimeout('/api/pulse', 4000, { cache: 'no-store' })
     if (!res.ok) return null
     const json = (await res.json()) as PulseApi
     const session = readSessionPulse()
@@ -1208,7 +1210,7 @@ type NavApiBundle = {
 
 async function fetchNavApi(): Promise<NavApiBundle | null> {
   try {
-    const res = await fetchWithTimeout('/api/nav', 8000, { cache: 'no-store' })
+    const res = await fetchWithTimeout('/api/nav', 6000, { cache: 'no-store' })
     if (!res.ok) return null
     const json = (await res.json()) as NavApiBundle
     if (!json?.ok || !json.holdings?.length || !json.nav) return null
@@ -1230,10 +1232,6 @@ function applyNavLive(base: DashboardData, bundle: NavApiBundle | null | undefin
 }
 
 async function fetchMineralStocksApi(): Promise<MineralStockSnap[] | null> {
-  const endpoints = ['/api/stocks', '/data/mineral_stocks.json']
-  let best: MineralStockSnap[] | null = null
-  let bestScore = -1
-
   const score = (stocks: MineralStockSnap[]) => {
     let n = 0
     let week = 0
@@ -1242,30 +1240,32 @@ async function fetchMineralStocksApi(): Promise<MineralStockSnap[] | null> {
       if (s.ytdPct != null || s.weekPct != null || s.closePrice != null || s.candleCount) n += 1
       if (Array.isArray(s.netIndividualWeekBt) && s.netIndividualWeekBt.length) week += 1
     }
-    // Prefer snapshots that include 7-day money-flow series.
     return n * 100 + week
   }
 
-  for (const endpoint of endpoints) {
-    try {
-      const ms = endpoint.startsWith('/api/') ? 22000 : 5000
-      const res = await fetchWithTimeout(endpoint, ms, { cache: 'no-store' })
-      if (!res.ok) continue
-      const json = (await res.json()) as { ok?: boolean; stocks?: MineralStockSnap[] } | MineralStockSnap[]
-      const stocks = Array.isArray(json) ? json : json.stocks
-      if (!stocks?.length) continue
-      const sc = score(stocks)
-      if (sc > bestScore) {
-        best = stocks
-        bestScore = sc
-      }
-      // Prefer a healthy live/static payload; keep scanning if this one is mostly errors.
-      if (sc >= Math.max(800, Math.floor(stocks.length * 0.5) * 100)) break
-    } catch {
-      // try next
-    }
+  const read = async (url: string, ms: number) => {
+    const res = await fetchWithTimeout(url, ms, { cache: 'no-store' })
+    if (!res.ok) return null
+    const json = (await res.json()) as { ok?: boolean; stocks?: MineralStockSnap[] } | MineralStockSnap[]
+    const stocks = Array.isArray(json) ? json : json.stocks
+    return stocks?.length ? stocks : null
   }
-  return best
+
+  // Static first so a slow /api/stocks scrape never blocks the whole SPA.
+  let staticStocks: MineralStockSnap[] | null = null
+  try {
+    staticStocks = await read('/data/mineral_stocks.json', 4000)
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    const live = await read('/api/stocks', 4000)
+    if (live && score(live) >= score(staticStocks || [])) return live
+  } catch {
+    /* fall through */
+  }
+  return staticStocks
 }
 
 function weightedPct(members: StockRow[], key: 'dailyPct' | 'weekPct' | 'monthPct' | 'ytdPct'): number {

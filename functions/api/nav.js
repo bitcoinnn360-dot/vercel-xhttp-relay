@@ -22,7 +22,7 @@ const HOLDINGS = [
   { symbol: 'کچاد', isin: 'IRO1CHML0001', exchange: 'IRTSENO', ownershipPct: 15.79, costMr: 46_586_910 },
   { symbol: 'کگهر', isin: 'IRO3GZIZ0001', exchange: 'IRIFBNO', ownershipPct: 17.7, costMr: 26_858_546 },
   { symbol: 'کنور', isin: 'IRO1KNRZ0001', exchange: 'IRTSENO', ownershipPct: 83.1, costMr: 57_457_439 },
-  { symbol: 'فملی', isin: 'IRO1MSMI0001', exchange: 'IRTSENO', ownershipPct: 4.97, costMr: 10_744_777 },
+  { symbol: 'فملی', isin: 'IRO1MSMI0001', exchange: 'IRTSENO', ownershipPct: 4.968657866190476, ownedShares: 71_548_673_273, costMr: 10_744_777 },
   { symbol: 'ارفع', isin: 'IRO3ARFZ0001', exchange: 'IRIFBNO', ownershipPct: 20.96, costMr: 6_066_330 },
   { symbol: 'تجلی', isin: 'IRO3TMMZ0001', exchange: 'IRIFBNO', ownershipPct: 53.4, costMr: 66_565_604 },
   { symbol: 'فخاس', isin: 'IRO1FKAS0001', exchange: 'IRTSENO', ownershipPct: 33.4, costMr: 10_944_380 },
@@ -66,7 +66,7 @@ const NAV_STATIC = {
 }
 
 const CACHE_TTL_MS = 5 * 60 * 1000
-const CACHE_KEY = 'https://cache.local/midco-nav-bv-v2'
+const CACHE_KEY = 'https://cache.local/midco-nav-bv-v3'
 
 function normalizeCookie(raw) {
   let c = String(raw || '').trim()
@@ -200,10 +200,17 @@ export async function onRequestGet(context) {
     try {
       const meta = await fetchStockMeta(cookie, h.exchange, h.isin, h.symbol)
       const liveOwn = await tryFetchOwnershipPct(cookie, h.exchange, h.isin, holderNeedles)
-      const ownershipPct = liveOwn != null ? liveOwn : h.ownershipPct
       const outstanding = meta.outstanding
       if (!outstanding || !meta.price) throw new Error('missing outstanding/price')
-      const shares = Math.round(outstanding * (ownershipPct / 100))
+      // Prefer explicit post-capital-increase share count (e.g. فملی 52.17B → 71.55B).
+      const shares =
+        h.ownedShares != null
+          ? Math.round(h.ownedShares)
+          : Math.round(outstanding * ((liveOwn != null ? liveOwn : h.ownershipPct) / 100))
+      const ownershipPct =
+        liveOwn != null
+          ? liveOwn
+          : Math.round((shares / outstanding) * 1e6) / 1e4
       const marketValueMr = round0((shares * meta.price) / 1e6)
       const costPerShare = shares > 0 ? round0((h.costMr * 1e6) / shares) : 0
       return {
@@ -213,7 +220,7 @@ export async function onRequestGet(context) {
         outstandingShares: outstanding,
         shares,
         ownershipPct,
-        ownershipSource: liveOwn != null ? 'bourseview' : 'pdf-baseline',
+        ownershipSource: liveOwn != null ? 'bourseview' : h.ownedShares != null ? 'scaled-capital-increase' : 'pdf-baseline',
         costMr: h.costMr,
         marketValueMr,
         costPerShare,

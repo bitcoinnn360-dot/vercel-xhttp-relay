@@ -1326,9 +1326,10 @@ async function fetchMineralStocksApi(): Promise<MineralStockSnap[] | null> {
     /* ignore */
   }
 
+  // Prefer live only when it clearly has richer money-flow / returns; keep timeout short.
   try {
-    const live = await read('/api/stocks', 4000)
-    if (live && score(live) >= score(staticStocks || [])) return live
+    const live = await read('/api/stocks', 5000)
+    if (live && score(live) > score(staticStocks || [])) return live
   } catch {
     /* fall through */
   }

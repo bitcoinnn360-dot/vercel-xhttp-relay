@@ -541,10 +541,40 @@ export async function onRequestGet(context) {
   const { request, env } = context
   const origin = new URL(request.url).origin
   const url = new URL(request.url)
-  const forceRefresh = url.searchParams.has('refresh')
+  const forceRefresh = url.searchParams.has('refresh') || url.searchParams.has('fresh')
   const token = (env?.SOURCEARENA_TOKEN || DEMO_TOKEN).trim()
   const bvCookie = normalizeCookie(env?.BOURSEVIEW_COOKIE || env?.BOURSEVIEW_TOKEN || '')
   const cache = typeof caches !== 'undefined' ? caches.default : null
+  const headers = {
+    'content-type': 'application/json; charset=utf-8',
+    'cache-control': 'public, max-age=60',
+    'access-control-allow-origin': '*',
+  }
+
+  // Static-first: never block SPA on a slow BourseView scrape.
+  let staticBundle = null
+  try {
+    staticBundle = await loadStaticFallback(origin)
+  } catch {
+    /* ignore */
+  }
+  const staticFlowOk = Boolean(
+    staticBundle?.stocks?.some(
+      (s) => Array.isArray(s.netIndividualWeekBt) && s.netIndividualWeekBt.length >= 5,
+    ),
+  )
+  if (!forceRefresh && staticBundle?.stocks?.length && staticFlowOk) {
+    return new Response(
+      JSON.stringify({
+        ...staticBundle,
+        ok: true,
+        updatedAt: staticBundle.updatedAt || new Date().toISOString(),
+        served: 'static-fast',
+        note: staticBundle.note || 'static mineral_stocks (ورود پول از snapshot)',
+      }),
+      { headers },
+    )
+  }
 
   if (cache && !forceRefresh) {
     const hit = await cache.match(CACHE_KEY)
@@ -553,8 +583,8 @@ export async function onRequestGet(context) {
       if (cachedAt && Date.now() - cachedAt < CACHE_TTL_MS) {
         return new Response(hit.body, {
           headers: {
-            'content-type': 'application/json; charset=utf-8',
-            'cache-control': 'public, max-age=60',
+            ...headers,
+            'x-cached-at': String(cachedAt),
             'x-cache': 'HIT',
           },
         })
@@ -702,8 +732,7 @@ export async function onRequestGet(context) {
   const body = JSON.stringify(payload)
   const response = new Response(body, {
     headers: {
-      'content-type': 'application/json; charset=utf-8',
-      'cache-control': 'public, max-age=60',
+      ...headers,
       'x-cached-at': String(Date.now()),
       'x-cache': 'MISS',
     },

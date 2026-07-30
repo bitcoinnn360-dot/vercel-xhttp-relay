@@ -66,7 +66,7 @@ const NAV_STATIC = {
 }
 
 const CACHE_TTL_MS = 5 * 60 * 1000
-const CACHE_KEY = 'https://cache.local/midco-nav-bv-v1'
+const CACHE_KEY = 'https://cache.local/midco-nav-bv-v2'
 
 function normalizeCookie(raw) {
   let c = String(raw || '').trim()
@@ -100,7 +100,7 @@ async function bvJson(cookie, path) {
   return res.json()
 }
 
-async function fetchStockMeta(cookie, exchange, isin) {
+async function fetchStockMeta(cookie, exchange, isin, symbol = '') {
   const [meta, quotes] = await Promise.all([
     bvJson(cookie, `/api/v2/exchanges/${exchange}/stocks/${isin}`),
     bvJson(
@@ -110,7 +110,11 @@ async function fetchStockMeta(cookie, exchange, isin) {
   ])
   const items = Array.isArray(quotes?.items) ? quotes.items : []
   const last = items[0] || {}
-  const outstanding = Number(meta?.numberOfOutstandingShares) || Number(last?.numberOfOutstandingShares) || null
+  let outstanding =
+    Number(meta?.numberOfOutstandingShares) || Number(last?.numberOfOutstandingShares) || null
+  // Capital-increase filings can land on stock meta before quote history catches up.
+  const shareOverrides = { فملی: 1_440_000_000_000 }
+  if (symbol && shareOverrides[symbol]) outstanding = shareOverrides[symbol]
   const vwap = Number(last?.vwap)
   const close = Number(last?.close)
   const price = Number.isFinite(vwap) && vwap > 0 ? vwap : Number.isFinite(close) && close > 0 ? close : null
@@ -194,7 +198,7 @@ export async function onRequestGet(context) {
 
   const liveRows = await mapPool(HOLDINGS, 4, async (h) => {
     try {
-      const meta = await fetchStockMeta(cookie, h.exchange, h.isin)
+      const meta = await fetchStockMeta(cookie, h.exchange, h.isin, h.symbol)
       const liveOwn = await tryFetchOwnershipPct(cookie, h.exchange, h.isin, holderNeedles)
       const ownershipPct = liveOwn != null ? liveOwn : h.ownershipPct
       const outstanding = meta.outstanding

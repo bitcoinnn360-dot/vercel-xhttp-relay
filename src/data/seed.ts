@@ -466,7 +466,7 @@ export const seedDashboard: DashboardData = {
     {
       group: 'مس',
       name: 'ملی صنایع مس ایران',
-      marketValueBr: 21_493_500,
+      marketValueBr: 28_828_800,
       marketValueUsdM: 11_450,
       volume: 610_266_046,
       tradeValueMr: 12_491_882,
@@ -552,14 +552,14 @@ export const seedDashboard: DashboardData = {
     },
     {
       symbol: 'فملی',
-      capitalMr: 1_050_000_000,
+      capitalMr: 1_440_000_000,
       ownershipPct: 4.97,
       portfolioPct: 45.2,
       costMr: 10_744_777,
-      marketValueMr: 1_067_938_478,
-      costPerShare: 206,
-      pricePerShare: 20_470,
-      unrealizedMr: 1_057_193_701,
+      marketValueMr: 1_432_791_360,
+      costPerShare: 150,
+      pricePerShare: 20_020,
+      unrealizedMr: 1_422_046_583,
     },
     {
       symbol: 'ارفع',

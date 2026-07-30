@@ -52,7 +52,12 @@ const MINERAL_STOCKS = [
 ]
 
 const CACHE_TTL_MS = 20 * 60 * 1000
-const CACHE_KEY = 'https://cache.local/mineral-stocks-bv-v5'
+const CACHE_KEY = 'https://cache.local/mineral-stocks-bv-v6'
+
+/** Manual share-count overrides when quote history lags capital-increase filings. */
+const OUTSTANDING_SHARES = {
+  فملی: 1_440_000_000_000,
+}
 
 function num(raw) {
   if (raw == null) return null
@@ -293,6 +298,22 @@ async function bvFetchQuotes(cookie, exchange, isin, attempts = 3) {
   throw lastErr || new Error('bourseview failed')
 }
 
+async function bvFetchStockMeta(cookie, exchange, isin) {
+  const url = `${BV_BASE}/api/v2/exchanges/${exchange}/stocks/${isin}`
+  const res = await fetch(url, {
+    headers: {
+      Cookie: cookie,
+      Accept: 'application/json',
+      'User-Agent': UA,
+      Referer: 'https://www.bourseview.com/',
+      Origin: 'https://www.bourseview.com',
+    },
+    redirect: 'follow',
+  })
+  if (!res.ok) throw new Error(`bourseview meta ${res.status}`)
+  return res.json()
+}
+
 function detailValue(item, code) {
   const details = item?.detail
   if (!Array.isArray(details)) return null
@@ -300,7 +321,7 @@ function detailValue(item, code) {
   return num(hit?.value)
 }
 
-function snapFromBv(meta, items) {
+function snapFromBv(meta, items, stockMeta = null) {
   const head = items[0] || {}
   const tradedHead = items.find((r) => num(r?.close) != null && num(r.close) > 0)
   const halted = !(num(head?.close) > 0)
@@ -359,10 +380,19 @@ function snapFromBv(meta, items) {
 
   const freeFloat =
     num(halted ? tradedHead?.freeFloat : head.freeFloat) ?? num(tradedHead?.freeFloat) ?? null
-  const outstanding =
-    num(halted ? tradedHead?.numberOfOutstandingShares : head.numberOfOutstandingShares) ??
-    num(tradedHead?.numberOfOutstandingShares) ??
+  let outstanding =
+    num(stockMeta?.numberOfOutstandingShares) ||
+    num(halted ? tradedHead?.numberOfOutstandingShares : head.numberOfOutstandingShares) ||
+    num(tradedHead?.numberOfOutstandingShares) ||
     null
+  const overrideShares = OUTSTANDING_SHARES[meta.symbol]
+  if (overrideShares) outstanding = overrideShares
+
+  // Quote marketCap often lags capital-increase filings — recompute from price × shares.
+  if (closePrice != null && outstanding != null && outstanding > 0) {
+    marketValueBr = Math.round((closePrice * outstanding) / 1e9)
+  }
+
   // BV freeFloat is a fraction (e.g. 0.23); volume / (float×shares) × 100
   let volumeToFloatPct = null
   if (volume > 0 && freeFloat != null && freeFloat > 0 && outstanding != null && outstanding > 0) {
@@ -498,8 +528,11 @@ export async function onRequestGet(context) {
 
   if (bvCookie) {
     const results = await mapInBatches(MINERAL_STOCKS, 5, async (meta) => {
-      const items = await bvFetchQuotes(bvCookie, meta.exchange, meta.isin)
-      return snapFromBv(meta, items)
+      const [items, stockMeta] = await Promise.all([
+        bvFetchQuotes(bvCookie, meta.exchange, meta.isin),
+        bvFetchStockMeta(bvCookie, meta.exchange, meta.isin).catch(() => null),
+      ])
+      return snapFromBv(meta, items, stockMeta)
     })
     results.forEach((r, i) => {
       const meta = MINERAL_STOCKS[i]

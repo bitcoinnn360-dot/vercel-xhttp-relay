@@ -395,7 +395,7 @@ function IndustryTr({
       <PctPill value={s.monthPct} />
       <PctPill value={s.ytdPct} />
       <FlowCell value={s.netIndividualBt} />
-      <td className="num">—</td>
+      <FlowSparkCell values={s.netIndividualWeekBt} />
     </tr>
   )
 }

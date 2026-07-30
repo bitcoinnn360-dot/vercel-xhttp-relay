@@ -1285,6 +1285,28 @@ export function displaySector(group: string): string {
   return group
 }
 
+function aggregateWeekFlows(members: StockRow[]): number[] | undefined {
+  const series = members
+    .map((s) => s.netIndividualWeekBt)
+    .filter((a): a is number[] => Array.isArray(a) && a.length > 0)
+  if (!series.length) return undefined
+  const n = 7
+  const out: number[] = []
+  for (let i = 0; i < n; i++) {
+    let sum = 0
+    let hit = false
+    for (const w of series) {
+      const v = w[w.length - n + i]
+      if (v != null && Number.isFinite(v)) {
+        sum += v
+        hit = true
+      }
+    }
+    out.push(hit ? Math.round(sum * 100) / 100 : 0)
+  }
+  return out
+}
+
 function rebuildIndustryRows(base: DashboardData) {
   const SECTOR_ORDER = ['سرمایه‌گذاری', 'سنگ‌آهن', 'فلزات', 'کابل'] as const
   const equities = base.stocks
@@ -1304,6 +1326,7 @@ function rebuildIndustryRows(base: DashboardData) {
     const vol = members.reduce((a, s) => a + (s.volume || 0), 0)
     const tv = members.reduce((a, s) => a + (s.tradeValueMr || 0), 0)
     const net = members.reduce((a, s) => a + (s.netIndividualBt || 0), 0)
+    const weekFlow = aggregateWeekFlows(members)
 
     rebuilt.push({
       group: g,
@@ -1319,6 +1342,7 @@ function rebuildIndustryRows(base: DashboardData) {
       monthPct: weightedPct(members, 'monthPct'),
       ytdPct: weightedPct(members, 'ytdPct'),
       netIndividualBt: Math.round(net * 100) / 100,
+      netIndividualWeekBt: weekFlow,
       returnsAdjusted: members.some((s) => s.returnsAdjusted),
       returnsSource: 'industry-weighted',
     })

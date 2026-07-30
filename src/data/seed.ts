@@ -1206,10 +1206,11 @@ export const seedDashboard: DashboardData = {
     stocks: [],
     industries: [],
     sectorPerformance: [],
-    materialsByCountry: [],
+    materialsIndustries: [],
+    metalsMiningByCountry: [],
     news: [],
     source: 'seed',
-    note: 'GuruFocus بسته است — سکتور تجمیعی + مواد پایه کشورها + میانگین وزنی صنعت',
+    note: 'سکتور تجمیعی · صنایع مواد پایه · فلزات و معادن کشورها',
   },
   sources: [
     {

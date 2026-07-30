@@ -12,7 +12,7 @@ import { GlobalMarketsSection } from './components/GlobalMarketsSection'
 import { GuruMarketTabs } from './components/GuruMarketTabs'
 import { useMarketData } from './hooks/useMarketData'
 
-const SECTION_IDS = ['overview', 'market-asia', 'charts', 'stocks', 'global', 'nav', 'commodities', 'steel', 'periodic']
+const SECTION_IDS = ['overview', 'charts', 'stocks', 'global', 'nav', 'commodities', 'steel', 'periodic', 'market-asia']
 
 function useActiveSection() {
   const [active, setActive] = useState('overview')
@@ -64,14 +64,14 @@ export default function App() {
               </div>
             )}
             <MarketOverview data={data} histories={histories} />
-            <GuruMarketTabs data={data} histories={histories} fred={fred} sectors={sectors} />
-            <ChartsHub data={data} histories={histories} candles={candles} fred={fred} />
+            <ChartsHub data={data} histories={histories} candles={candles} />
             <StocksSection data={data} />
             <GlobalMarketsSection data={data} />
             <NavSection data={data} />
             <CommoditiesSection data={data} />
             <SteelSection data={data} histories={histories} />
             <PeriodicSection data={data} />
+            <GuruMarketTabs data={data} histories={histories} fred={fred} sectors={sectors} />
             <footer className="border-t border-[var(--color-line)] pt-5 text-center text-xs text-[var(--color-muted)]">
               <p>معاونت مالی و اقتصادی — واحد سرمایه‌گذاری · توسعه معادن و فلزات</p>
               <p className="mt-1">

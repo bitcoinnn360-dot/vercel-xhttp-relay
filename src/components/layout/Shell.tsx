@@ -4,7 +4,6 @@ import { jalaliTodayTehran, timeFa } from '../../lib/format'
 
 const NAV = [
   { id: 'overview', label: 'نمای بازار' },
-  { id: 'market-asia', label: 'مرکز بازارها' },
   { id: 'charts', label: 'نمودار کامودیتی‌ها' },
   { id: 'stocks', label: 'سهام معدنی و فلزی ایران' },
   { id: 'global', label: 'بازار جهانی' },
@@ -12,6 +11,7 @@ const NAV = [
   { id: 'commodities', label: 'کامودیتی' },
   { id: 'steel', label: 'زنجیره فولاد' },
   { id: 'periodic', label: 'تغییرات دوره‌ای' },
+  { id: 'market-asia', label: 'مرکز بازارها' },
 ]
 
 interface Props {

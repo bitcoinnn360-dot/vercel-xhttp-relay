@@ -16,6 +16,7 @@ import type {
   CountrySectorRow,
   DashboardData,
   GlobalMarketRow,
+  MaterialsIndustryRow,
   SectorPerformanceRow,
 } from '../data/types'
 import { changeClass, fmtNum, fmtPct } from '../lib/format'
@@ -132,20 +133,27 @@ export function GlobalMarketsSection({ data }: { data: DashboardData }) {
   }, [gm.industries, gm.stocks, group])
 
   const sectors = gm.sectorPerformance || []
-  const materials = gm.materialsByCountry || gm.countrySectors || []
+  const materialsIndustries = gm.materialsIndustries || []
+  const metalsByCountry = gm.metalsMiningByCountry || gm.materialsByCountry || []
 
   return (
     <section id="global" className="scroll-mt-28 space-y-4">
       <div>
         <h2 className="section-title">بازار جهانی معادن و مواد</h2>
         <p className="section-sub">
-          سکتورهای تجمیعی بازارهای عمده · مواد پایه کشورها · شرکت‌های صنعت (میانگین وزنی)
+          سکتورهای تجمیعی · صنایع مواد پایه · فلزات و معادن کشورها · شرکت‌های صنعت (میانگین وزنی)
           {gm.updatedAt ? ` · ${new Date(gm.updatedAt).toLocaleString('fa-IR')}` : ''}
         </p>
       </div>
       {gm.note ? <p className="text-[0.72rem] text-[var(--color-muted)]">{gm.note}</p> : null}
 
-      <SectorPerformanceBlock sectors={sectors} materials={materials} period={period} onPeriod={setPeriod} />
+      <SectorPerformanceBlock
+        sectors={sectors}
+        materialsIndustries={materialsIndustries}
+        metalsByCountry={metalsByCountry}
+        period={period}
+        onPeriod={setPeriod}
+      />
 
       <div className="flex flex-wrap gap-1.5">
         {GROUPS.map((g) => (
@@ -253,39 +261,51 @@ export function GlobalMarketsSection({ data }: { data: DashboardData }) {
 
 function SectorPerformanceBlock({
   sectors,
-  materials,
+  materialsIndustries,
+  metalsByCountry,
   period,
   onPeriod,
 }: {
   sectors: SectorPerformanceRow[]
-  materials: CountrySectorRow[]
+  materialsIndustries: MaterialsIndustryRow[]
+  metalsByCountry: CountrySectorRow[]
   period: PeriodKey
   onPeriod: (k: PeriodKey) => void
 }) {
-  const countryMaterials = useMemo(() => aggregateMaterialsByCountry(materials), [materials])
+  const POS = '#15803d'
+  const NEG = '#b91c1c'
 
   const sectorChart = useMemo(
     () =>
       [...sectors]
-        .map((s) => ({
-          name: s.nameFa,
-          value: Number(s[period]) || 0,
-          fill: (Number(s[period]) || 0) >= 0 ? '#0f766e' : '#b91c1c',
-        }))
+        .map((s) => {
+          const value = Number(s[period]) || 0
+          return { name: s.nameFa, value, fill: value >= 0 ? POS : NEG }
+        })
         .sort((a, b) => a.value - b.value),
     [sectors, period],
   )
 
   const materialsChart = useMemo(
     () =>
-      [...countryMaterials]
-        .map((s) => ({
-          name: s.countryFa,
-          value: Number(s[period]) || 0,
-          fill: (Number(s[period]) || 0) >= 0 ? '#9a3412' : '#b91c1c',
-        }))
+      [...materialsIndustries]
+        .map((s) => {
+          const value = Number(s[period]) || 0
+          return { name: s.nameFa, value, fill: value >= 0 ? POS : NEG }
+        })
         .sort((a, b) => a.value - b.value),
-    [countryMaterials, period],
+    [materialsIndustries, period],
+  )
+
+  const metalsChart = useMemo(
+    () =>
+      [...metalsByCountry]
+        .map((s) => {
+          const value = Number(s[period]) || 0
+          return { name: s.countryFa, value, fill: value >= 0 ? POS : NEG }
+        })
+        .sort((a, b) => a.value - b.value),
+    [metalsByCountry, period],
   )
 
   const sortedSectors = useMemo(
@@ -293,19 +313,19 @@ function SectorPerformanceBlock({
     [sectors, period],
   )
   const sortedMats = useMemo(
-    () => [...countryMaterials].sort((a, b) => (Number(b[period]) || 0) - (Number(a[period]) || 0)),
-    [countryMaterials, period],
+    () => [...materialsIndustries].sort((a, b) => (Number(b[period]) || 0) - (Number(a[period]) || 0)),
+    [materialsIndustries, period],
   )
 
-  if (!sectors.length && !materials.length) return null
+  if (!sectors.length && !materialsIndustries.length && !metalsByCountry.length) return null
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h3 className="text-sm font-bold">Major Global Stock Markets — Sector & Industry Performance</h3>
+          <h3 className="text-sm font-bold">عملکرد سکتور و صنعت بازارهای عمده جهانی</h3>
           <p className="text-[0.7rem] text-[var(--color-muted)]">
-            دو نمودار و دو جدول تجمیعی · سکتورهای عمده + مواد پایه کشورها (وزنی)
+            سکتورهای تجمیعی · صنایع مواد پایه · فلزات و معادن کشورها
           </p>
         </div>
         <div className="flex flex-wrap gap-1 rounded-lg border border-[var(--color-line)] bg-white p-1">
@@ -314,7 +334,7 @@ function SectorPerformanceBlock({
               ['dailyPct', '۱روز'],
               ['weekPct', '۱هفته'],
               ['monthPct', '۱ماه'],
-              ['ytdPct', 'YTD'],
+              ['ytdPct', 'از ابتدای سال'],
               ['year1Pct', '۱سال'],
               ['year3Pct', '۳سال'],
             ] as const
@@ -335,25 +355,31 @@ function SectorPerformanceBlock({
         </div>
       </div>
 
-      <div className="grid gap-3 xl:grid-cols-2">
+      <div className="grid gap-3 xl:grid-cols-3">
         <PerfChart
-          title="Performance Comparison — سکتورهای تجمیعی"
-          subtitle="Select Sector SPDR · بازدهی نسبی سکتورها"
+          title="مقایسه عملکرد سکتورها"
+          subtitle="صندوق‌های سکتوری بازارهای عمده"
           data={sectorChart}
           accent="#0f766e"
         />
         <PerfChart
-          title="Performance Comparison — Basic Materials"
-          subtitle="تجمیع وزنی ETF مواد/معادن هر کشور"
+          title="مواد پایه — صنایع"
+          subtitle="فولاد، فلزات و معادن، شیمیایی، کشاورزی و … (وزنی چندکشور)"
           data={materialsChart}
+          accent="#0b3d6e"
+        />
+        <PerfChart
+          title="فلزات و معادن — کشورها"
+          subtitle="بازدهی پروکسی فلزات و معادن در هر کشور"
+          data={metalsChart}
           accent="#9a3412"
         />
       </div>
 
       <div className="grid gap-3 xl:grid-cols-2">
         <PerfTable
-          title="Market Cap Performance — سکتورهای تجمیعی"
-          subtitle="وزن ≈ AUM صندوق سکتوری"
+          title="عملکرد ارزش بازار — سکتورهای تجمیعی"
+          subtitle="وزن ≈ ارزش خالص صندوق سکتوری"
           rows={sortedSectors.map((s) => ({
             key: s.symbol,
             label: s.nameFa,
@@ -369,13 +395,13 @@ function SectorPerformanceBlock({
           }))}
         />
         <PerfTable
-          title="Basic Materials — کشورها (تجمیع‌شده)"
-          subtitle="چند نماد یک کشور با وزن AUM ادغام شده‌اند"
+          title="مواد پایه — جزئیات صنایع"
+          subtitle="هر صنعت میانگین وزنی پروکسی‌های چند کشور است"
           rows={sortedMats.map((s) => ({
-            key: s.country,
-            label: s.countryFa,
-            sub: s.symbols,
-            cap: s.marketCapUsd,
+            key: s.id,
+            label: s.nameFa,
+            sub: s.symbols || '',
+            cap: s.marketCapUsd || s.aumUsd,
             weight: s.weightPct,
             dailyPct: s.dailyPct,
             weekPct: s.weekPct,
@@ -388,75 +414,6 @@ function SectorPerformanceBlock({
       </div>
     </div>
   )
-}
-
-type AggCountryRow = {
-  country: string
-  countryFa: string
-  symbols: string
-  marketCapUsd: number | null
-  weightPct: number | null
-  dailyPct: number | null
-  weekPct: number | null
-  monthPct: number | null
-  ytdPct: number | null
-  year1Pct: number | null
-  year3Pct: number | null
-}
-
-function aggregateMaterialsByCountry(materials: CountrySectorRow[]): AggCountryRow[] {
-  const buckets = new Map<string, CountrySectorRow[]>()
-  for (const m of materials) {
-    const key = m.country || m.countryFa
-    if (!buckets.has(key)) buckets.set(key, [])
-    buckets.get(key)!.push(m)
-  }
-
-  const rows: AggCountryRow[] = []
-  for (const [, list] of buckets) {
-    const capSum = list.reduce((a, r) => a + (r.aumUsd || r.marketCapUsd || 0), 0)
-    const wAvg = (key: PeriodKey) => {
-      let num = 0
-      let den = 0
-      let plain = 0
-      let n = 0
-      for (const r of list) {
-        const v = r[key]
-        if (v == null || !Number.isFinite(v)) continue
-        const w = r.aumUsd || r.marketCapUsd || 0
-        if (w > 0) {
-          num += w * v
-          den += w
-        } else {
-          plain += v
-          n += 1
-        }
-      }
-      if (den > 0) return Math.round((num / den) * 100) / 100
-      if (n > 0) return Math.round((plain / n) * 100) / 100
-      return null
-    }
-    rows.push({
-      country: list[0].country,
-      countryFa: list[0].countryFa,
-      symbols: list.map((r) => r.symbol).join(' · '),
-      marketCapUsd: capSum > 0 ? capSum : null,
-      weightPct: null,
-      dailyPct: wAvg('dailyPct'),
-      weekPct: wAvg('weekPct'),
-      monthPct: wAvg('monthPct'),
-      ytdPct: wAvg('ytdPct'),
-      year1Pct: wAvg('year1Pct'),
-      year3Pct: wAvg('year3Pct'),
-    })
-  }
-
-  const total = rows.reduce((a, r) => a + (r.marketCapUsd || 0), 0)
-  for (const r of rows) {
-    r.weightPct =
-      total > 0 && r.marketCapUsd ? Math.round((r.marketCapUsd / total) * 10000) / 100 : null
-  }
-  return rows
 }
 
 function PerfChart({
@@ -583,7 +540,7 @@ function PerfTable({
             <th>وزن</th>
             <th>۱روز</th>
             <th>۱هفته</th>
-            <th>YTD</th>
+            <th>از ابتدای سال</th>
             <th>۱سال</th>
             <th>۳سال</th>
           </tr>

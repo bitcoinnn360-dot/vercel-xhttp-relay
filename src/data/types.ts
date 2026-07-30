@@ -294,6 +294,24 @@ export interface CountrySectorRow {
   asOf?: string
 }
 
+/** صنایع داخل مواد پایه (فولاد، فلزات و معادن، شیمیایی، …) — تجمیع وزنی چندکشور */
+export interface MaterialsIndustryRow {
+  id: string
+  name: string
+  nameFa: string
+  symbols?: string
+  dailyPct?: number | null
+  weekPct?: number | null
+  monthPct?: number | null
+  ytdPct?: number | null
+  year1Pct?: number | null
+  year3Pct?: number | null
+  marketCapUsd?: number | null
+  aumUsd?: number | null
+  weightPct?: number | null
+  asOf?: string
+}
+
 export interface GlobalNewsItem {
   title: string
   titleFa?: string | null
@@ -308,7 +326,11 @@ export interface GlobalMarketsBundle {
   industries: GlobalMarketRow[]
   /** Performance Comparison + Market Cap Performance (سکتورهای تجمیعی) */
   sectorPerformance?: SectorPerformanceRow[]
-  /** Basic Materials به تفکیک کشور */
+  /** صنایع مواد پایه (تجمیع وزنی پروکسی‌های چندکشور) */
+  materialsIndustries?: MaterialsIndustryRow[]
+  /** فلزات و معادن به تفکیک کشور */
+  metalsMiningByCountry?: CountrySectorRow[]
+  /** @deprecated نگه داشته شده برای سازگاری */
   materialsByCountry?: CountrySectorRow[]
   countrySectors?: CountrySectorRow[]
   news?: GlobalNewsItem[]

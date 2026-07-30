@@ -68,18 +68,71 @@ const GICS_SECTORS = [
   { symbol: 'XLRE', name: 'Real Estate', nameFa: 'املاک' },
 ]
 
-/** Basic Materials / metals proxies by country (GuruFocus Basic Materials drill-down). */
-const MATERIALS_BY_COUNTRY = [
-  { country: 'United States', countryFa: 'آمریکا', sector: 'Basic Materials', sectorFa: 'مواد پایه', symbol: 'XLB' },
-  { country: 'United States', countryFa: 'آمریکا', sector: 'Metals & Mining', sectorFa: 'فلزات و معادن', symbol: 'XME' },
-  { country: 'Canada', countryFa: 'کانادا', sector: 'Materials', sectorFa: 'مواد', symbol: 'XMA.TO' },
-  { country: 'Australia', countryFa: 'استرالیا', sector: 'Resources', sectorFa: 'منابع معدنی', symbol: 'MVR.AX' },
-  { country: 'Europe', countryFa: 'اروپا', sector: 'Basic Resources', sectorFa: 'منابع پایه', symbol: 'EXV6.DE' },
-  { country: 'China', countryFa: 'چین', sector: 'Basic Materials', sectorFa: 'مواد پایه', symbol: '512400.SS' },
-  { country: 'Global', countryFa: 'جهانی', sector: 'Materials', sectorFa: 'مواد پایه', symbol: 'MXI' },
-  { country: 'Global', countryFa: 'جهانی', sector: 'Metals & Mining', sectorFa: 'فلزات و معادن', symbol: 'PICK' },
-  { country: 'Brazil', countryFa: 'برزیل', sector: 'Broad (materials-heavy)', sectorFa: 'بازار گسترده (موادمحور)', symbol: 'EWZ' },
-  { country: 'Peru', countryFa: 'پرو', sector: 'Broad (mining-heavy)', sectorFa: 'بازار گسترده (معدن‌محور)', symbol: 'EPU' },
+/**
+ * صنایع داخل مواد پایه — هر صنعت از چند پروکسی کشوری/جهانی وزنی تجمیع می‌شود.
+ * (معادل جزئیات Basic Materials در GuruFocus)
+ */
+const MATERIALS_INDUSTRIES = [
+  {
+    id: 'metals-mining',
+    name: 'Metals & Mining',
+    nameFa: 'فلزات و معادن',
+    proxies: ['XME', 'PICK', 'XMA.TO', 'MVR.AX', 'EXV6.DE', '512400.SS'],
+  },
+  {
+    id: 'steel',
+    name: 'Steel',
+    nameFa: 'فولاد',
+    proxies: ['SLX'],
+  },
+  {
+    id: 'copper',
+    name: 'Copper',
+    nameFa: 'مس',
+    proxies: ['COPX'],
+  },
+  {
+    id: 'gold',
+    name: 'Gold Miners',
+    nameFa: 'معدن‌کاران طلا',
+    proxies: ['GDX'],
+  },
+  {
+    id: 'chemicals',
+    name: 'Chemicals',
+    nameFa: 'شیمیایی',
+    proxies: ['PYZ'],
+  },
+  {
+    id: 'agriculture',
+    name: 'Agriculture',
+    nameFa: 'کشاورزی',
+    proxies: ['MOO', 'VEGI'],
+  },
+  {
+    id: 'lithium',
+    name: 'Lithium & Battery',
+    nameFa: 'لیتیوم و باتری',
+    proxies: ['LIT'],
+  },
+  {
+    id: 'rare-earth',
+    name: 'Rare Earth / Strategic',
+    nameFa: 'خاک نادر و استراتژیک',
+    proxies: ['REMX'],
+  },
+]
+
+/** فلزات و معادن به تفکیک کشور */
+const METALS_MINING_BY_COUNTRY = [
+  { country: 'United States', countryFa: 'آمریکا', symbol: 'XME' },
+  { country: 'Canada', countryFa: 'کانادا', symbol: 'XMA.TO' },
+  { country: 'Australia', countryFa: 'استرالیا', symbol: 'MVR.AX' },
+  { country: 'Europe', countryFa: 'اروپا', symbol: 'EXV6.DE' },
+  { country: 'China', countryFa: 'چین', symbol: '512400.SS' },
+  { country: 'Global', countryFa: 'جهانی', symbol: 'PICK' },
+  { country: 'Brazil', countryFa: 'برزیل', symbol: 'EWZ' },
+  { country: 'Peru', countryFa: 'پرو', symbol: 'EPU' },
 ]
 
 function pct(from, to) {
@@ -366,18 +419,56 @@ async function buildLiveBundle(errors) {
     }
   }
 
-  const materialsByCountry = []
-  for (const meta of MATERIALS_BY_COUNTRY) {
+  const periodKeys = ['dailyPct', 'weekPct', 'monthPct', 'ytdPct', 'year1Pct', 'year3Pct']
+  const materialsIndustries = []
+  for (const ind of MATERIALS_INDUSTRIES) {
+    const quotes = []
+    for (const symbol of ind.proxies) {
+      try {
+        const q = await ensureQuote({
+          symbol,
+          name: ind.name,
+          nameFa: ind.nameFa,
+          group: 'materials-industry',
+          kind: 'etf',
+        })
+        quotes.push(q)
+      } catch (e) {
+        errors.push(`mat-ind ${symbol}: ${e?.message || e}`)
+      }
+    }
+    if (!quotes.length) continue
+    const row = {
+      id: ind.id,
+      name: ind.name,
+      nameFa: ind.nameFa,
+      symbols: ind.proxies.filter((s) => quotes.some((q) => q.symbol === s)).join(' · '),
+      marketCapUsd: quotes.reduce((a, q) => a + (q.aumUsd || q.marketCapUsd || 0), 0) || null,
+      aumUsd: quotes.reduce((a, q) => a + (q.aumUsd || 0), 0) || null,
+      asOf: quotes[0]?.asOf,
+    }
+    for (const key of periodKeys) {
+      row[key] = weightedAvg(quotes, key)
+    }
+    materialsIndustries.push(row)
+  }
+
+  const metalsMiningByCountry = []
+  for (const meta of METALS_MINING_BY_COUNTRY) {
     try {
       const q = await ensureQuote({
         symbol: meta.symbol,
-        name: meta.sector,
-        nameFa: meta.sectorFa,
-        group: 'materials-country',
+        name: 'Metals & Mining',
+        nameFa: 'فلزات و معادن',
+        group: 'metals-country',
         kind: 'etf',
       })
-      materialsByCountry.push({
-        ...meta,
+      metalsMiningByCountry.push({
+        country: meta.country,
+        countryFa: meta.countryFa,
+        sector: 'Metals & Mining',
+        sectorFa: 'فلزات و معادن',
+        symbol: meta.symbol,
         price: q.price,
         currency: q.currency,
         dailyPct: q.dailyPct,
@@ -391,7 +482,7 @@ async function buildLiveBundle(errors) {
         asOf: q.asOf,
       })
     } catch (e) {
-      errors.push(`materials ${meta.symbol}: ${e?.message || e}`)
+      errors.push(`metals ${meta.symbol}: ${e?.message || e}`)
     }
   }
 
@@ -399,11 +490,13 @@ async function buildLiveBundle(errors) {
     ok: stocks.length > 0,
     updatedAt: new Date().toISOString(),
     source: 'yahoo-finance',
-    note: 'GuruFocus بسته است؛ سکتورهای تجمیعی = Select Sector SPDR · مواد پایه کشورها = ETF مواد/معادن · میانگین صنعت وزنی ارزش بازار',
+    note: 'سکتور تجمیعی · صنایع مواد پایه (وزنی چندکشور) · فلزات و معادن کشورها · میانگین صنعت سهام وزنی ارزش بازار',
     stocks,
     industries: buildIndustries(stocks),
     sectorPerformance: withWeights(sectorPerformance),
-    materialsByCountry: withWeights(materialsByCountry),
+    materialsIndustries: withWeights(materialsIndustries),
+    metalsMiningByCountry: withWeights(metalsMiningByCountry),
+    materialsByCountry: withWeights(metalsMiningByCountry),
     countrySectors: [],
     news: [],
     errors: errors.slice(0, 20),

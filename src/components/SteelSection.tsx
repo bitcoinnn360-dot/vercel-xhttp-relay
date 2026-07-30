@@ -38,6 +38,33 @@ export function SteelSection({
   const custeelLive = data.sources.find((s) => s.id === 'custeel')?.status === 'live'
   const imeLive = data.sources.find((s) => s.id === 'ime')?.status === 'live'
 
+  const chinaBillet = data.steel.find((s) => s.id === 'tangshan_billet')
+  const chinaRatioDefs: { id: string; name: string; key: string }[] = [
+    { id: 'tangshan_billet', name: 'بیلت تانگشان', key: 'billet' },
+    { id: 'rebar_beijing', name: 'میلگرد پکن', key: 'rebar' },
+    { id: 'br_pellet', name: 'گندله برزیل (FOB)', key: 'pellet' },
+    { id: 'chile_conc', name: 'کنسانتره شیلی (FOB)', key: 'conc' },
+    { id: 'iran_conc', name: 'کنسانتره ایران (FOB)', key: 'iran_conc' },
+    { id: 'pb61', name: 'نرمه سنگ‌آهن PB', key: 'ore' },
+    { id: 'brbf', name: 'نرمه BRBF برزیل', key: 'brbf' },
+    { id: 'iran_hem', name: 'هماتیت ایران (FOB)', key: 'hem' },
+  ]
+  const chinaChain =
+    chinaBillet?.value && chinaBillet.value > 0
+      ? chinaRatioDefs
+          .map((d) => {
+            const row = data.steel.find((s) => s.id === d.id)
+            if (!row?.value) return null
+            return {
+              name: d.name,
+              price: row.value,
+              unit: row.unit,
+              ratio: Math.round((row.value / chinaBillet.value) * 1000) / 10,
+            }
+          })
+          .filter(Boolean) as { name: string; price: number; unit: string; ratio: number }[]
+      : []
+
   const chartSeries = CHART_IDS.map((c) => {
     const fromHist = histories?.[`steel:${c.id}`] || histories?.[c.id]
     const fromRow = data.steel.find((s) => s.id === c.id)?.history
@@ -156,70 +183,128 @@ export function SteelSection({
           </table>
         </div>
 
-        <div className="panel p-4">
-          <h3 className="mb-1 text-sm font-bold">ضریب قیمتی زنجیره فولاد بورس کالا نسبت به شمش</h3>
+        <div className="panel p-4 lg:col-span-2">
+          <h3 className="mb-1 text-sm font-bold">ضریب قیمتی زنجیره نسبت به شمش — ایران و چین</h3>
           <p className="mb-3 text-xs text-[var(--color-muted)]">
-            {imeLive
-              ? 'از آمار معاملات فیزیکی ime.co.ir/offer-stat'
-              : 'فعلاً از seed — برای زنده شدن باید scrape از IP ایران اجرا شود'}
+            ایران: بورس کالا (ریال) · چین/دریایی: Custeel نسبت به بیلت تانگشان (دلار) · اسفنجی فعلاً فقط در ایران
           </p>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chain} layout="vertical" margin={{ right: 16, left: 8 }}>
-                <CartesianGrid stroke="#d4cfc4" strokeDasharray="3 3" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 11, fill: '#6b7c8a' }} unit="%" />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  width={100}
-                  tick={{ fontSize: 11, fill: '#3d4f5f' }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip
-                  contentStyle={{
-                    background: '#15202b',
-                    border: 'none',
-                    borderRadius: 10,
-                    color: '#fff',
-                    fontSize: 12,
-                  }}
-                  itemStyle={{ color: '#fff' }}
-                  labelStyle={{ color: '#fff' }}
-                  formatter={(v, _n, item) => {
-                    const price = (item?.payload as { price?: number })?.price
-                    return [
-                      `${fmtNum(Number(v), 1)}٪${price ? ` · ${fmtInt(price)} ریال` : ''}`,
-                      'نسبت به شمش',
-                    ]
-                  }}
-                />
-                <Bar dataKey="ratio" fill="#2f5d7a" radius={[0, 6, 6, 0]} barSize={16} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <RatioBlock
+              title="ایران — بورس کالا"
+              subtitle={imeLive ? 'زنده از offer-stat' : 'seed / نیاز به IP ایران'}
+              color="#2f5d7a"
+              rows={chain.map((r) => ({
+                name: r.name,
+                ratio: r.ratio,
+                detail: `${fmtInt(r.price)} ریال/کیلو`,
+              }))}
+              table={data.imeChain.map((r) => ({
+                name: r.product,
+                price: fmtInt(r.priceRialKg),
+                ratio: r.ratioToBilletPct,
+                meta: r.tradeDate,
+              }))}
+            />
+            <RatioBlock
+              title="چین / دریایی — Custeel"
+              subtitle={custeelLive ? 'نسبت به بیلت تانگشان' : 'از آخرین snapshot'}
+              color="#9a3412"
+              rows={chinaChain.map((r) => ({
+                name: r.name,
+                ratio: r.ratio,
+                detail: `${fmtNum(r.price, 1)} ${r.unit}`,
+              }))}
+              table={chinaChain.map((r) => ({
+                name: r.name,
+                price: fmtNum(r.price, 1),
+                ratio: r.ratio,
+                meta: r.unit,
+              }))}
+            />
           </div>
-          <table className="data-table mt-2">
-            <thead>
-              <tr>
-                <th>محصول</th>
-                <th>ریال/کیلو</th>
-                <th>ضریب</th>
-                <th>تاریخ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.imeChain.map((r) => (
-                <tr key={r.product}>
-                  <td>{r.product}</td>
-                  <td className="num">{fmtInt(r.priceRialKg)}</td>
-                  <td className="num">{fmtNum(r.ratioToBilletPct, 1)}٪</td>
-                  <td className="num text-[var(--color-muted)]">{r.tradeDate}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       </div>
     </section>
+  )
+}
+
+function RatioBlock({
+  title,
+  subtitle,
+  color,
+  rows,
+  table,
+}: {
+  title: string
+  subtitle: string
+  color: string
+  rows: { name: string; ratio: number; detail: string }[]
+  table: { name: string; price: string; ratio: number; meta: string }[]
+}) {
+  if (!rows.length) {
+    return (
+      <div>
+        <h4 className="text-xs font-bold">{title}</h4>
+        <p className="mt-2 text-xs text-[var(--color-muted)]">داده نسبت در دسترس نیست.</p>
+      </div>
+    )
+  }
+  return (
+    <div>
+      <h4 className="text-xs font-bold">{title}</h4>
+      <p className="mb-2 text-[0.65rem] text-[var(--color-muted)]">{subtitle}</p>
+      <div className="h-56">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={rows} layout="vertical" margin={{ right: 12, left: 4 }}>
+            <CartesianGrid stroke="#d4cfc4" strokeDasharray="3 3" horizontal={false} />
+            <XAxis type="number" tick={{ fontSize: 10, fill: '#6b7c8a' }} unit="%" />
+            <YAxis
+              type="category"
+              dataKey="name"
+              width={108}
+              tick={{ fontSize: 10, fill: '#3d4f5f' }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <Tooltip
+              contentStyle={{
+                background: '#15202b',
+                border: 'none',
+                borderRadius: 10,
+                color: '#fff',
+                fontSize: 12,
+              }}
+              itemStyle={{ color: '#fff' }}
+              labelStyle={{ color: '#fff' }}
+              formatter={(v, _n, item) => {
+                const detail = (item?.payload as { detail?: string })?.detail
+                return [`${fmtNum(Number(v), 1)}٪${detail ? ` · ${detail}` : ''}`, 'نسبت به شمش']
+              }}
+            />
+            <Bar dataKey="ratio" fill={color} radius={[0, 6, 6, 0]} barSize={14} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <table className="data-table mt-2">
+        <thead>
+          <tr>
+            <th>محصول</th>
+            <th>نرخ</th>
+            <th>ضریب</th>
+            <th>توضیح</th>
+          </tr>
+        </thead>
+        <tbody>
+          {table.map((r) => (
+            <tr key={r.name}>
+              <td>{r.name}</td>
+              <td className="num">{r.price}</td>
+              <td className="num">{fmtNum(r.ratio, 1)}٪</td>
+              <td className="num text-[var(--color-muted)]">{r.meta}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }

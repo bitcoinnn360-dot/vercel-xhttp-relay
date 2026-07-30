@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import type { DashboardData, GlobalMarketRow, GlobalNewsItem } from '../data/types'
+import type { CountrySectorRow, DashboardData, GlobalMarketRow } from '../data/types'
 import { changeClass, fmtNum, fmtPct } from '../lib/format'
 
 const GROUPS = [
@@ -28,15 +28,10 @@ type DisplayRow =
   | { kind: 'equity'; s: GlobalMarketRow; sector: string; rowSpan: number; showSector: boolean }
   | { kind: 'industry'; s: GlobalMarketRow; sector: string }
 
+type SortKey = 'ytdPct' | 'dailyPct' | 'weekPct' | 'monthPct'
+
 function pctOrNull(v: number | null | undefined) {
   return v == null || !Number.isFinite(v) ? null : v
-}
-
-function volFmt(v?: number | null) {
-  if (v == null || !Number.isFinite(v) || v <= 0) return '—'
-  if (v >= 1_000_000) return `${fmtNum(v / 1_000_000, 1)}M`
-  if (v >= 1_000) return `${fmtNum(v / 1_000, 1)}K`
-  return fmtNum(v, 0)
 }
 
 function PctPill({ value }: { value: number | null | undefined }) {
@@ -49,15 +44,24 @@ function PctPill({ value }: { value: number | null | undefined }) {
   )
 }
 
-function newsDate(pub?: string) {
-  if (!pub) return ''
-  const d = new Date(pub)
-  if (Number.isNaN(d.getTime())) return pub.slice(0, 16)
-  return d.toLocaleDateString('fa-IR', { month: 'short', day: 'numeric', year: 'numeric' })
+function MarginCell({ value }: { value: number | null | undefined }) {
+  const v = pctOrNull(value)
+  if (v == null) return <td className="num text-[var(--color-muted)]">—</td>
+  return <td className={`num font-semibold ${v >= 0 ? 'pos' : 'neg'}`}>{fmtPct(v)}</td>
+}
+
+function heatColor(pct: number | null | undefined) {
+  const v = pctOrNull(pct) ?? 0
+  const abs = Math.min(Math.abs(v), 20)
+  const a = 0.12 + (abs / 20) * 0.45
+  if (v > 0.15) return `color-mix(in oklab, #15803d ${Math.round(a * 100)}%, white)`
+  if (v < -0.15) return `color-mix(in oklab, #b91c1c ${Math.round(a * 100)}%, white)`
+  return '#f8fafc'
 }
 
 export function GlobalMarketsSection({ data }: { data: DashboardData }) {
   const [group, setGroup] = useState<(typeof GROUPS)[number]>('همه')
+  const [sectorSort, setSectorSort] = useState<SortKey>('ytdPct')
   const gm = data.globalMarkets
 
   const displayRows = useMemo(() => {
@@ -81,26 +85,26 @@ export function GlobalMarketsSection({ data }: { data: DashboardData }) {
 
     const out: DisplayRow[] = []
     for (const sector of keys) {
-      const eq = buckets.get(sector) || []
+      const eq = (buckets.get(sector) || []).slice().sort((a, b) => (b.ytdPct || 0) - (a.ytdPct || 0))
       const ind = indByGroup.get(sector)
       const n = eq.length + (ind ? 1 : 0)
       eq.forEach((s, i) => {
         out.push({ kind: 'equity', s, sector, rowSpan: n, showSector: i === 0 })
       })
-      if (ind)
+      if (ind) {
         out.push({
           kind: 'industry',
           s: { ...ind, symbol: ind.symbol || 'IND', nameFa: ind.nameFa || `صنعت ${sector}` },
           sector,
         })
+      }
     }
     return out
   }, [gm.stocks, gm.industries, group])
 
   const sectorCards = useMemo(() => {
     const stocks = gm.stocks || []
-    const industries = gm.industries || []
-    return industries
+    return (gm.industries || [])
       .filter((i) => group === 'همه' || i.group === group)
       .map((i) => {
         const tone = GROUP_TONE[i.group] || GROUP_TONE.شاخص‌ها
@@ -108,14 +112,19 @@ export function GlobalMarketsSection({ data }: { data: DashboardData }) {
           sector: i.group,
           count: i.count || stocks.filter((s) => s.group === i.group).length,
           daily: i.dailyPct ?? 0,
-          week: i.weekPct ?? 0,
           ytd: i.ytdPct ?? 0,
+          gross: i.grossMarginPct,
+          profit: i.profitMarginPct,
           tone,
         }
       })
   }, [gm.industries, gm.stocks, group])
 
-  const news = gm.news || []
+  const countryRows = useMemo(() => {
+    const rows = [...(gm.countrySectors || [])]
+    rows.sort((a, b) => (Number(b[sectorSort]) || 0) - (Number(a[sectorSort]) || 0))
+    return rows
+  }, [gm.countrySectors, sectorSort])
 
   return (
     <section id="global" className="scroll-mt-28 space-y-4">
@@ -123,34 +132,32 @@ export function GlobalMarketsSection({ data }: { data: DashboardData }) {
         <div>
           <h2 className="section-title">بازار جهانی معادن و مواد</h2>
           <p className="section-sub">
-            شاخص‌ها و ETFهای صنعتی · سنگ‌آهن · فولاد · مس · طلا — معادل نمای صنایع در سهام معدنی
+            عملکرد سکتور کشورها · شرکت‌های معروف هر صنعت · حاشیه سود
             {gm.updatedAt ? ` · ${new Date(gm.updatedAt).toLocaleString('fa-IR')}` : ''}
           </p>
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          {GROUPS.map((g) => (
-            <button
-              key={g}
-              type="button"
-              onClick={() => setGroup(g)}
-              className={`rounded-md border px-2.5 py-1 text-xs font-semibold transition ${
-                group === g
-                  ? 'border-[var(--color-ink)] bg-[var(--color-ink)] text-white'
-                  : 'border-[var(--color-line)] bg-white text-[var(--color-muted)] hover:border-[var(--color-ink)]/40'
-              }`}
-            >
-              {g}
-            </button>
-          ))}
-        </div>
       </div>
 
-      {gm.note ? (
-        <p className="text-[0.72rem] text-[var(--color-muted)]">
-          {gm.note}
-          {gm.source ? ` · منبع: ${gm.source}` : ''}
-        </p>
-      ) : null}
+      {gm.note ? <p className="text-[0.72rem] text-[var(--color-muted)]">{gm.note}</p> : null}
+
+      <CountrySectorBoard rows={countryRows} sortKey={sectorSort} onSort={setSectorSort} />
+
+      <div className="flex flex-wrap gap-1.5">
+        {GROUPS.map((g) => (
+          <button
+            key={g}
+            type="button"
+            onClick={() => setGroup(g)}
+            className={`rounded-md border px-2.5 py-1 text-xs font-semibold transition ${
+              group === g
+                ? 'border-[var(--color-ink)] bg-[var(--color-ink)] text-white'
+                : 'border-[var(--color-line)] bg-white text-[var(--color-muted)] hover:border-[var(--color-ink)]/40'
+            }`}
+          >
+            {g}
+          </button>
+        ))}
+      </div>
 
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         {sectorCards.map((c, i) => (
@@ -159,7 +166,7 @@ export function GlobalMarketsSection({ data }: { data: DashboardData }) {
             type="button"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.04 }}
+            transition={{ delay: i * 0.03 }}
             onClick={() => setGroup(c.sector as (typeof GROUPS)[number])}
             className="sector-chip text-right"
             style={{
@@ -176,20 +183,26 @@ export function GlobalMarketsSection({ data }: { data: DashboardData }) {
             </div>
             <div className="mt-2 flex flex-wrap items-end justify-between gap-2">
               <div>
-                <div className="text-[9px] text-[var(--color-muted)]">روزانه</div>
-                <div className={`num text-sm font-bold ${changeClass(c.daily)}`}>{fmtPct(c.daily)}</div>
+                <div className="text-[9px] text-[var(--color-muted)]">روزانه / YTD</div>
+                <div className={`num text-sm font-bold ${changeClass(c.daily)}`}>
+                  {fmtPct(c.daily)}
+                  <span className={`ms-2 text-xs font-semibold ${changeClass(c.ytd)}`}>{fmtPct(c.ytd)}</span>
+                </div>
               </div>
               <div className="text-left">
-                <div className="text-[9px] text-[var(--color-muted)]">YTD</div>
-                <div className={`num text-sm font-semibold ${changeClass(c.ytd)}`}>{fmtPct(c.ytd)}</div>
+                <div className="text-[9px] text-[var(--color-muted)]">حاشیه خالص*</div>
+                <div className="num text-sm font-semibold">
+                  {c.profit != null ? fmtPct(c.profit) : '—'}
+                </div>
               </div>
             </div>
           </motion.button>
         ))}
       </div>
+      <p className="text-[0.65rem] text-[var(--color-muted)]">* میانگین حاشیه سود خالص سهام‌های صنعت (بدون ETF)</p>
 
       <div className="panel overflow-x-auto p-2 sm:p-3">
-        <table className="data-table stocks-table min-w-[820px]">
+        <table className="data-table stocks-table min-w-[920px]">
           <thead>
             <tr>
               <th>صنعت</th>
@@ -197,15 +210,22 @@ export function GlobalMarketsSection({ data }: { data: DashboardData }) {
               <th>نام</th>
               <th>
                 قیمت
-                <div className="unit-row">دلار</div>
+                <div className="unit-row">محلی</div>
               </th>
               <th>روزانه</th>
               <th>هفتگی</th>
-              <th>ماهانه</th>
               <th>YTD</th>
               <th>
-                حجم
-                <div className="unit-row">سهم</div>
+                حاشیه ناخالص
+                <div className="unit-row">٪</div>
+              </th>
+              <th>
+                حاشیه خالص
+                <div className="unit-row">٪</div>
+              </th>
+              <th>
+                P/B
+                <div className="unit-row">مرتبه</div>
               </th>
             </tr>
           </thead>
@@ -223,7 +243,7 @@ export function GlobalMarketsSection({ data }: { data: DashboardData }) {
             )}
             {!displayRows.length ? (
               <tr>
-                <td colSpan={9} className="py-8 text-center text-sm text-[var(--color-muted)]">
+                <td colSpan={10} className="py-8 text-center text-sm text-[var(--color-muted)]">
                   داده بازار جهانی هنوز بارگذاری نشده است.
                 </td>
               </tr>
@@ -231,9 +251,98 @@ export function GlobalMarketsSection({ data }: { data: DashboardData }) {
           </tbody>
         </table>
       </div>
-
-      <GlobalNewsBlock news={news} />
     </section>
+  )
+}
+
+function CountrySectorBoard({
+  rows,
+  sortKey,
+  onSort,
+}: {
+  rows: CountrySectorRow[]
+  sortKey: SortKey
+  onSort: (k: SortKey) => void
+}) {
+  if (!rows.length) return null
+  const maxAbs = Math.max(...rows.map((r) => Math.abs(Number(r[sortKey]) || 0)), 1)
+
+  return (
+    <div className="panel space-y-3 p-3 sm:p-4">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-bold">عملکرد سکتور و صنعت در کشورها</h3>
+          <p className="text-[0.7rem] text-[var(--color-muted)]">
+            شبیه Market → Sector & Industry Performance در GuruFocus — پروکسی ETF مواد پایه / فلزات و معادن
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {(
+            [
+              ['dailyPct', 'روزانه'],
+              ['weekPct', 'هفتگی'],
+              ['monthPct', 'ماهانه'],
+              ['ytdPct', 'YTD'],
+            ] as const
+          ).map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => onSort(k)}
+              className={`rounded-md border px-2 py-0.5 text-[0.65rem] font-semibold ${
+                sortKey === k
+                  ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white'
+                  : 'border-[var(--color-line)] text-[var(--color-muted)]'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        {rows.map((r, i) => {
+          const v = Number(r[sortKey]) || 0
+          const w = Math.max(8, Math.round((Math.abs(v) / maxAbs) * 100))
+          return (
+            <motion.div
+              key={`${r.country}-${r.sector}-${r.symbol}`}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: Math.min(i, 12) * 0.025 }}
+              className="rounded-lg border border-[var(--color-line)] px-3 py-2.5"
+              style={{ background: heatColor(v) }}
+            >
+              <div className="flex items-baseline justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-bold text-[var(--color-ink)]">{r.countryFa}</div>
+                  <div className="truncate text-[0.7rem] text-[var(--color-muted)]">
+                    {r.sectorFa}
+                    <span className="ms-1 opacity-70">· {r.symbol}</span>
+                  </div>
+                </div>
+                <div className={`num shrink-0 text-sm font-extrabold ${changeClass(v)}`}>{fmtPct(v)}</div>
+              </div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/70">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${w}%`,
+                    background: v >= 0 ? '#15803d' : '#b91c1c',
+                    marginInlineStart: v >= 0 ? 0 : 'auto',
+                  }}
+                />
+              </div>
+              <div className="mt-1.5 flex justify-between text-[0.65rem] text-[var(--color-muted)]">
+                <span className={changeClass(r.dailyPct ?? 0)}>روز {r.dailyPct != null ? fmtPct(r.dailyPct) : '—'}</span>
+                <span className={changeClass(r.ytdPct ?? 0)}>YTD {r.ytdPct != null ? fmtPct(r.ytdPct) : '—'}</span>
+              </div>
+            </motion.div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
@@ -260,12 +369,18 @@ function EquityTr({ row }: { row: Extract<DisplayRow, { kind: 'equity' }> }) {
         {isEtf ? <span className="halt-tag">ETF</span> : null}
       </td>
       <td className="text-[0.8rem] text-[var(--color-muted)]">{s.nameFa || s.name}</td>
-      <td className="num font-semibold">{s.price != null ? fmtNum(s.price, 2) : '—'}</td>
+      <td className="num font-semibold">
+        {s.price != null ? fmtNum(s.price, s.price >= 1000 ? 0 : 2) : '—'}
+        {s.currency && s.currency !== 'USD' ? (
+          <span className="ms-1 text-[0.6rem] text-[var(--color-muted)]">{s.currency}</span>
+        ) : null}
+      </td>
       <PctPill value={s.dailyPct} />
       <PctPill value={s.weekPct} />
-      <PctPill value={s.monthPct} />
       <PctPill value={s.ytdPct} />
-      <td className="num">{volFmt(s.volume)}</td>
+      <MarginCell value={s.grossMarginPct} />
+      <MarginCell value={s.profitMarginPct} />
+      <td className="num">{s.priceToBook != null ? fmtNum(s.priceToBook, 2) : '—'}</td>
     </motion.tr>
   )
 }
@@ -298,47 +413,10 @@ function IndustryTr({
       <td className="num">—</td>
       <PctPill value={s.dailyPct} />
       <PctPill value={s.weekPct} />
-      <PctPill value={s.monthPct} />
       <PctPill value={s.ytdPct} />
+      <MarginCell value={s.grossMarginPct} />
+      <MarginCell value={s.profitMarginPct} />
       <td className="num">—</td>
     </tr>
-  )
-}
-
-function GlobalNewsBlock({ news }: { news: GlobalNewsItem[] }) {
-  return (
-    <div className="space-y-3">
-      <div>
-        <h3 className="section-title text-base">اخبار و مقالات صنعت و کلان</h3>
-        <p className="section-sub">Mining.com · Kitco · Fed — مروری شبیه بخش اخبار GuruFocus</p>
-      </div>
-      <div className="panel divide-y divide-[var(--color-line)]">
-        {news.length ? (
-          news.map((n, i) => (
-            <motion.a
-              key={n.link}
-              href={n.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: Math.min(i, 8) * 0.03 }}
-              className="block px-4 py-3 transition hover:bg-[#f8fafc]"
-            >
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="text-[0.7rem] font-bold text-[var(--color-muted)]">{n.source}</span>
-                <span className="text-[0.65rem] text-[var(--color-muted)]">{newsDate(n.pubDate)}</span>
-              </div>
-              <div className="mt-1 text-sm font-semibold leading-6 text-[var(--color-ink)]">{n.title}</div>
-              {n.summary ? (
-                <p className="mt-1 line-clamp-2 text-[0.75rem] leading-5 text-[var(--color-muted)]">{n.summary}</p>
-              ) : null}
-            </motion.a>
-          ))
-        ) : (
-          <div className="px-4 py-6 text-center text-sm text-[var(--color-muted)]">خبری در دسترس نیست.</div>
-        )}
-      </div>
-    </div>
   )
 }

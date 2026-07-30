@@ -1247,7 +1247,8 @@ async function fetchGlobalMarketsApi(): Promise<GlobalMarketsBundle | null> {
     return {
       stocks: json.stocks,
       industries: json.industries || [],
-      news: json.news || [],
+      countrySectors: json.countrySectors || [],
+      news: [],
       updatedAt: json.updatedAt,
       source: json.source,
       note: json.note,
@@ -1255,7 +1256,7 @@ async function fetchGlobalMarketsApi(): Promise<GlobalMarketsBundle | null> {
     }
   }
 
-  // Static first — never block SPA on Yahoo/RSS scrape.
+  // Static first — never block SPA on Yahoo scrape.
   let staticBundle: GlobalMarketsBundle | null = null
   try {
     staticBundle = await read('/data/global_markets.json', 4000)
@@ -1277,9 +1278,10 @@ function applyGlobalMarkets(base: DashboardData, bundle: GlobalMarketsBundle | n
   base.globalMarkets = {
     stocks: bundle.stocks,
     industries: bundle.industries || [],
-    news: bundle.news || [],
+    countrySectors: bundle.countrySectors || [],
+    news: [],
     updatedAt: bundle.updatedAt,
-    source: bundle.source || 'yahoo-finance+rss',
+    source: bundle.source || 'yahoo-finance',
     note: bundle.note,
     served: bundle.served,
   }
@@ -1667,13 +1669,13 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
     }
     if (s.id === 'yahoo') {
       const n = base.globalMarkets.stocks.length
-      const newsN = base.globalMarkets.news.length
+      const sectors = base.globalMarkets.countrySectors?.length || 0
       return {
         ...s,
         status: globalOk ? 'live' : 'seed',
         note: globalOk
-          ? `${n} نماد جهانی · ${newsN} خبر · ${base.globalMarkets.source || 'yahoo+rss'}`
-          : 'Yahoo Finance / RSS هنوز لود نشده',
+          ? `${n} نماد · ${sectors} سکتور کشوری · ${base.globalMarkets.source || 'yahoo'}`
+          : 'Yahoo Finance هنوز لود نشده',
         lastOk: globalOk ? base.globalMarkets.updatedAt || now : s.lastOk,
       }
     }

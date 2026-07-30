@@ -12,7 +12,8 @@
     "scrape": "python3 scripts/scrape_market.py",
     "steel": "python3 scripts/scrape_steel.py",
     "fred": "python3 scripts/fetch_fred.py",
-    "data": "python3 scripts/scrape_market.py && python3 scripts/scrape_steel.py && python3 scripts/fetch_fred.py",
+    "global": "node scripts/fetch_global.mjs",
+    "data": "python3 scripts/scrape_market.py && python3 scripts/scrape_steel.py && python3 scripts/fetch_fred.py && node scripts/fetch_global.mjs",
     "deploy": "npm run data && npm run build && npx wrangler pages deploy dist --project-name=arz-digital-dashboard --branch=main"
   },
   "dependencies": {

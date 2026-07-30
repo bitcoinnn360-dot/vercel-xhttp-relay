@@ -234,6 +234,31 @@ export interface GlobalMarketRow {
   source?: string
   isIndustry?: boolean
   count?: number
+  /** حاشیه سود ناخالص % */
+  grossMarginPct?: number | null
+  /** حاشیه عملیاتی % */
+  operatingMarginPct?: number | null
+  /** حاشیه سود خالص % */
+  profitMarginPct?: number | null
+  returnOnEquityPct?: number | null
+  revenueGrowthPct?: number | null
+  priceToBook?: number | null
+}
+
+/** عملکرد سکتور/صنعت در کشورها (پروکسی ETF — شبیه GuruFocus Sector Performance) */
+export interface CountrySectorRow {
+  country: string
+  countryFa: string
+  sector: string
+  sectorFa: string
+  symbol: string
+  price?: number | null
+  currency?: string
+  dailyPct?: number | null
+  weekPct?: number | null
+  monthPct?: number | null
+  ytdPct?: number | null
+  asOf?: string
 }
 
 export interface GlobalNewsItem {
@@ -248,7 +273,8 @@ export interface GlobalNewsItem {
 export interface GlobalMarketsBundle {
   stocks: GlobalMarketRow[]
   industries: GlobalMarketRow[]
-  news: GlobalNewsItem[]
+  countrySectors?: CountrySectorRow[]
+  news?: GlobalNewsItem[]
   updatedAt?: string
   source?: string
   note?: string

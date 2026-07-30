@@ -296,10 +296,20 @@
   }
   .stocks-table .name-cell {
     text-align: center;
-    min-width: 11rem;
+    min-width: 4.25rem;
+    width: 4.25rem;
+    max-width: 5.5rem;
+    padding-inline: 0.35rem;
   }
   .stocks-table .name-main {
-    display: inline;
+    display: inline-block;
+    font-size: 0.82rem;
+    font-weight: 800;
+    max-width: 5.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
   }
   .stocks-table .symbol-tag {
     display: inline-block;

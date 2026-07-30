@@ -190,7 +190,7 @@ export function StocksSection({ data }: { data: DashboardData }) {
       </div>
 
       <div className="panel overflow-x-auto p-2 sm:p-3">
-        <table className="data-table stocks-table min-w-[1280px]">
+        <table className="data-table stocks-table min-w-[980px]">
           <thead>
             <tr>
               <th rowSpan={2}>صنعت</th>

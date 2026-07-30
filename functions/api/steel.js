@@ -143,21 +143,54 @@ async function fetchUsdIrr() {
 
 async function custeelSession(env) {
   const cookieSecret = String(env?.CUSTEEL_COOKIE || '').trim()
-  if (cookieSecret) return cookieSecret
+  if (cookieSecret) return cookieSecret.includes('=') ? cookieSecret : `JSESSIONID=${cookieSecret}`
 
   const user = String(env?.CUSTEEL_USER || '').trim()
   const pass = String(env?.CUSTEEL_PASS || '').trim()
   if (!user || !pass) return ''
 
   const url = `${CUSTEEL_LOGIN}&username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'User-Agent': UA, Referer: 'https://www.custeel.net/en/' },
-    body: '',
-  })
-  const text = (await res.text()).trim()
-  if (text !== '0') throw new Error(`custeel login ${text || res.status}`)
-  return cookieFromSetCookie(res.headers.getSetCookie?.() || res.headers.get('set-cookie'))
+
+  const tryLogin = async (warmCookie) => {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'User-Agent': UA,
+        Referer: 'https://www.custeel.net/en/',
+        Origin: 'https://www.custeel.net',
+        ...(warmCookie ? { Cookie: warmCookie } : {}),
+      },
+      body: '',
+      redirect: 'follow',
+    })
+    const text = (await res.text()).trim()
+    if (text !== '0') throw new Error(`custeel login ${text || res.status}`)
+    const loginCookie = cookieFromSetCookie(res.headers.getSetCookie?.() || res.headers.get('set-cookie'))
+    return loginCookie || warmCookie || ''
+  }
+
+  // Prefer direct login (usually returns JSESSIONID). Warm home only as fallback.
+  try {
+    const cookie = await tryLogin('')
+    if (cookie) return cookie
+  } catch {
+    /* try warm path */
+  }
+
+  let warmCookie = ''
+  try {
+    const home = await Promise.race([
+      fetch('https://www.custeel.net/en/', {
+        headers: { 'User-Agent': UA, Referer: 'https://www.custeel.net/' },
+        redirect: 'follow',
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('warm timeout')), 2500)),
+    ])
+    warmCookie = cookieFromSetCookie(home.headers.getSetCookie?.() || home.headers.get('set-cookie'))
+  } catch {
+    /* continue */
+  }
+  return tryLogin(warmCookie)
 }
 
 function tableRows(html) {
@@ -286,7 +319,7 @@ function pickTangshanBillet(rows) {
   return null
 }
 
-async function fetchText(url, cookie, attempts = 4) {
+async function fetchText(url, cookie, attempts = 2) {
   let lastErr
   for (let i = 0; i < attempts; i++) {
     try {
@@ -301,7 +334,7 @@ async function fetchText(url, cookie, attempts = 4) {
       return await res.text()
     } catch (err) {
       lastErr = err
-      await new Promise((r) => setTimeout(r, 400 * (i + 1)))
+      if (i + 1 < attempts) await new Promise((r) => setTimeout(r, 250 * (i + 1)))
     }
   }
   throw lastErr || new Error(url)
@@ -324,7 +357,7 @@ async function scrapeCusteel(cookie, cnyUsd) {
 
   // Warm home (login cookies sometimes need a GET first).
   try {
-    await fetchText('https://www.custeel.net/en/', cookie, 2)
+    await fetchText('https://www.custeel.net/en/', cookie, 1)
   } catch {
     /* ignore */
   }
@@ -334,56 +367,74 @@ async function scrapeCusteel(cookie, cnyUsd) {
     ;(byCountry[meta.country] ||= []).push([sid, meta])
   }
 
-  for (const [country, items] of Object.entries(byCountry)) {
-    let listHtml
-    try {
-      listHtml = await fetchText(countryListUrl(country), cookie)
-    } catch {
-      continue
-    }
-    const links = listLinks(listHtml, 5, 3)
-    const perSid = Object.fromEntries(items.map(([sid]) => [sid, []]))
-    for (const { href, title } of links) {
-      let html
+  // Parallelize countries — sequential scrapes exceed CF/Pages wall-clock limits.
+  const countryResults = await Promise.all(
+    Object.entries(byCountry).map(async ([country, items]) => {
+      let listHtml
       try {
-        html = await fetchText(absCusteel(href), cookie)
+        listHtml = await fetchText(countryListUrl(country), cookie)
       } catch {
-        continue
+        return []
       }
-      const asOf = parseEnglishDate(articleTitle(html) || title)
-      if (!asOf) continue
-      const rows = tableRows(html)
+      const links = listLinks(listHtml, 5, 2)
+      const perSid = Object.fromEntries(items.map(([sid]) => [sid, []]))
+      const articles = await Promise.all(
+        links.map(async ({ href, title }) => {
+          try {
+            const html = await fetchText(absCusteel(href), cookie)
+            return { html, title }
+          } catch {
+            return null
+          }
+        }),
+      )
+      for (const art of articles) {
+        if (!art) continue
+        const asOf = parseEnglishDate(articleTitle(art.html) || art.title)
+        if (!asOf) continue
+        const rows = tableRows(art.html)
+        for (const [sid, meta] of items) {
+          const hit = fobFromRows(rows, meta.desc, meta.grade)
+          if (!hit) continue
+          const pts = perSid[sid]
+          if (pts.length && pts[pts.length - 1].date === asOf) continue
+          pts.push({ date: asOf, value: hit.fob })
+        }
+      }
+      const out = []
       for (const [sid, meta] of items) {
-        const hit = fobFromRows(rows, meta.desc, meta.grade)
-        if (!hit) continue
-        const pts = perSid[sid]
-        if (pts.length && pts[pts.length - 1].date === asOf) continue
-        pts.push({ date: asOf, value: hit.fob })
+        const pts = [...perSid[sid]].reverse()
+        if (!pts.length) continue
+        const last = pts[pts.length - 1]
+        const prev = pts.length > 1 ? pts[pts.length - 2] : null
+        const change = prev ? +(last.value - prev.value).toFixed(3) : 0
+        const changePct = prev?.value ? +((change / prev.value) * 100).toFixed(2) : 0
+        out.push({
+          row: {
+            id: sid,
+            name: meta.name,
+            nameFa: meta.nameFa,
+            value: +last.value.toFixed(2),
+            unit: meta.unit,
+            change,
+            changePct,
+            region: meta.region,
+            basis: 'FOB',
+            nativeValue: last.value,
+            nativeUnit: meta.unit,
+            asOf: last.date,
+            source: 'custeel-seaborne-fob',
+          },
+          hist: pts.map((p) => ({ date: p.date, value: +p.value.toFixed(3) })),
+        })
       }
-    }
-    for (const [sid, meta] of items) {
-      const pts = [...perSid[sid]].reverse()
-      if (!pts.length) continue
-      const last = pts[pts.length - 1]
-      const prev = pts.length > 1 ? pts[pts.length - 2] : null
-      const change = prev ? +(last.value - prev.value).toFixed(3) : 0
-      const changePct = prev?.value ? +((change / prev.value) * 100).toFixed(2) : 0
-      steel.push({
-        id: sid,
-        name: meta.name,
-        nameFa: meta.nameFa,
-        value: +last.value.toFixed(2),
-        unit: meta.unit,
-        change,
-        changePct,
-        region: meta.region,
-        basis: 'FOB',
-        nativeValue: last.value,
-        nativeUnit: meta.unit,
-        asOf: last.date,
-        source: 'custeel-seaborne-fob',
-      })
-      histories[sid] = pts.map((p) => ({ date: p.date, value: +p.value.toFixed(3) }))
+      return out
+    }),
+  )
+  for (const batch of countryResults) {
+    for (const { row, hist } of batch) {
+      steel.push(row)
+      histories[row.id] = hist
       ok += 1
     }
   }
@@ -409,61 +460,77 @@ async function scrapeCusteel(cookie, cnyUsd) {
     },
   ]
 
-  for (const spec of domesticSpecs) {
-    let page
-    try {
-      page = await fetchText(spec.page, cookie)
-    } catch {
-      continue
-    }
-    const links = listLinks(page, 3, 40).filter((l) =>
-      spec.need.every((n) => l.title.toLowerCase().includes(n)),
-    ).slice(0, 3)
-    const pts = []
-    for (const { href, title } of links) {
-      let html
+  const domesticResults = await Promise.all(
+    domesticSpecs.map(async (spec) => {
+      let page
       try {
-        html = await fetchText(absCusteel(href), cookie)
+        page = await fetchText(spec.page, cookie)
       } catch {
-        continue
+        return null
       }
-      const asOf = parseEnglishDate(articleTitle(html) || title)
-      if (!asOf) continue
-      const picked = spec.pick(tableRows(html))
-      if (!picked) continue
-      if (pts.length && pts[pts.length - 1].date === asOf) continue
-      pts.push({ date: asOf, value: picked.price, change: picked.change })
-    }
-    const chrono = [...pts].reverse()
-    if (!chrono.length) continue
-    const last = chrono[chrono.length - 1]
-    const prev = chrono.length > 1 ? chrono[chrono.length - 2] : null
-    const lastUsd = +(last.value * cnyUsd).toFixed(2)
-    const prevUsd = prev ? +(prev.value * cnyUsd).toFixed(2) : last.change != null
-      ? +((last.value - last.change) * cnyUsd).toFixed(2)
-      : lastUsd
-    const change = +(lastUsd - prevUsd).toFixed(3)
-    const changePct = prevUsd ? +((change / prevUsd) * 100).toFixed(2) : 0
-    const meta = DOMESTIC_META[spec.id]
-    steel.push({
-      id: spec.id,
-      name: meta.name,
-      nameFa: meta.nameFa,
-      value: lastUsd,
-      unit: 'دلار/تن',
-      change,
-      changePct,
-      region: meta.region,
-      basis: 'market',
-      nativeValue: last.value,
-      nativeUnit: 'یوان/تن',
-      asOf: last.date,
-      source: 'custeel-steel-market',
-    })
-    histories[spec.id] = chrono.map((p) => ({
-      date: p.date,
-      value: +(p.value * cnyUsd).toFixed(3),
-    }))
+      const links = listLinks(page, 3, 40)
+        .filter((l) => spec.need.every((n) => l.title.toLowerCase().includes(n)))
+        .slice(0, 2)
+      const articles = await Promise.all(
+        links.map(async ({ href, title }) => {
+          try {
+            const html = await fetchText(absCusteel(href), cookie)
+            return { html, title }
+          } catch {
+            return null
+          }
+        }),
+      )
+      const pts = []
+      for (const art of articles) {
+        if (!art) continue
+        const asOf = parseEnglishDate(articleTitle(art.html) || art.title)
+        if (!asOf) continue
+        const picked = spec.pick(tableRows(art.html))
+        if (!picked) continue
+        if (pts.length && pts[pts.length - 1].date === asOf) continue
+        pts.push({ date: asOf, value: picked.price, change: picked.change })
+      }
+      const chrono = [...pts].reverse()
+      if (!chrono.length) return null
+      const last = chrono[chrono.length - 1]
+      const prev = chrono.length > 1 ? chrono[chrono.length - 2] : null
+      const lastUsd = +(last.value * cnyUsd).toFixed(2)
+      const prevUsd = prev
+        ? +(prev.value * cnyUsd).toFixed(2)
+        : last.change != null
+          ? +((last.value - last.change) * cnyUsd).toFixed(2)
+          : lastUsd
+      const change = +(lastUsd - prevUsd).toFixed(3)
+      const changePct = prevUsd ? +((change / prevUsd) * 100).toFixed(2) : 0
+      const meta = DOMESTIC_META[spec.id]
+      return {
+        row: {
+          id: spec.id,
+          name: meta.name,
+          nameFa: meta.nameFa,
+          value: lastUsd,
+          unit: 'دلار/تن',
+          change,
+          changePct,
+          region: meta.region,
+          basis: 'market',
+          nativeValue: last.value,
+          nativeUnit: 'یوان/تن',
+          asOf: last.date,
+          source: 'custeel-steel-market',
+        },
+        hist: chrono.map((p) => ({
+          date: p.date,
+          value: +(p.value * cnyUsd).toFixed(3),
+        })),
+      }
+    }),
+  )
+  for (const hit of domesticResults) {
+    if (!hit) continue
+    steel.push(hit.row)
+    histories[hit.row.id] = hit.hist
     ok += 1
   }
 
@@ -878,7 +945,7 @@ export async function onRequestGet(context) {
     let cookie = ''
     let custeelErr = null
     try {
-      cookie = await withTimeout(custeelSession(env), 6000, 'custeel-login')
+      cookie = await withTimeout(custeelSession(env), 10000, 'custeel-login')
     } catch (e) {
       custeelErr = String(e?.message || e)
     }
@@ -887,8 +954,8 @@ export async function onRequestGet(context) {
     let indicators = { ok: false }
     if (cookie) {
       const [indRes, seriesRes] = await Promise.allSettled([
-        withTimeout(scrapeIndicators(cookie), 8000, 'custeel-indicators'),
-        withTimeout(scrapeCusteel(cookie, cnyUsd), 10000, 'custeel-scrape'),
+        withTimeout(scrapeIndicators(cookie), 14000, 'custeel-indicators'),
+        withTimeout(scrapeCusteel(cookie, cnyUsd), 28000, 'custeel-scrape'),
       ])
       if (indRes.status === 'fulfilled') indicators = indRes.value
       else custeelErr = String(indRes.reason?.message || indRes.reason)
@@ -900,7 +967,7 @@ export async function onRequestGet(context) {
 
     let ime = { ok: false }
     try {
-      ime = await withTimeout(scrapeIme(usdIrr), 6000, 'ime')
+      ime = await withTimeout(scrapeIme(usdIrr), 8000, 'ime')
     } catch (e) {
       ime = { ok: false, error: String(e?.message || e) }
     }

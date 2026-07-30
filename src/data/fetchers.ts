@@ -1236,16 +1236,19 @@ async function fetchMineralStocksApi(): Promise<MineralStockSnap[] | null> {
 
   const score = (stocks: MineralStockSnap[]) => {
     let n = 0
+    let week = 0
     for (const s of stocks) {
       if (s.returnsSource === 'error') continue
       if (s.ytdPct != null || s.weekPct != null || s.closePrice != null || s.candleCount) n += 1
+      if (Array.isArray(s.netIndividualWeekBt) && s.netIndividualWeekBt.length) week += 1
     }
-    return n
+    // Prefer snapshots that include 7-day money-flow series.
+    return n * 100 + week
   }
 
   for (const endpoint of endpoints) {
     try {
-      const ms = endpoint.startsWith('/api/') ? 10000 : 5000
+      const ms = endpoint.startsWith('/api/') ? 22000 : 5000
       const res = await fetchWithTimeout(endpoint, ms, { cache: 'no-store' })
       if (!res.ok) continue
       const json = (await res.json()) as { ok?: boolean; stocks?: MineralStockSnap[] } | MineralStockSnap[]
@@ -1257,7 +1260,7 @@ async function fetchMineralStocksApi(): Promise<MineralStockSnap[] | null> {
         bestScore = sc
       }
       // Prefer a healthy live/static payload; keep scanning if this one is mostly errors.
-      if (sc >= Math.max(8, Math.floor(stocks.length * 0.5))) break
+      if (sc >= Math.max(800, Math.floor(stocks.length * 0.5) * 100)) break
     } catch {
       // try next
     }

@@ -52,7 +52,7 @@ const MINERAL_STOCKS = [
 ]
 
 const CACHE_TTL_MS = 20 * 60 * 1000
-const CACHE_KEY = 'https://cache.local/mineral-stocks-bv-v7'
+const CACHE_KEY = 'https://cache.local/mineral-stocks-bv-v8'
 
 /** Manual share-count overrides when quote history lags capital-increase filings. */
 const OUTSTANDING_SHARES = {
@@ -539,9 +539,12 @@ export async function onRequestGet(context) {
 
   if (bvCookie) {
     const results = await mapInBatches(MINERAL_STOCKS, 5, async (meta) => {
+      const needMeta = Boolean(OUTSTANDING_SHARES[meta.symbol] || PRICE_ADJUST_SHARES[meta.symbol])
       const [items, stockMeta] = await Promise.all([
         bvFetchQuotes(bvCookie, meta.exchange, meta.isin),
-        bvFetchStockMeta(bvCookie, meta.exchange, meta.isin).catch(() => null),
+        needMeta
+          ? bvFetchStockMeta(bvCookie, meta.exchange, meta.isin).catch(() => null)
+          : Promise.resolve(null),
       ])
       return snapFromBv(meta, items, stockMeta)
     })

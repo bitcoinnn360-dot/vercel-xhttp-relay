@@ -201,7 +201,7 @@ export function StocksSection({ data }: { data: DashboardData }) {
                 <div className="unit-row">میلیون سهم</div>
               </th>
               <th rowSpan={2}>
-                نسبت حجم به شناوری
+                حجم/شناوری
                 <div className="unit-row">درصد</div>
               </th>
               <th rowSpan={2}>

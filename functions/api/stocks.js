@@ -52,17 +52,18 @@ const MINERAL_STOCKS = [
 ]
 
 const CACHE_TTL_MS = 20 * 60 * 1000
-const CACHE_KEY = 'https://cache.local/mineral-stocks-bv-v9'
+const CACHE_KEY = 'https://cache.local/mineral-stocks-bv-v10'
 
 /** Manual share-count overrides when quote history lags capital-increase filings. */
 const OUTSTANDING_SHARES = {
   فملی: 1_440_000_000_000,
 }
 
-/** Pre-increase / post-increase share bases for price adjustment (last trade still pre-split). */
-const PRICE_ADJUST_SHARES = {
-  فملی: { from: 1_050_000_000_000, to: 1_440_000_000_000 },
-}
+/**
+ * Pre-increase / post-increase share bases for price adjustment.
+ * Empty once the exchange itself publishes adjusted prices (فملی: 1050→1440 done).
+ */
+const PRICE_ADJUST_SHARES = {}
 
 function num(raw) {
   if (raw == null) return null
@@ -419,8 +420,8 @@ function snapFromBv(meta, items, stockMeta = null) {
   const overrideShares = OUTSTANDING_SHARES[meta.symbol]
   if (overrideShares) outstanding = overrideShares
 
-  // Quote marketCap / last price often lag capital-increase filings.
-  // Adjust price by old/new share base, then MV = adjPrice × shares.
+  // MV from close × shares. Manual price scale only if PRICE_ADJUST_SHARES is set
+  // (exchange has not yet adjusted). فملی is already exchange-adjusted — do not scale.
   let priceForMv = closePrice
   const adj = PRICE_ADJUST_SHARES[meta.symbol]
   if (closePrice != null && adj?.from > 0 && adj?.to > 0) {

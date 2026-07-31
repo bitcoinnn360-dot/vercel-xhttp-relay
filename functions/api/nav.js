@@ -22,7 +22,8 @@ const HOLDINGS = [
   { symbol: 'کچاد', isin: 'IRO1CHML0001', exchange: 'IRTSENO', ownershipPct: 15.79, costMr: 46_586_910 },
   { symbol: 'کگهر', isin: 'IRO3GZIZ0001', exchange: 'IRIFBNO', ownershipPct: 17.7, costMr: 26_858_546 },
   { symbol: 'کنور', isin: 'IRO1KNRZ0001', exchange: 'IRTSENO', ownershipPct: 83.1, costMr: 57_457_439 },
-  { symbol: 'فملی', isin: 'IRO1MSMI0001', exchange: 'IRTSENO', ownershipPct: 4.968657866190476, ownedShares: 71_548_673_273, costMr: 10_744_777, priceAdjustFromShares: 1_050_000_000_000, priceAdjustToShares: 1_440_000_000_000 },
+  // فملی: سهم‌های تحت تملک بعد از افزایش سرمایه؛ قیمت دیگر توسط بورس تعدیل شده — بدون scale دستی
+  { symbol: 'فملی', isin: 'IRO1MSMI0001', exchange: 'IRTSENO', ownershipPct: 4.968657866190476, ownedShares: 71_548_673_273, costMr: 10_744_777 },
   { symbol: 'ارفع', isin: 'IRO3ARFZ0001', exchange: 'IRIFBNO', ownershipPct: 20.96, costMr: 6_066_330 },
   { symbol: 'تجلی', isin: 'IRO3TMMZ0001', exchange: 'IRIFBNO', ownershipPct: 53.4, costMr: 66_565_604 },
   { symbol: 'فخاس', isin: 'IRO1FKAS0001', exchange: 'IRTSENO', ownershipPct: 33.4, costMr: 10_944_380 },
@@ -66,7 +67,7 @@ const NAV_STATIC = {
 }
 
 const CACHE_TTL_MS = 5 * 60 * 1000
-const CACHE_KEY = 'https://cache.local/midco-nav-bv-v4'
+const CACHE_KEY = 'https://cache.local/midco-nav-bv-v5'
 
 function normalizeCookie(raw) {
   let c = String(raw || '').trim()
@@ -211,13 +212,8 @@ export async function onRequestGet(context) {
         liveOwn != null
           ? liveOwn
           : Math.round((shares / outstanding) * 1e6) / 1e4
-      // Last trade price may still be pre-increase; scale by old/new capital shares.
-      let price = meta.price
-      let priceAdjusted = false
-      if (h.priceAdjustFromShares > 0 && h.priceAdjustToShares > 0) {
-        price = meta.price * (h.priceAdjustFromShares / h.priceAdjustToShares)
-        priceAdjusted = true
-      }
+      // Use exchange price as-is (TSETMC/BV already adjust for capital increases).
+      const price = meta.price
       const marketValueMr = round0((shares * price) / 1e6)
       const costPerShare = shares > 0 ? round0((h.costMr * 1e6) / shares) : 0
       return {
@@ -232,8 +228,6 @@ export async function onRequestGet(context) {
         marketValueMr,
         costPerShare,
         pricePerShare: round0(price),
-        priceRaw: priceAdjusted ? round0(meta.price) : undefined,
-        priceAdjusted,
         unrealizedMr: marketValueMr - h.costMr,
         portfolioPct: 0,
         asOf: meta.asOf,

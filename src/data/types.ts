@@ -340,6 +340,58 @@ export interface GlobalMarketsBundle {
   served?: string
 }
 
+/** یک ماه تولید/انرژی با مقایسه سال قبل */
+export interface OpsMonthPoint {
+  fiscalYear: number
+  fiscalMonth: number
+  periodEndingDate?: number
+  label: string
+  value: number | null
+  priorValue: number | null
+  yoyPct: number | null
+}
+
+export interface OpsProductSeries {
+  productKey: number
+  productName: string
+  productNameFa: string
+  unit: string
+  unitFa?: string
+  months: OpsMonthPoint[]
+}
+
+export interface OpsEnergySeries {
+  id: 'water' | 'electricity' | 'gas'
+  labelFa: string
+  unit: string
+  unitFa?: string
+  months: OpsMonthPoint[]
+}
+
+export interface OpsCompany {
+  symbol: string
+  name: string
+  isin?: string
+  exchange?: string
+  ok?: boolean
+  latestFiscalYear?: number | null
+  latestFiscalMonth?: number | null
+  latestLabel?: string | null
+  products: OpsProductSeries[]
+  energy: OpsEnergySeries[]
+}
+
+/** تولید ماهانه + مصرف انرژی شرکت‌های پرتفو (بورس‌ویو) */
+export interface ProductionOpsBundle {
+  ok?: boolean
+  companies: OpsCompany[]
+  updatedAt?: string
+  source?: string
+  note?: string
+  served?: string
+  errors?: string[]
+}
+
 export interface SourceStatus {
   id: string
   name: string
@@ -372,6 +424,8 @@ export interface DashboardData {
   periodic: PeriodicRow[]
   /** صنایع معدنی/مواد جهانی + اخبار (معادل GuruFocus؛ منبع Yahoo + RSS) */
   globalMarkets: GlobalMarketsBundle
+  /** تولید ماهانه و مصرف آب/برق/گاز شرکت‌های پرتفو */
+  productionOps: ProductionOpsBundle
   sources: SourceStatus[]
   updatedAt: string
 }

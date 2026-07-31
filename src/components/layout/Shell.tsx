@@ -11,7 +11,7 @@ const NAV = [
   { id: 'commodities', label: 'کامودیتی' },
   { id: 'steel', label: 'زنجیره فولاد' },
   { id: 'periodic', label: 'تغییرات دوره‌ای' },
-  { id: 'market-asia', label: 'مرکز بازارها' },
+  { id: 'production', label: 'تولید و انرژی' },
 ]
 
 interface Props {

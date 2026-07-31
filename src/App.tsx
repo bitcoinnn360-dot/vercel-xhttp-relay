@@ -9,10 +9,10 @@ import { CommoditiesSection } from './components/CommoditiesSection'
 import { SteelSection } from './components/SteelSection'
 import { PeriodicSection } from './components/PeriodicSection'
 import { GlobalMarketsSection } from './components/GlobalMarketsSection'
-import { GuruMarketTabs } from './components/GuruMarketTabs'
+import { ProductionOpsSection } from './components/ProductionOpsSection'
 import { useMarketData } from './hooks/useMarketData'
 
-const SECTION_IDS = ['overview', 'charts', 'stocks', 'global', 'nav', 'commodities', 'steel', 'periodic', 'market-asia']
+const SECTION_IDS = ['overview', 'charts', 'stocks', 'global', 'nav', 'commodities', 'steel', 'periodic', 'production']
 
 function useActiveSection() {
   const [active, setActive] = useState('overview')
@@ -35,7 +35,7 @@ function useActiveSection() {
 }
 
 export default function App() {
-  const { data, histories, candles, fred, sectors, scrapeMeta, loading, refreshing, error, refresh } = useMarketData()
+  const { data, histories, candles, scrapeMeta, loading, refreshing, error, refresh } = useMarketData()
   const active = useActiveSection()
 
   return (
@@ -71,7 +71,7 @@ export default function App() {
             <CommoditiesSection data={data} />
             <SteelSection data={data} histories={histories} />
             <PeriodicSection data={data} />
-            <GuruMarketTabs data={data} histories={histories} fred={fred} sectors={sectors} />
+            <ProductionOpsSection data={data} />
             <footer className="border-t border-[var(--color-line)] pt-5 text-center text-xs text-[var(--color-muted)]">
               <p>معاونت مالی و اقتصادی — واحد سرمایه‌گذاری · توسعه معادن و فلزات</p>
               <p className="mt-1">

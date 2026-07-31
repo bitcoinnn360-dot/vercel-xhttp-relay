@@ -1,0 +1,32 @@
+name: Refresh portfolio production cache
+
+# Warm /api/production?refresh=1 so BourseView monthly production + energy
+# snapshots stay fresh (uses Cloudflare secret BOURSEVIEW_COOKIE).
+
+on:
+  schedule:
+    # ~weekly after Tehran weekend — Codal monthly filings land irregularly
+    - cron: '30 14 * * 2'
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Warm /api/production
+        run: |
+          set -e
+          url="${PRODUCTION_API_URL:-https://www.arz-digital.xyz/api/production?refresh=1}"
+          echo "GET $url"
+          body=$(curl -fsS --max-time 180 "$url")
+          echo "$body" | python3 -c "
+          import json,sys
+          d=json.load(sys.stdin)
+          print('source=', d.get('source'), 'served=', d.get('served'), 'ok=', d.get('ok'))
+          cos=d.get('companies') or []
+          print('companies=', len(cos))
+          for c in cos[:8]:
+            print(' ', c.get('symbol'), 'products=', len(c.get('products') or []), 'energy=', [e.get('id') for e in (c.get('energy') or [])], 'latest=', c.get('latestLabel'))
+          if not d.get('ok'):
+            raise SystemExit('production refresh failed')
+          "

@@ -1212,6 +1212,12 @@ export const seedDashboard: DashboardData = {
     source: 'seed',
     note: 'سکتور تجمیعی · صنایع مواد پایه · فلزات و معادن کشورها',
   },
+  productionOps: {
+    ok: false,
+    companies: [],
+    source: 'seed',
+    note: 'تولید و انرژی پرتفو از بورس‌ویو',
+  },
   sources: [
     {
       id: 'tgju',

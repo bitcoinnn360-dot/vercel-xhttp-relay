@@ -3,6 +3,7 @@ import type {
   CommodityQuote,
   DashboardData,
   GlobalMarketsBundle,
+  ProductionOpsBundle,
   SourceStatus,
   StockRow,
 } from './types'
@@ -1298,6 +1299,45 @@ function applyGlobalMarkets(base: DashboardData, bundle: GlobalMarketsBundle | n
   return true
 }
 
+async function fetchProductionOpsApi(): Promise<ProductionOpsBundle | null> {
+  const read = async (url: string, ms: number): Promise<ProductionOpsBundle | null> => {
+    const res = await fetchWithTimeout(url, ms, { cache: 'no-store' })
+    if (!res.ok) return null
+    const json = (await res.json()) as ProductionOpsBundle & { ok?: boolean }
+    if (!json?.companies?.length) return null
+    return json
+  }
+
+  let staticBundle: ProductionOpsBundle | null = null
+  try {
+    staticBundle = await read('/data/production.json', 4000)
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    const live = await read('/api/production', 6000)
+    if (live && live.companies.length >= (staticBundle?.companies.length || 0)) return live
+  } catch {
+    /* fall through */
+  }
+  return staticBundle
+}
+
+function applyProductionOps(base: DashboardData, bundle: ProductionOpsBundle | null | undefined) {
+  if (!bundle?.companies?.length) return false
+  base.productionOps = {
+    ok: bundle.ok !== false,
+    companies: bundle.companies,
+    updatedAt: bundle.updatedAt,
+    source: bundle.source || 'bourseview',
+    note: bundle.note,
+    served: bundle.served,
+    errors: bundle.errors,
+  }
+  return true
+}
+
 async function fetchMineralStocksApi(): Promise<MineralStockSnap[] | null> {
   const score = (stocks: MineralStockSnap[]) => {
     let n = 0
@@ -1490,7 +1530,7 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   const base: DashboardData = structuredClone(seedDashboard)
   const now = new Date().toISOString()
 
-  const [current, histEntries, candleEntries, fredEntries, scraped, overviewApi, intradayFallback, stocksApi, steelApi, navApi, globalApi] =
+  const [current, histEntries, candleEntries, fredEntries, scraped, overviewApi, intradayFallback, stocksApi, steelApi, navApi, globalApi, productionApi] =
     await Promise.all([
       fetchTgjuAjax(),
       Promise.all(HIST_KEYS.map(async (k) => [k, await fetchTgjuHistory(k)] as const)),
@@ -1503,6 +1543,7 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
       fetchSteelChainApi(),
       fetchNavApi(),
       fetchGlobalMarketsApi(),
+      fetchProductionOpsApi(),
     ])
 
   const liveCount = applyLiveQuotes(base, current)
@@ -1512,6 +1553,7 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   const steelStatus = applySteelChain(base, steelApi)
   applyNavLive(base, navApi)
   const globalOk = applyGlobalMarkets(base, globalApi)
+  const productionOk = applyProductionOps(base, productionApi)
   const apiImpacts = normalizeImpacts(overviewApi?.impacts)
   if (apiImpacts && (overviewApi?.impactsFromSourceArena || overviewApi?.impactsFromRahavard || overviewApi?.impactsSource)) {
     base.impacts = apiImpacts
@@ -1698,6 +1740,20 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
     }
     return s
   })
+  if (productionOk) {
+    const n = base.productionOps.companies.length
+    const has = base.sources.some((s) => s.id === 'bourseview-ops')
+    const row: SourceStatus = {
+      id: 'bourseview-ops',
+      name: 'بورس‌ویو · تولید/انرژی',
+      status: 'live',
+      note: `${n} شرکت پرتفو · تولید ماهانه + آب/برق/گاز`,
+      lastOk: base.productionOps.updatedAt || now,
+    }
+    base.sources = has
+      ? base.sources.map((s) => (s.id === 'bourseview-ops' ? row : s))
+      : [...base.sources, row]
+  }
   base.updatedAt = overviewApi?.updatedAt || steelApi?.updatedAt || base.globalMarkets.updatedAt || now
 
   return {

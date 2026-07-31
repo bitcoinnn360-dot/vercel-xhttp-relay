@@ -430,6 +430,14 @@ export interface FinancialLineItem {
   kind: 'income' | 'expense' | 'total'
 }
 
+/** فروش به تفکیک محصول — ورودی سمت چپ Sankey */
+export interface FinancialSegment {
+  productKey: number
+  name: string
+  nameFa: string
+  value: number
+}
+
 export interface CompanyFinancials {
   symbol: string
   name: string
@@ -441,6 +449,8 @@ export interface CompanyFinancials {
   label: string
   currency?: string | null
   lines: FinancialLineItem[]
+  /** فروش محصولی (نرمال‌شده به رقم فروش صورت سود) */
+  segments?: FinancialSegment[]
   /** مقیاس نمایش — معمولاً میلیارد ریال */
   scale: number
   scaleLabel: string

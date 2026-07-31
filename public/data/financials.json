@@ -1,8 +1,8 @@
 {
   "ok": true,
-  "updatedAt": "2026-07-31T07:47:25.880Z",
+  "updatedAt": "2026-07-31T13:11:58.409Z",
   "source": "bourseview",
-  "note": "صورت سود و زیان سالانه · مقیاس میلیارد ریال · ویژوال سبز (درآمد/سود) / قرمز (هزینه)",
+  "note": "محصولات ← فروش ← COGS/سود ناخالص ← هزینه عملیاتی/سود عملیاتی ← مالیات/سود خالص (سبک GuruFocus)",
   "companies": [
     {
       "symbol": "کگل",
@@ -93,6 +93,26 @@
           "kind": "total"
         }
       ],
+      "segments": [
+        {
+          "productKey": 19,
+          "name": "Pellets",
+          "nameFa": "گندله",
+          "value": 706807
+        },
+        {
+          "productKey": 10023,
+          "name": "سایر (10023)",
+          "nameFa": "سایر (10023)",
+          "value": 64352
+        },
+        {
+          "productKey": 796,
+          "name": "Iron Ore Concentrate",
+          "nameFa": "کنسانتره سنگ‌آهن",
+          "value": 59295
+        }
+      ],
       "scale": 1000000000,
       "scaleLabel": "میلیارد ریال"
     },
@@ -176,6 +196,56 @@
           "nameFa": "سود خالص",
           "value": 152167,
           "kind": "total"
+        }
+      ],
+      "segments": [
+        {
+          "productKey": 22,
+          "name": "Steel",
+          "nameFa": "فولاد",
+          "value": 288343
+        },
+        {
+          "productKey": 20,
+          "name": "Iron Concentrate (Dry)",
+          "nameFa": "کنسانتره خشک",
+          "value": 230488
+        },
+        {
+          "productKey": 19,
+          "name": "Pellets",
+          "nameFa": "گندله",
+          "value": 118649
+        },
+        {
+          "productKey": 382,
+          "name": "Direct Reduced Iron",
+          "nameFa": "آهن اسفنجی",
+          "value": 10525
+        },
+        {
+          "productKey": 13060,
+          "name": "سایر (13060)",
+          "nameFa": "سایر (13060)",
+          "value": 5637
+        },
+        {
+          "productKey": 12992,
+          "name": "سایر (12992)",
+          "nameFa": "سایر (12992)",
+          "value": 2532
+        },
+        {
+          "productKey": 10023,
+          "name": "سایر (10023)",
+          "nameFa": "سایر (10023)",
+          "value": 572
+        },
+        {
+          "productKey": 21,
+          "name": "Apatite",
+          "nameFa": "Apatite",
+          "value": 13
         }
       ],
       "scale": 1000000000,
@@ -270,6 +340,80 @@
           "kind": "total"
         }
       ],
+      "segments": [
+        {
+          "productKey": 16544,
+          "name": "سایر (16544)",
+          "nameFa": "سایر (16544)",
+          "value": 311067
+        },
+        {
+          "productKey": 19,
+          "name": "Pellets",
+          "nameFa": "گندله",
+          "value": 138217
+        },
+        {
+          "productKey": 9676,
+          "name": "Iron Ore Lump",
+          "nameFa": "سنگ‌آهن دانه‌بندی",
+          "value": 91630
+        },
+        {
+          "productKey": 16543,
+          "name": "سایر (16543)",
+          "nameFa": "سایر (16543)",
+          "value": 84535
+        },
+        {
+          "productKey": 2606,
+          "name": "Steel Ingots",
+          "nameFa": "شمش فولاد",
+          "value": 38979
+        },
+        {
+          "productKey": 796,
+          "name": "Iron Ore Concentrate",
+          "nameFa": "کنسانتره سنگ‌آهن",
+          "value": 28786
+        },
+        {
+          "productKey": 129,
+          "name": "Granulated Iron Ore",
+          "nameFa": "Granulated Iron Ore",
+          "value": 22758
+        },
+        {
+          "productKey": 12285,
+          "name": "سایر (12285)",
+          "nameFa": "سایر (12285)",
+          "value": 15846
+        },
+        {
+          "productKey": 382,
+          "name": "Direct Reduced Iron",
+          "nameFa": "آهن اسفنجی",
+          "value": 7257
+        },
+        {
+          "productKey": 19169,
+          "name": "سایر (19169)",
+          "nameFa": "سایر (19169)",
+          "value": 3070
+        },
+        {
+          "productKey": 2,
+          "name": "Other",
+          "nameFa": "سایر",
+          "value": 584
+        },
+        {
+          "productKey": 13894,
+          "name": "سایر (13894)",
+          "nameFa": "سایر (13894)",
+          "value": 276
+        }
+      ],
       "scale": 1000000000,
       "scaleLabel": "میلیارد ریال"
     },
@@ -360,6 +504,38 @@
           "nameFa": "سود خالص",
           "value": 47900,
           "kind": "total"
+        }
+      ],
+      "segments": [
+        {
+          "productKey": 131,
+          "name": "Concentrate",
+          "nameFa": "کنسانتره",
+          "value": 59956
+        },
+        {
+          "productKey": 19,
+          "name": "Pellets",
+          "nameFa": "گندله",
+          "value": 35845
+        },
+        {
+          "productKey": 9676,
+          "name": "Iron Ore Lump",
+          "nameFa": "سنگ‌آهن دانه‌بندی",
+          "value": 4223
+        },
+        {
+          "productKey": 16256,
+          "name": "سایر (16256)",
+          "nameFa": "سایر (16256)",
+          "value": 3474
+        },
+        {
+          "productKey": 21275,
+          "name": "سایر (21275)",
+          "nameFa": "سایر (21275)",
+          "value": 4
         }
       ],
       "scale": 1000000000,
@@ -454,6 +630,62 @@
           "kind": "total"
         }
       ],
+      "segments": [
+        {
+          "productKey": 46,
+          "name": "Cathode",
+          "nameFa": "کاتد",
+          "value": 2163108
+        },
+        {
+          "productKey": 3613,
+          "name": "Rolled Wire",
+          "nameFa": "مفتول",
+          "value": 375555
+        },
+        {
+          "productKey": 43,
+          "name": "Gold & Silver Concentrate",
+          "nameFa": "کنسانتره طلا و نقره",
+          "value": 208926
+        },
+        {
+          "productKey": 44,
+          "name": "Copper Concentrate",
+          "nameFa": "کنسانتره مس",
+          "value": 171802
+        },
+        {
+          "productKey": 40,
+          "name": "Molybdenum Concentrate",
+          "nameFa": "کنسانتره مولیبدن",
+          "value": 171457
+        },
+        {
+          "productKey": 2,
+          "name": "Other",
+          "nameFa": "سایر",
+          "value": 55176
+        },
+        {
+          "productKey": 53,
+          "name": "Molybdenum Oxide",
+          "nameFa": "اکسید مولیبدن",
+          "value": 45715
+        },
+        {
+          "productKey": 42,
+          "name": "Sulfuric Acid",
+          "nameFa": "اسید سولفوریک",
+          "value": 26295
+        },
+        {
+          "productKey": 41,
+          "name": "Sulfur Rock",
+          "nameFa": "سنگ گوگرد",
+          "value": 861
+        }
+      ],
       "scale": 1000000000,
       "scaleLabel": "میلیارد ریال"
     },
@@ -544,6 +776,14 @@
           "nameFa": "سود خالص",
           "value": 48616,
           "kind": "total"
+        }
+      ],
+      "segments": [
+        {
+          "productKey": 2606,
+          "name": "Steel Ingots",
+          "nameFa": "شمش فولاد",
+          "value": 296133
         }
       ],
       "scale": 1000000000,
@@ -638,6 +878,32 @@
           "kind": "total"
         }
       ],
+      "segments": [
+        {
+          "productKey": 1073,
+          "name": "Light Building Products",
+          "nameFa": "Light Building Products",
+          "value": 214541
+        },
+        {
+          "productKey": 1074,
+          "name": "Ingot",
+          "nameFa": "شمش",
+          "value": 102849
+        },
+        {
+          "productKey": 12329,
+          "name": "Income on Investments",
+          "nameFa": "Income on Investments",
+          "value": 4728
+        },
+        {
+          "productKey": 10011,
+          "name": "سایر (10011)",
+          "nameFa": "سایر (10011)",
+          "value": 658
+        }
+      ],
       "scale": 1000000000,
       "scaleLabel": "میلیارد ریال"
     },
@@ -728,6 +994,56 @@
           "nameFa": "سود خالص",
           "value": 112,
           "kind": "total"
+        }
+      ],
+      "segments": [
+        {
+          "productKey": 588,
+          "name": "Fiber Optic Telecommunication Cables",
+          "nameFa": "کابل فیبر نوری",
+          "value": 5700
+        },
+        {
+          "productKey": 15967,
+          "name": "سایر (15967)",
+          "nameFa": "سایر (15967)",
+          "value": 1438
+        },
+        {
+          "productKey": 20270,
+          "name": "سایر (20270)",
+          "nameFa": "سایر (20270)",
+          "value": 1179
+        },
+        {
+          "productKey": 586,
+          "name": "Telecommunication Copper Cables",
+          "nameFa": "کابل مسی مخابراتی",
+          "value": 456
+        },
+        {
+          "productKey": 2,
+          "name": "Other",
+          "nameFa": "سایر",
+          "value": 140
+        },
+        {
+          "productKey": 19310,
+          "name": "سایر (19310)",
+          "nameFa": "سایر (19310)",
+          "value": 111
+        },
+        {
+          "productKey": 10048,
+          "name": "سایر (10048)",
+          "nameFa": "سایر (10048)",
+          "value": 37
+        },
+        {
+          "productKey": 10058,
+          "name": "سایر (10058)",
+          "nameFa": "سایر (10058)",
+          "value": 31
         }
       ],
       "scale": 1000000000,

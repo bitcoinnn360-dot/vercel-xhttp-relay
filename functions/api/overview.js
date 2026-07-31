@@ -60,23 +60,27 @@ function stripHtml(s) {
     .trim()
 }
 
-async function fetchText(url) {
+const UPSTREAM_MS = 4500
+
+async function fetchText(url, ms = UPSTREAM_MS) {
   const res = await fetch(url, {
     headers: { Accept: '*/*', 'User-Agent': UA, Referer: 'https://www.tgju.org/' },
+    signal: AbortSignal.timeout(ms),
   })
   if (!res.ok) throw new Error(`${url} ${res.status}`)
   return res.text()
 }
 
-async function fetchJson(url) {
+async function fetchJson(url, ms = UPSTREAM_MS) {
   const res = await fetch(url, {
     headers: { Accept: 'application/json', 'User-Agent': UA },
+    signal: AbortSignal.timeout(ms),
   })
   if (!res.ok) throw new Error(`${url} ${res.status}`)
   return res.json()
 }
 
-async function fetchJsonRetry(url, attempts = 4) {
+async function fetchJsonRetry(url, attempts = 2) {
   let lastErr
   for (let i = 0; i < attempts; i++) {
     try {
@@ -86,12 +90,13 @@ async function fetchJsonRetry(url, attempts = 4) {
           'User-Agent': UA,
           Referer: 'https://sourcearena.ir/',
         },
+        signal: AbortSignal.timeout(UPSTREAM_MS),
       })
       if (!res.ok) throw new Error(`${url} ${res.status}`)
       return await res.json()
     } catch (e) {
       lastErr = e
-      await new Promise((r) => setTimeout(r, 400 * (i + 1)))
+      await new Promise((r) => setTimeout(r, 200 * (i + 1)))
     }
   }
   throw lastErr
@@ -265,6 +270,7 @@ async function scrapeShakhesbanPages({ maxPages = 12, orderCol = 'trades.arzesh_
           Referer: 'https://www.shakhesban.com/',
           'X-Requested-With': 'XMLHttpRequest',
         },
+        signal: AbortSignal.timeout(UPSTREAM_MS),
       })
       if (!res.ok) throw new Error(`shakhesban ${page} ${res.status}`)
       return res.json()
@@ -278,7 +284,7 @@ async function scrapeShakhesbanPages({ maxPages = 12, orderCol = 'trades.arzesh_
   return rows
 }
 
-async function scrapeShakhesbanBoardLite(maxPages = 12) {
+async function scrapeShakhesbanBoardLite(maxPages = 4) {
   // Full board (سهام+صندوق+اوراق) — no market=stock filter. Used for IFB impacts + fallback pulse.
   return scrapeShakhesbanPages({ maxPages, orderCol: 'trades.arzesh_bazar' })
 }
@@ -304,6 +310,7 @@ async function fetchEquityFundSymbolSet() {
       'User-Agent': UA,
       Referer: 'https://tradersarena.ir/',
     },
+    signal: AbortSignal.timeout(UPSTREAM_MS),
   })
   if (!res.ok) throw new Error(`ta heatmap stock-funds ${res.status}`)
   const rows = await res.json()
@@ -377,6 +384,7 @@ async function fetchMainWatchTradeRows() {
       'User-Agent': UA,
       Referer: 'https://tradersarena.ir/',
     },
+    signal: AbortSignal.timeout(UPSTREAM_MS),
   })
   if (!res.ok) throw new Error(`ta mainwatch symbols ${res.status}`)
   const rows = await res.json()
@@ -517,7 +525,10 @@ async function scrapeRahavardImpacts() {
     Origin: 'https://rahavard365.com',
   }
   const load = async (kind) => {
-    const res = await fetch(`${RAHAVARD_API}/home/${kind}-instrument-effect-d`, { headers: hdrs })
+    const res = await fetch(`${RAHAVARD_API}/home/${kind}-instrument-effect-d`, {
+      headers: hdrs,
+      signal: AbortSignal.timeout(UPSTREAM_MS),
+    })
     if (!res.ok) throw new Error(`rahavard ${kind} ${res.status}`)
     const payload = await res.json()
     const list = payload?.data?.list || []
@@ -555,7 +566,10 @@ async function scrapeRahavardIfbMovers() {
     Origin: 'https://rahavard365.com',
   }
   try {
-    const res = await fetch(`${RAHAVARD_API}/index/${RAHAVARD_IFB_PRICE_INDEX_ID}/assets`, { headers: hdrs })
+    const res = await fetch(`${RAHAVARD_API}/index/${RAHAVARD_IFB_PRICE_INDEX_ID}/assets`, {
+      headers: hdrs,
+      signal: AbortSignal.timeout(UPSTREAM_MS),
+    })
     if (!res.ok) throw new Error(`rahavard ifb ${res.status}`)
     const payload = await res.json()
     const rows = Array.isArray(payload?.data) ? payload.data : []
@@ -927,7 +941,9 @@ function parseParsistahlilHtml(html, cid, url) {
 }
 
 async function scrapeParsistahlil() {
-  const home = await fetchText(PARSIS_HOME)
+  // Keep this cheap: sequential page probes previously took ~50s and made
+  // /api/overview feel like the whole site was down on refresh.
+  const home = await fetchText(PARSIS_HOME, 5000)
   const ids = [...home.matchAll(/\/contents\/(\d+)-%DA%AF%D8%B2%D8%A7%D8%B1%D8%B4-%D9%88%D8%B6%D8%B9%DB%8C%D8%AA-%D8%A8%D8%A7%D8%B2%D8%A7%D8%B1/g)].map(
     (x) => x[1],
   )
@@ -939,21 +955,23 @@ async function scrapeParsistahlil() {
   const days = []
   const seedIds = uniq.map(Number).filter((n) => Number.isFinite(n))
   const newest = seedIds.length ? Math.max(...seedIds) : 1180
-  const probe = new Set(seedIds)
-  for (let i = newest; i > newest - 10 && i > 0; i--) probe.add(i)
-  const ordered = [...probe].sort((a, b) => b - a).slice(0, 12)
+  const probe = new Set(seedIds.slice(0, 3))
+  for (let i = newest; i > newest - 3 && i > 0; i--) probe.add(i)
+  const ordered = [...probe].sort((a, b) => b - a).slice(0, 3)
 
-  for (const cidNum of ordered) {
-    const cid = String(cidNum)
-    const url = `https://parsistahlil.ir/contents/${cid}-${slug}`
-    try {
-      const html = await fetchText(url)
+  const settled = await Promise.allSettled(
+    ordered.map(async (cidNum) => {
+      const cid = String(cidNum)
+      const url = `https://parsistahlil.ir/contents/${cid}-${slug}`
+      const html = await fetchText(url, 4000)
       const row = parseParsistahlilHtml(html, cid, url)
-      if (row) days.push(row)
-      else lastErr = `content ${cid} no numbers`
-    } catch (e) {
-      lastErr = String(e)
-    }
+      if (!row) throw new Error(`content ${cid} no numbers`)
+      return row
+    }),
+  )
+  for (const r of settled) {
+    if (r.status === 'fulfilled') days.push(r.value)
+    else lastErr = String(r.reason)
   }
   if (!days.length) return { ok: false, error: lastErr, days: [] }
   days.sort((a, b) => String(b.dateJalali || '').localeCompare(String(a.dateJalali || '')))
@@ -1031,7 +1049,28 @@ function mergeMoneyFlowStore(store, days) {
   return { store: next, added }
 }
 
+const OVERVIEW_CACHE_URL = 'https://pulse-cache.internal/midco-overview-v2'
+const OVERVIEW_CACHE_TTL_MS = 45_000
+
 export async function onRequestGet(context) {
+  const cache = typeof caches !== 'undefined' ? caches.default : null
+  if (cache) {
+    try {
+      const hit = await cache.match(OVERVIEW_CACHE_URL)
+      if (hit) {
+        const cachedAt = Number(hit.headers.get('x-overview-cached-at') || 0)
+        if (cachedAt && Date.now() - cachedAt < OVERVIEW_CACHE_TTL_MS) {
+          const headers = new Headers(hit.headers)
+          headers.set('x-overview-cache', 'HIT')
+          headers.set('Access-Control-Allow-Origin', '*')
+          return new Response(hit.body, { status: 200, headers })
+        }
+      }
+    } catch {
+      /* ignore cache read errors */
+    }
+  }
+
   const errors = []
   let quotes = {}
   let indices = {}
@@ -1060,7 +1099,7 @@ export async function onRequestGet(context) {
     scrapeSourceArena(token),
     fetchJson(`${origin}/data/money_flow_ytd.json`).catch(() => null),
     scrapeRahavardImpacts(),
-    scrapeShakhesbanBoardLite(12),
+    scrapeShakhesbanBoardLite(4),
     fetchJson(`${origin}/data/market_pulse.json`).catch(() => null),
     fetchJson(`${origin}/data/impacts_cache.json`).catch(() => null),
     fetchTradersArenaPulse(),
@@ -1175,7 +1214,6 @@ export async function onRequestGet(context) {
     }
   }
 
-  const cache = typeof caches !== 'undefined' ? caches.default : null
   const today = jalaliToday()
   if (sourcearena?.ok) await saveSaGlanceCache(cache, sourcearena, today.dateJalali)
   const saCache = sourcearena?.ok ? null : await loadSaGlanceCache(cache)
@@ -1228,59 +1266,68 @@ export async function onRequestGet(context) {
     ...(rahavard.ok ? [] : ['rahavard365']),
   ]
 
-  return Response.json(
-    {
-      ok: true,
-      updatedAt: new Date().toISOString(),
-      dateJalali: today.dateJalali,
-      dateGregorian: today.dateGregorian,
-      quotes,
-      indices: {
-        tedpix,
-        equalWeight: indices.equalWeight || null,
-        ifb: indices.ifb || null,
-      },
-      intraday: {
-        source: 'tgju-today-table',
-        note: 'مسیر روزانه TGJU (رزولوشن چنددقیقه‌ای).',
-        points: intraday,
-      },
-      sourcearena,
-      rahavard,
-      bourseMarketValueHmt: marketStats.bourseMarketValueHmt,
-      ifbMarketValueHmt: marketStats.ifbMarketValueHmt,
-      totalMarketValueHmt: marketStats.totalMarketValueHmt,
-      totalMarketValueUsdM: marketStats.totalMarketValueUsdM,
-      marketValueSource: marketStats.marketValueSource,
-      totalTradeValueHmt: marketStats.totalTradeValueHmt,
-      totalTradeValueSource: marketStats.totalTradeValueSource,
-      impacts: mergedImpacts.impacts,
-      impactsFromSourceArena: Boolean(mergedImpacts.source?.includes('sourcearena')),
-      impactsFromRahavard: Boolean(mergedImpacts.source?.includes('rahavard')),
-      impactsSource: mergedImpacts.source,
-      topTrades,
-      topTradesSource,
-      marketPulse,
-      marketPulseHistory,
-      parsistahlil,
-      retailMoneyFlowYtd: moneyFlowStore.ytdBillionToman,
-      retailMoneyFlowYtdSource: 'parsistahlil-cumulative',
-      moneyFlowAsOfJalali: moneyFlowStore.asOfJalali,
-      moneyFlowSeries: (moneyFlowStore.series || []).map((r) => ({
-        date: r.date,
-        dateJalali: r.dateJalali,
-        value: r.value,
-      })),
-      moneyFlowAdded: merged.added,
-      usdRate: usd,
-      errors,
-      blocked,
+  const body = {
+    ok: true,
+    updatedAt: new Date().toISOString(),
+    dateJalali: today.dateJalali,
+    dateGregorian: today.dateGregorian,
+    quotes,
+    indices: {
+      tedpix,
+      equalWeight: indices.equalWeight || null,
+      ifb: indices.ifb || null,
     },
-    {
-      headers: {
-        'Cache-Control': 'public, max-age=60',
-        'Access-Control-Allow-Origin': '*',
-      },
+    intraday: {
+      source: 'tgju-today-table',
+      note: 'مسیر روزانه TGJU (رزولوشن چنددقیقه‌ای).',
+      points: intraday,
     },
-  )
+    sourcearena,
+    rahavard,
+    bourseMarketValueHmt: marketStats.bourseMarketValueHmt,
+    ifbMarketValueHmt: marketStats.ifbMarketValueHmt,
+    totalMarketValueHmt: marketStats.totalMarketValueHmt,
+    totalMarketValueUsdM: marketStats.totalMarketValueUsdM,
+    marketValueSource: marketStats.marketValueSource,
+    totalTradeValueHmt: marketStats.totalTradeValueHmt,
+    totalTradeValueSource: marketStats.totalTradeValueSource,
+    impacts: mergedImpacts.impacts,
+    impactsFromSourceArena: Boolean(mergedImpacts.source?.includes('sourcearena')),
+    impactsFromRahavard: Boolean(mergedImpacts.source?.includes('rahavard')),
+    impactsSource: mergedImpacts.source,
+    topTrades,
+    topTradesSource,
+    marketPulse,
+    marketPulseHistory,
+    parsistahlil,
+    retailMoneyFlowYtd: moneyFlowStore.ytdBillionToman,
+    retailMoneyFlowYtdSource: 'parsistahlil-cumulative',
+    moneyFlowAsOfJalali: moneyFlowStore.asOfJalali,
+    moneyFlowSeries: (moneyFlowStore.series || []).map((r) => ({
+      date: r.date,
+      dateJalali: r.dateJalali,
+      value: r.value,
+    })),
+    moneyFlowAdded: merged.added,
+    usdRate: usd,
+    errors,
+    blocked,
+  }
+
+  const headers = {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'public, max-age=60',
+    'Access-Control-Allow-Origin': '*',
+    'x-overview-cache': 'MISS',
+    'x-overview-cached-at': String(Date.now()),
+  }
+  const response = new Response(JSON.stringify(body), { status: 200, headers })
+  if (cache) {
+    try {
+      await cache.put(OVERVIEW_CACHE_URL, response.clone())
+    } catch {
+      /* ignore */
+    }
+  }
+  return response
 }

@@ -5,16 +5,15 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="داشبورد مدیریتی گزارش روزانه بازار — معادن و فلزات" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Vazirmatn:wght@400;500;600;700;800&display=swap"
-      rel="stylesheet"
-    />
     <title>داشبورد بازار | توسعه معادن و فلزات</title>
+    <!--
+      No Google Fonts: fonts.googleapis.com is often blocked/slow in IR and is a
+      render-blocking stylesheet — the page appears blank until it times out.
+      System UI stack covers Persian well enough (Tahoma / Segoe UI).
+    -->
     <!-- Inline shell fallback: keeps layout usable if the hashed CSS bundle fails -->
     <style>
-      body{margin:0;min-height:100vh;font-family:Vazirmatn,IBM Plex Sans,sans-serif;color:#0f172a;background:linear-gradient(180deg,#e8eef5 0%,#f1f5f9 40%,#f8fafc 100%)}
+      body{margin:0;min-height:100vh;font-family:Tahoma,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;color:#0f172a;background:linear-gradient(180deg,#e8eef5 0%,#f1f5f9 40%,#f8fafc 100%)}
       .app-shell{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
       .side-nav{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:.35rem;padding:1.1rem .85rem;color:#e2e8f0;background:linear-gradient(180deg,#0b3d6e 0%,#0a2f54 100%)}
       .side-link{display:block;border-radius:8px;padding:.55rem .7rem;font-size:.82rem;font-weight:600;color:#cbd5e1;text-decoration:none}

@@ -10,6 +10,7 @@ import { PeriodicSection } from './components/PeriodicSection'
 import { GlobalMarketsSection } from './components/GlobalMarketsSection'
 import { ProductionOpsSection } from './components/ProductionOpsSection'
 import { FinancialsSection } from './components/FinancialsSection'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { useMarketData } from './hooks/useMarketData'
 
 const SECTION_IDS = [
@@ -73,15 +74,33 @@ export default function App() {
                   : ''}
               </div>
             )}
-            <MarketOverview data={data} histories={histories} />
-            <StocksSection data={data} />
-            <GlobalMarketsSection data={data} />
-            <NavSection data={data} />
-            <CommoditiesSection data={data} histories={histories} candles={candles} />
-            <SteelSection data={data} histories={histories} />
-            <PeriodicSection data={data} />
-            <ProductionOpsSection data={data} />
-            <FinancialsSection data={data} />
+            <ErrorBoundary name="نمای بازار">
+              <MarketOverview data={data} histories={histories} />
+            </ErrorBoundary>
+            <ErrorBoundary name="سهام">
+              <StocksSection data={data} />
+            </ErrorBoundary>
+            <ErrorBoundary name="بازار جهانی">
+              <GlobalMarketsSection data={data} />
+            </ErrorBoundary>
+            <ErrorBoundary name="NAV">
+              <NavSection data={data} />
+            </ErrorBoundary>
+            <ErrorBoundary name="کامودیتی">
+              <CommoditiesSection data={data} histories={histories} candles={candles} />
+            </ErrorBoundary>
+            <ErrorBoundary name="زنجیره فولاد">
+              <SteelSection data={data} histories={histories} />
+            </ErrorBoundary>
+            <ErrorBoundary name="تغییرات دوره‌ای">
+              <PeriodicSection data={data} />
+            </ErrorBoundary>
+            <ErrorBoundary name="تولید و انرژی">
+              <ProductionOpsSection data={data} />
+            </ErrorBoundary>
+            <ErrorBoundary name="صورت‌های مالی">
+              <FinancialsSection data={data} />
+            </ErrorBoundary>
             <footer className="border-t border-[var(--color-line)] pt-5 text-center text-xs text-[var(--color-muted)]">
               <p>معاونت مالی و اقتصادی — واحد سرمایه‌گذاری · توسعه معادن و فلزات</p>
               <p className="mt-1">

@@ -151,7 +151,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: Tahoma, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family: 'Vazirmatn', 'IBM Plex Sans', Tahoma, 'Segoe UI', sans-serif;
   color: #0f172a;
   background: linear-gradient(180deg, #e8eef5 0%, #f1f5f9 40%, #f8fafc 100%);
 }

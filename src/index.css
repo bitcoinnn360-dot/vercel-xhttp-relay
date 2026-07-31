@@ -1,9 +1,9 @@
 @import 'tailwindcss';
 
 @theme {
-  --font-display: Tahoma, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-body: Tahoma, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-num: 'Segoe UI', Tahoma, Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: 'Vazirmatn', 'IBM Plex Sans', Tahoma, 'Segoe UI', sans-serif;
+  --font-body: 'Vazirmatn', 'IBM Plex Sans', Tahoma, 'Segoe UI', sans-serif;
+  --font-num: 'IBM Plex Sans', 'Vazirmatn', Tahoma, 'Segoe UI', sans-serif;
 
   --color-ink: #0f172a;
   --color-ink-soft: #334155;

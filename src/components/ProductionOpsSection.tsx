@@ -97,27 +97,36 @@ export function ProductionOpsSection({ data }: { data: DashboardData }) {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {companies.map((c, i) => (
-          <motion.button
-            key={c.symbol}
-            type="button"
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.02 }}
-            onClick={() => {
-              setSymbol(c.symbol)
-              setProductKey(null)
-            }}
-            className={`rounded-md border px-2.5 py-1 text-xs font-semibold transition ${
-              company?.symbol === c.symbol
-                ? 'border-[var(--color-ink)] bg-[var(--color-ink)] text-white'
-                : 'border-[var(--color-line)] bg-white text-[var(--color-muted)] hover:border-[var(--color-ink)]/40'
-            }`}
-          >
-            {c.symbol}
-            <span className="ms-1 opacity-70 font-normal">{c.name}</span>
-          </motion.button>
-        ))}
+        {companies.map((c, i) => {
+          const active = company?.symbol === c.symbol
+          return (
+            <motion.button
+              key={c.symbol}
+              type="button"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.02 }}
+              onClick={() => {
+                setSymbol(c.symbol)
+                setProductKey(null)
+              }}
+              className={`inline-flex min-w-[5.5rem] flex-col items-start gap-0.5 rounded-md border px-2.5 py-1.5 text-right transition ${
+                active
+                  ? 'border-[var(--color-ink)] bg-[var(--color-ink)] text-white'
+                  : 'border-[var(--color-line)] bg-white text-[var(--color-muted)] hover:border-[var(--color-ink)]/40'
+              }`}
+            >
+              <span className="text-xs font-extrabold leading-none tracking-wide">{c.symbol}</span>
+              <span
+                className={`max-w-[9rem] truncate text-[10px] font-normal leading-tight ${
+                  active ? 'text-white/75' : 'opacity-70'
+                }`}
+              >
+                {c.name}
+              </span>
+            </motion.button>
+          )
+        })}
       </div>
 
       <div className="flex flex-wrap gap-2">

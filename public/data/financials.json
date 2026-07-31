@@ -1,0 +1,738 @@
+{
+  "ok": true,
+  "updatedAt": "2026-07-31T07:47:25.880Z",
+  "source": "bourseview",
+  "note": "صورت سود و زیان سالانه · مقیاس میلیارد ریال · ویژوال سبز (درآمد/سود) / قرمز (هزینه)",
+  "companies": [
+    {
+      "symbol": "کگل",
+      "name": "گل‌گهر",
+      "industry": "iron-ore",
+      "industryFa": "سنگ‌آهن",
+      "fiscalYear": 2024,
+      "fiscalMonth": 12,
+      "periodEndingDate": 20250320,
+      "label": "سال مالی ۱۴۰۳ · اسفند",
+      "currency": "IRR",
+      "lines": [
+        {
+          "key": 44,
+          "name": "Sales",
+          "nameFa": "فروش",
+          "value": 830454,
+          "kind": "income"
+        },
+        {
+          "key": 48,
+          "name": "Cost of Sales",
+          "nameFa": "بهای تمام‌شده",
+          "value": -598548,
+          "kind": "expense"
+        },
+        {
+          "key": 52,
+          "name": "Gross Profit (Loss)",
+          "nameFa": "سود ناخالص",
+          "value": 231906,
+          "kind": "total"
+        },
+        {
+          "key": 54,
+          "name": "Sales, General and Administrative Expense",
+          "nameFa": "هزینه عمومی و اداری",
+          "value": -68590,
+          "kind": "expense"
+        },
+        {
+          "key": 55,
+          "name": "Other Operating Revenue (Expenses)",
+          "nameFa": "سایر درآمد (هزینه) عملیاتی",
+          "value": 26389,
+          "kind": "income"
+        },
+        {
+          "key": 56,
+          "name": "Operating Profit (Loss)",
+          "nameFa": "سود عملیاتی",
+          "value": 189705,
+          "kind": "total"
+        },
+        {
+          "key": 57,
+          "name": "Finance Expense",
+          "nameFa": "هزینه مالی",
+          "value": -30150,
+          "kind": "expense"
+        },
+        {
+          "key": 59,
+          "name": "Net Miscellaneous Revenue",
+          "nameFa": "خالص سایر درآمدها",
+          "value": 61230,
+          "kind": "income"
+        },
+        {
+          "key": 60,
+          "name": "Net Income from Continuing Operations before Tax",
+          "nameFa": "سود قبل از مالیات",
+          "value": 220785,
+          "kind": "total"
+        },
+        {
+          "key": 63,
+          "name": "Income Tax Expense",
+          "nameFa": "مالیات",
+          "value": -31077,
+          "kind": "expense"
+        },
+        {
+          "key": 66,
+          "name": "Net Income (Loss)",
+          "nameFa": "سود خالص",
+          "value": 189708,
+          "kind": "total"
+        }
+      ],
+      "scale": 1000000000,
+      "scaleLabel": "میلیارد ریال"
+    },
+    {
+      "symbol": "کچاد",
+      "name": "چادرملو",
+      "industry": "iron-ore",
+      "industryFa": "سنگ‌آهن",
+      "fiscalYear": 2025,
+      "fiscalMonth": 12,
+      "periodEndingDate": 20251221,
+      "label": "سال مالی ۱۴۰۴ · آذر",
+      "currency": "IRR",
+      "lines": [
+        {
+          "key": 44,
+          "name": "Sales",
+          "nameFa": "فروش",
+          "value": 656759,
+          "kind": "income"
+        },
+        {
+          "key": 48,
+          "name": "Cost of Sales",
+          "nameFa": "بهای تمام‌شده",
+          "value": -514584,
+          "kind": "expense"
+        },
+        {
+          "key": 52,
+          "name": "Gross Profit (Loss)",
+          "nameFa": "سود ناخالص",
+          "value": 142175,
+          "kind": "total"
+        },
+        {
+          "key": 54,
+          "name": "Sales, General and Administrative Expense",
+          "nameFa": "هزینه عمومی و اداری",
+          "value": -23675,
+          "kind": "expense"
+        },
+        {
+          "key": 56,
+          "name": "Operating Profit (Loss)",
+          "nameFa": "سود عملیاتی",
+          "value": 118500,
+          "kind": "total"
+        },
+        {
+          "key": 57,
+          "name": "Finance Expense",
+          "nameFa": "هزینه مالی",
+          "value": -3612,
+          "kind": "expense"
+        },
+        {
+          "key": 59,
+          "name": "Net Miscellaneous Revenue",
+          "nameFa": "خالص سایر درآمدها",
+          "value": 59057,
+          "kind": "income"
+        },
+        {
+          "key": 60,
+          "name": "Net Income from Continuing Operations before Tax",
+          "nameFa": "سود قبل از مالیات",
+          "value": 173946,
+          "kind": "total"
+        },
+        {
+          "key": 63,
+          "name": "Income Tax Expense",
+          "nameFa": "مالیات",
+          "value": -21779,
+          "kind": "expense"
+        },
+        {
+          "key": 66,
+          "name": "Net Income (Loss)",
+          "nameFa": "سود خالص",
+          "value": 152167,
+          "kind": "total"
+        }
+      ],
+      "scale": 1000000000,
+      "scaleLabel": "میلیارد ریال"
+    },
+    {
+      "symbol": "کگهر",
+      "name": "گهرزمین",
+      "industry": "iron-ore",
+      "industryFa": "سنگ‌آهن",
+      "fiscalYear": 2025,
+      "fiscalMonth": 12,
+      "periodEndingDate": 20251221,
+      "label": "سال مالی ۱۴۰۴ · آذر",
+      "currency": "IRR",
+      "lines": [
+        {
+          "key": 44,
+          "name": "Sales",
+          "nameFa": "فروش",
+          "value": 743005,
+          "kind": "income"
+        },
+        {
+          "key": 48,
+          "name": "Cost of Sales",
+          "nameFa": "بهای تمام‌شده",
+          "value": -563379,
+          "kind": "expense"
+        },
+        {
+          "key": 52,
+          "name": "Gross Profit (Loss)",
+          "nameFa": "سود ناخالص",
+          "value": 179626,
+          "kind": "total"
+        },
+        {
+          "key": 54,
+          "name": "Sales, General and Administrative Expense",
+          "nameFa": "هزینه عمومی و اداری",
+          "value": -39279,
+          "kind": "expense"
+        },
+        {
+          "key": 55,
+          "name": "Other Operating Revenue (Expenses)",
+          "nameFa": "سایر درآمد (هزینه) عملیاتی",
+          "value": 10944,
+          "kind": "income"
+        },
+        {
+          "key": 56,
+          "name": "Operating Profit (Loss)",
+          "nameFa": "سود عملیاتی",
+          "value": 151292,
+          "kind": "total"
+        },
+        {
+          "key": 57,
+          "name": "Finance Expense",
+          "nameFa": "هزینه مالی",
+          "value": -13409,
+          "kind": "expense"
+        },
+        {
+          "key": 59,
+          "name": "Net Miscellaneous Revenue",
+          "nameFa": "خالص سایر درآمدها",
+          "value": 27481,
+          "kind": "income"
+        },
+        {
+          "key": 60,
+          "name": "Net Income from Continuing Operations before Tax",
+          "nameFa": "سود قبل از مالیات",
+          "value": 165364,
+          "kind": "total"
+        },
+        {
+          "key": 63,
+          "name": "Income Tax Expense",
+          "nameFa": "مالیات",
+          "value": -4977,
+          "kind": "expense"
+        },
+        {
+          "key": 66,
+          "name": "Net Income (Loss)",
+          "nameFa": "سود خالص",
+          "value": 160387,
+          "kind": "total"
+        }
+      ],
+      "scale": 1000000000,
+      "scaleLabel": "میلیارد ریال"
+    },
+    {
+      "symbol": "کنور",
+      "name": "صبانور",
+      "industry": "iron-ore",
+      "industryFa": "سنگ‌آهن",
+      "fiscalYear": 2025,
+      "fiscalMonth": 12,
+      "periodEndingDate": 20260320,
+      "label": "سال مالی ۱۴۰۴ · اسفند",
+      "currency": "IRR",
+      "lines": [
+        {
+          "key": 44,
+          "name": "Sales",
+          "nameFa": "فروش",
+          "value": 103502,
+          "kind": "income"
+        },
+        {
+          "key": 48,
+          "name": "Cost of Sales",
+          "nameFa": "بهای تمام‌شده",
+          "value": -67462,
+          "kind": "expense"
+        },
+        {
+          "key": 52,
+          "name": "Gross Profit (Loss)",
+          "nameFa": "سود ناخالص",
+          "value": 36040,
+          "kind": "total"
+        },
+        {
+          "key": 54,
+          "name": "Sales, General and Administrative Expense",
+          "nameFa": "هزینه عمومی و اداری",
+          "value": -3463,
+          "kind": "expense"
+        },
+        {
+          "key": 55,
+          "name": "Other Operating Revenue (Expenses)",
+          "nameFa": "سایر درآمد (هزینه) عملیاتی",
+          "value": 13083,
+          "kind": "income"
+        },
+        {
+          "key": 56,
+          "name": "Operating Profit (Loss)",
+          "nameFa": "سود عملیاتی",
+          "value": 45659,
+          "kind": "total"
+        },
+        {
+          "key": 57,
+          "name": "Finance Expense",
+          "nameFa": "هزینه مالی",
+          "value": -3253,
+          "kind": "expense"
+        },
+        {
+          "key": 59,
+          "name": "Net Miscellaneous Revenue",
+          "nameFa": "خالص سایر درآمدها",
+          "value": 6978,
+          "kind": "income"
+        },
+        {
+          "key": 60,
+          "name": "Net Income from Continuing Operations before Tax",
+          "nameFa": "سود قبل از مالیات",
+          "value": 49384,
+          "kind": "total"
+        },
+        {
+          "key": 63,
+          "name": "Income Tax Expense",
+          "nameFa": "مالیات",
+          "value": -1484,
+          "kind": "expense"
+        },
+        {
+          "key": 66,
+          "name": "Net Income (Loss)",
+          "nameFa": "سود خالص",
+          "value": 47900,
+          "kind": "total"
+        }
+      ],
+      "scale": 1000000000,
+      "scaleLabel": "میلیارد ریال"
+    },
+    {
+      "symbol": "فملی",
+      "name": "ملی صنایع مس",
+      "industry": "copper",
+      "industryFa": "مس",
+      "fiscalYear": 2025,
+      "fiscalMonth": 12,
+      "periodEndingDate": 20260320,
+      "label": "سال مالی ۱۴۰۴ · اسفند",
+      "currency": "IRR",
+      "lines": [
+        {
+          "key": 44,
+          "name": "Sales",
+          "nameFa": "فروش",
+          "value": 3218895,
+          "kind": "income"
+        },
+        {
+          "key": 48,
+          "name": "Cost of Sales",
+          "nameFa": "بهای تمام‌شده",
+          "value": -1354424,
+          "kind": "expense"
+        },
+        {
+          "key": 52,
+          "name": "Gross Profit (Loss)",
+          "nameFa": "سود ناخالص",
+          "value": 1864470,
+          "kind": "total"
+        },
+        {
+          "key": 54,
+          "name": "Sales, General and Administrative Expense",
+          "nameFa": "هزینه عمومی و اداری",
+          "value": -268030,
+          "kind": "expense"
+        },
+        {
+          "key": 55,
+          "name": "Other Operating Revenue (Expenses)",
+          "nameFa": "سایر درآمد (هزینه) عملیاتی",
+          "value": 209986,
+          "kind": "income"
+        },
+        {
+          "key": 56,
+          "name": "Operating Profit (Loss)",
+          "nameFa": "سود عملیاتی",
+          "value": 1806427,
+          "kind": "total"
+        },
+        {
+          "key": 57,
+          "name": "Finance Expense",
+          "nameFa": "هزینه مالی",
+          "value": -12162,
+          "kind": "expense"
+        },
+        {
+          "key": 59,
+          "name": "Net Miscellaneous Revenue",
+          "nameFa": "خالص سایر درآمدها",
+          "value": 9751,
+          "kind": "income"
+        },
+        {
+          "key": 60,
+          "name": "Net Income from Continuing Operations before Tax",
+          "nameFa": "سود قبل از مالیات",
+          "value": 1804016,
+          "kind": "total"
+        },
+        {
+          "key": 63,
+          "name": "Income Tax Expense",
+          "nameFa": "مالیات",
+          "value": -298004,
+          "kind": "expense"
+        },
+        {
+          "key": 66,
+          "name": "Net Income (Loss)",
+          "nameFa": "سود خالص",
+          "value": 1506012,
+          "kind": "total"
+        }
+      ],
+      "scale": 1000000000,
+      "scaleLabel": "میلیارد ریال"
+    },
+    {
+      "symbol": "ارفع",
+      "name": "آهن و فولاد ارفع",
+      "industry": "steel",
+      "industryFa": "فولاد",
+      "fiscalYear": 2025,
+      "fiscalMonth": 12,
+      "periodEndingDate": 20260320,
+      "label": "سال مالی ۱۴۰۴ · اسفند",
+      "currency": "IRR",
+      "lines": [
+        {
+          "key": 44,
+          "name": "Sales",
+          "nameFa": "فروش",
+          "value": 296133,
+          "kind": "income"
+        },
+        {
+          "key": 48,
+          "name": "Cost of Sales",
+          "nameFa": "بهای تمام‌شده",
+          "value": -251829,
+          "kind": "expense"
+        },
+        {
+          "key": 52,
+          "name": "Gross Profit (Loss)",
+          "nameFa": "سود ناخالص",
+          "value": 44304,
+          "kind": "total"
+        },
+        {
+          "key": 54,
+          "name": "Sales, General and Administrative Expense",
+          "nameFa": "هزینه عمومی و اداری",
+          "value": -7743,
+          "kind": "expense"
+        },
+        {
+          "key": 55,
+          "name": "Other Operating Revenue (Expenses)",
+          "nameFa": "سایر درآمد (هزینه) عملیاتی",
+          "value": 12457,
+          "kind": "income"
+        },
+        {
+          "key": 56,
+          "name": "Operating Profit (Loss)",
+          "nameFa": "سود عملیاتی",
+          "value": 49018,
+          "kind": "total"
+        },
+        {
+          "key": 57,
+          "name": "Finance Expense",
+          "nameFa": "هزینه مالی",
+          "value": -1553,
+          "kind": "expense"
+        },
+        {
+          "key": 59,
+          "name": "Net Miscellaneous Revenue",
+          "nameFa": "خالص سایر درآمدها",
+          "value": 1452,
+          "kind": "income"
+        },
+        {
+          "key": 60,
+          "name": "Net Income from Continuing Operations before Tax",
+          "nameFa": "سود قبل از مالیات",
+          "value": 48917,
+          "kind": "total"
+        },
+        {
+          "key": 63,
+          "name": "Income Tax Expense",
+          "nameFa": "مالیات",
+          "value": -301,
+          "kind": "expense"
+        },
+        {
+          "key": 66,
+          "name": "Net Income (Loss)",
+          "nameFa": "سود خالص",
+          "value": 48616,
+          "kind": "total"
+        }
+      ],
+      "scale": 1000000000,
+      "scaleLabel": "میلیارد ریال"
+    },
+    {
+      "symbol": "فخاس",
+      "name": "فولاد خراسان",
+      "industry": "steel",
+      "industryFa": "فولاد",
+      "fiscalYear": 2025,
+      "fiscalMonth": 12,
+      "periodEndingDate": 20260320,
+      "label": "سال مالی ۱۴۰۴ · اسفند",
+      "currency": "IRR",
+      "lines": [
+        {
+          "key": 44,
+          "name": "Sales",
+          "nameFa": "فروش",
+          "value": 322776,
+          "kind": "income"
+        },
+        {
+          "key": 48,
+          "name": "Cost of Sales",
+          "nameFa": "بهای تمام‌شده",
+          "value": -276143,
+          "kind": "expense"
+        },
+        {
+          "key": 52,
+          "name": "Gross Profit (Loss)",
+          "nameFa": "سود ناخالص",
+          "value": 46633,
+          "kind": "total"
+        },
+        {
+          "key": 54,
+          "name": "Sales, General and Administrative Expense",
+          "nameFa": "هزینه عمومی و اداری",
+          "value": -10028,
+          "kind": "expense"
+        },
+        {
+          "key": 55,
+          "name": "Other Operating Revenue (Expenses)",
+          "nameFa": "سایر درآمد (هزینه) عملیاتی",
+          "value": 6688,
+          "kind": "income"
+        },
+        {
+          "key": 56,
+          "name": "Operating Profit (Loss)",
+          "nameFa": "سود عملیاتی",
+          "value": 43293,
+          "kind": "total"
+        },
+        {
+          "key": 57,
+          "name": "Finance Expense",
+          "nameFa": "هزینه مالی",
+          "value": -15158,
+          "kind": "expense"
+        },
+        {
+          "key": 59,
+          "name": "Net Miscellaneous Revenue",
+          "nameFa": "خالص سایر درآمدها",
+          "value": 8485,
+          "kind": "income"
+        },
+        {
+          "key": 60,
+          "name": "Net Income from Continuing Operations before Tax",
+          "nameFa": "سود قبل از مالیات",
+          "value": 36621,
+          "kind": "total"
+        },
+        {
+          "key": 63,
+          "name": "Income Tax Expense",
+          "nameFa": "مالیات",
+          "value": -3314,
+          "kind": "expense"
+        },
+        {
+          "key": 66,
+          "name": "Net Income (Loss)",
+          "nameFa": "سود خالص",
+          "value": 33307,
+          "kind": "total"
+        }
+      ],
+      "scale": 1000000000,
+      "scaleLabel": "میلیارد ریال"
+    },
+    {
+      "symbol": "بکام",
+      "name": "شهید قندی",
+      "industry": "cable",
+      "industryFa": "کابل و مخابرات",
+      "fiscalYear": 2025,
+      "fiscalMonth": 12,
+      "periodEndingDate": 20260320,
+      "label": "سال مالی ۱۴۰۴ · اسفند",
+      "currency": "IRR",
+      "lines": [
+        {
+          "key": 44,
+          "name": "Sales",
+          "nameFa": "فروش",
+          "value": 9092,
+          "kind": "income"
+        },
+        {
+          "key": 48,
+          "name": "Cost of Sales",
+          "nameFa": "بهای تمام‌شده",
+          "value": -6293,
+          "kind": "expense"
+        },
+        {
+          "key": 52,
+          "name": "Gross Profit (Loss)",
+          "nameFa": "سود ناخالص",
+          "value": 2800,
+          "kind": "total"
+        },
+        {
+          "key": 54,
+          "name": "Sales, General and Administrative Expense",
+          "nameFa": "هزینه عمومی و اداری",
+          "value": -2008,
+          "kind": "expense"
+        },
+        {
+          "key": 55,
+          "name": "Other Operating Revenue (Expenses)",
+          "nameFa": "سایر درآمد (هزینه) عملیاتی",
+          "value": -1251,
+          "kind": "expense"
+        },
+        {
+          "key": 56,
+          "name": "Operating Profit (Loss)",
+          "nameFa": "سود عملیاتی",
+          "value": -459,
+          "kind": "total"
+        },
+        {
+          "key": 57,
+          "name": "Finance Expense",
+          "nameFa": "هزینه مالی",
+          "value": -52,
+          "kind": "expense"
+        },
+        {
+          "key": 59,
+          "name": "Net Miscellaneous Revenue",
+          "nameFa": "خالص سایر درآمدها",
+          "value": 647,
+          "kind": "income"
+        },
+        {
+          "key": 60,
+          "name": "Net Income from Continuing Operations before Tax",
+          "nameFa": "سود قبل از مالیات",
+          "value": 136,
+          "kind": "total"
+        },
+        {
+          "key": 63,
+          "name": "Income Tax Expense",
+          "nameFa": "مالیات",
+          "value": -23,
+          "kind": "expense"
+        },
+        {
+          "key": 66,
+          "name": "Net Income (Loss)",
+          "nameFa": "سود خالص",
+          "value": 112,
+          "kind": "total"
+        }
+      ],
+      "scale": 1000000000,
+      "scaleLabel": "میلیارد ریال"
+    }
+  ],
+  "errors": []
+}

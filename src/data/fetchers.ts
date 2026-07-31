@@ -3,6 +3,7 @@ import type {
   CommodityQuote,
   DashboardData,
   GlobalMarketsBundle,
+  FinancialsBundle,
   ProductionOpsBundle,
   SourceStatus,
   StockRow,
@@ -1329,11 +1330,48 @@ function applyProductionOps(base: DashboardData, bundle: ProductionOpsBundle | n
   base.productionOps = {
     ok: bundle.ok !== false,
     companies: bundle.companies,
+    industryEnergyRates: bundle.industryEnergyRates || [],
     updatedAt: bundle.updatedAt,
     source: bundle.source || 'bourseview',
     note: bundle.note,
     served: bundle.served,
     errors: bundle.errors,
+  }
+  return true
+}
+
+async function fetchFinancialsApi(): Promise<FinancialsBundle | null> {
+  const read = async (url: string, ms: number): Promise<FinancialsBundle | null> => {
+    const res = await fetchWithTimeout(url, ms, { cache: 'no-store' })
+    if (!res.ok) return null
+    const json = (await res.json()) as FinancialsBundle
+    if (!json?.companies?.length) return null
+    return json
+  }
+  let staticBundle: FinancialsBundle | null = null
+  try {
+    staticBundle = await read('/data/financials.json', 4000)
+  } catch {
+    /* ignore */
+  }
+  try {
+    const live = await read('/api/financials', 6000)
+    if (live && live.companies.length >= (staticBundle?.companies.length || 0)) return live
+  } catch {
+    /* fall through */
+  }
+  return staticBundle
+}
+
+function applyFinancials(base: DashboardData, bundle: FinancialsBundle | null | undefined) {
+  if (!bundle?.companies?.length) return false
+  base.financials = {
+    ok: bundle.ok !== false,
+    companies: bundle.companies,
+    updatedAt: bundle.updatedAt,
+    source: bundle.source || 'bourseview',
+    note: bundle.note,
+    served: bundle.served,
   }
   return true
 }
@@ -1530,7 +1568,7 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   const base: DashboardData = structuredClone(seedDashboard)
   const now = new Date().toISOString()
 
-  const [current, histEntries, candleEntries, fredEntries, scraped, overviewApi, intradayFallback, stocksApi, steelApi, navApi, globalApi, productionApi] =
+  const [current, histEntries, candleEntries, fredEntries, scraped, overviewApi, intradayFallback, stocksApi, steelApi, navApi, globalApi, productionApi, financialsApi] =
     await Promise.all([
       fetchTgjuAjax(),
       Promise.all(HIST_KEYS.map(async (k) => [k, await fetchTgjuHistory(k)] as const)),
@@ -1544,6 +1582,7 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
       fetchNavApi(),
       fetchGlobalMarketsApi(),
       fetchProductionOpsApi(),
+      fetchFinancialsApi(),
     ])
 
   const liveCount = applyLiveQuotes(base, current)
@@ -1554,6 +1593,7 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   applyNavLive(base, navApi)
   const globalOk = applyGlobalMarkets(base, globalApi)
   const productionOk = applyProductionOps(base, productionApi)
+  applyFinancials(base, financialsApi)
   const apiImpacts = normalizeImpacts(overviewApi?.impacts)
   if (apiImpacts && (overviewApi?.impactsFromSourceArena || overviewApi?.impactsFromRahavard || overviewApi?.impactsSource)) {
     base.impacts = apiImpacts

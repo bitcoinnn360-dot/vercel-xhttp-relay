@@ -1215,8 +1215,15 @@ export const seedDashboard: DashboardData = {
   productionOps: {
     ok: false,
     companies: [],
+    industryEnergyRates: [],
     source: 'seed',
     note: 'تولید و انرژی پرتفو از بورس‌ویو',
+  },
+  financials: {
+    ok: false,
+    companies: [],
+    source: 'seed',
+    note: 'صورت سود و زیان پرتفو',
   },
   sources: [
     {

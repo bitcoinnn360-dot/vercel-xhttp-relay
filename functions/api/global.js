@@ -203,12 +203,14 @@ async function yahooQuote(meta) {
   const j = await res.json()
   const r = j.chart?.result?.[0]
   const closes = r?.indicators?.quote?.[0]?.close || []
+  const adj = r?.indicators?.adjclose?.[0]?.adjclose || []
   const volumes = r?.indicators?.quote?.[0]?.volume || []
   const ts = r?.timestamp || []
   const valid = []
   for (let i = 0; i < closes.length; i++) {
-    if (closes[i] != null && Number.isFinite(closes[i])) {
-      valid.push({ c: closes[i], v: volumes[i] || 0, t: ts[i] })
+    const px = adj[i] != null && Number.isFinite(adj[i]) ? adj[i] : closes[i]
+    if (px != null && Number.isFinite(px)) {
+      valid.push({ c: px, v: volumes[i] || 0, t: ts[i] })
     }
   }
   if (valid.length < 2) throw new Error(`${meta.symbol} thin history`)
@@ -239,6 +241,7 @@ async function yahooQuote(meta) {
     volume: last.v || null,
     asOf: new Date(last.t * 1000).toISOString().slice(0, 10),
     source: 'yahoo-finance',
+    returnsBasis: 'adjclose',
   }
 }
 
@@ -330,6 +333,7 @@ function buildIndustries(stocks) {
       year1Pct: weightedAvg(members, 'year1Pct'),
       year3Pct: weightedAvg(members, 'year3Pct'),
       grossMarginPct: weightedAvg(eqs, 'grossMarginPct'),
+      operatingMarginPct: weightedAvg(eqs, 'operatingMarginPct'),
       profitMarginPct: weightedAvg(eqs, 'profitMarginPct'),
       count: members.length,
     }
@@ -490,7 +494,7 @@ async function buildLiveBundle(errors) {
     ok: stocks.length > 0,
     updatedAt: new Date().toISOString(),
     source: 'yahoo-finance',
-    note: 'سکتور تجمیعی · صنایع مواد پایه (وزنی چندکشور) · فلزات و معادن کشورها · میانگین صنعت سهام وزنی ارزش بازار',
+    note: 'بازدهی از adjclose یاهو · حاشیه TTM یاهو (با GF ممکن است فرق کند) · سکتور/صنایع وزنی',
     stocks,
     industries: buildIndustries(stocks),
     sectorPerformance: withWeights(sectorPerformance),

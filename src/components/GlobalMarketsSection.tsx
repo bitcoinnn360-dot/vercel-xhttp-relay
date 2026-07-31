@@ -145,7 +145,11 @@ export function GlobalMarketsSection({ data }: { data: DashboardData }) {
           {gm.updatedAt ? ` · ${new Date(gm.updatedAt).toLocaleString('fa-IR')}` : ''}
         </p>
       </div>
-      {gm.note ? <p className="text-[0.72rem] text-[var(--color-muted)]">{gm.note}</p> : null}
+      <p className="text-[0.72rem] text-[var(--color-muted)]">
+        منبع fundamentals: Yahoo Finance TTM (نه GuruFocus). حاشیه ناخالص GAAP یاهو برای معدن‌کاران اغلب
+        با رقم GF فرق دارد (تعریف COGS). بازدهی‌ها از قیمت تعدیل‌شده (adjclose · شامل سود نقدی).
+        {gm.note ? ` · ${gm.note}` : ''}
+      </p>
 
       <SectorPerformanceBlock
         sectors={sectors}
@@ -227,8 +231,9 @@ export function GlobalMarketsSection({ data }: { data: DashboardData }) {
               <th>روزانه</th>
               <th>هفتگی</th>
               <th>YTD</th>
+              <th>۱ساله</th>
               <th>سه‌ساله</th>
-              <th>حاشیه ناخالص</th>
+              <th>حاشیه عملیاتی</th>
               <th>حاشیه خالص</th>
               <th>P/B</th>
             </tr>
@@ -247,7 +252,7 @@ export function GlobalMarketsSection({ data }: { data: DashboardData }) {
             )}
             {!displayRows.length ? (
               <tr>
-                <td colSpan={11} className="py-8 text-center text-sm text-[var(--color-muted)]">
+                <td colSpan={12} className="py-8 text-center text-sm text-[var(--color-muted)]">
                   داده بازار جهانی هنوز بارگذاری نشده است.
                 </td>
               </tr>
@@ -606,8 +611,9 @@ function EquityTr({ row }: { row: Extract<DisplayRow, { kind: 'equity' }> }) {
       <PctPill value={s.dailyPct} />
       <PctPill value={s.weekPct} />
       <PctPill value={s.ytdPct} />
+      <PctPill value={s.year1Pct} />
       <PctPill value={s.year3Pct} />
-      <MarginCell value={s.grossMarginPct} />
+      <MarginCell value={s.operatingMarginPct} />
       <MarginCell value={s.profitMarginPct} />
       <td className="num">{s.priceToBook != null ? fmtNum(s.priceToBook, 2) : '—'}</td>
     </motion.tr>
@@ -643,8 +649,9 @@ function IndustryTr({
       <PctPill value={s.dailyPct} />
       <PctPill value={s.weekPct} />
       <PctPill value={s.ytdPct} />
+      <PctPill value={s.year1Pct} />
       <PctPill value={s.year3Pct} />
-      <MarginCell value={s.grossMarginPct} />
+      <MarginCell value={s.operatingMarginPct} />
       <MarginCell value={s.profitMarginPct} />
       <td className="num">—</td>
     </tr>

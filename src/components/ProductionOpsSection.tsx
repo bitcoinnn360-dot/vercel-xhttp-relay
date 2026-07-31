@@ -333,11 +333,152 @@ export function ProductionOpsSection({ data }: { data: DashboardData }) {
         />
       ) : null}
 
+      {mode !== 'production' && company ? (
+        <EnergyRatePanel
+          title={`نرخ ${MODES.find((m) => m.id === mode)?.label} — ${company.symbol}`}
+          rates={energy?.rates}
+        />
+      ) : null}
+
+      {(bundle?.industryEnergyRates || []).length > 0 ? (
+        <IndustryRateTables rows={bundle?.industryEnergyRates || []} focus={mode === 'production' ? null : mode} />
+      ) : null}
+
       <p className="text-[0.65rem] text-[var(--color-muted)]">
         منبع: بورس‌ویو (گزارش فعالیت ماهانه کدال). مقادیر تجمعی سال مالی به ماهانه تبدیل شده‌اند.
+        نرخ انرژی = هزینه ماهانه ÷ حجم ماهانه (ریال).
         {bundle?.note ? ` ${bundle.note}` : ''}
       </p>
     </section>
+  )
+}
+
+function fmtRate(n: number | null | undefined) {
+  if (n == null || !Number.isFinite(n)) return '—'
+  if (n >= 1_000_000) return fmtNum(n / 1_000_000, 2) + ' م'
+  if (n >= 1000) return fmtNum(n / 1000, 1) + ' ه'
+  return fmtNum(n, 0)
+}
+
+function EnergyRatePanel({
+  title,
+  rates,
+}: {
+  title: string
+  rates?: {
+    unitFa?: string
+    months?: OpsMonthPoint[]
+    latestRate?: number | null
+    latestLabel?: string | null
+    avg3m?: number | null
+    avg6m?: number | null
+    avg12m?: number | null
+  } | null
+}) {
+  if (!rates?.months?.length && rates?.latestRate == null) return null
+  const recent = lastPoints(rates.months || [], 8)
+  return (
+    <div className="panel overflow-x-auto p-2 sm:p-3">
+      <h3 className="mb-1 px-2 pt-2 text-sm font-bold">{title}</h3>
+      <p className="mb-2 px-2 text-[0.65rem] text-[var(--color-muted)]">
+        واحد: {rates.unitFa || 'ریال'} · میانگین‌های غلتان روی نرخ ماهانه
+      </p>
+      <div className="mb-3 grid grid-cols-2 gap-2 px-2 sm:grid-cols-4">
+        {[
+          { label: 'آخرین ماه', value: rates.latestRate, sub: rates.latestLabel },
+          { label: 'میانگین ۳ماهه', value: rates.avg3m },
+          { label: 'میانگین ۶ماهه', value: rates.avg6m },
+          { label: 'میانگین ۱۲ماهه', value: rates.avg12m },
+        ].map((k) => (
+          <div key={k.label} className="rounded-md border border-[var(--color-line)] bg-[#f8fafc] px-2.5 py-2">
+            <div className="text-[10px] text-[var(--color-muted)]">{k.label}</div>
+            <div className="num text-sm font-extrabold text-[var(--color-brand)]">{fmtRate(k.value)}</div>
+            {k.sub ? <div className="text-[10px] text-[var(--color-muted)]">{k.sub}</div> : null}
+          </div>
+        ))}
+      </div>
+      {recent.length ? (
+        <table className="data-table min-w-[420px] text-xs">
+          <thead>
+            <tr>
+              <th>ماه</th>
+              <th>نرخ</th>
+              <th>سال قبل</th>
+              <th>YoY</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...recent].reverse().map((m) => (
+              <tr key={m.label}>
+                <td className="font-semibold whitespace-nowrap">{m.label}</td>
+                <td className="num">{fmtRate(m.value)}</td>
+                <td className="num text-[var(--color-muted)]">{fmtRate(m.priorValue)}</td>
+                <td className={`num font-semibold ${m.yoyPct == null ? '' : changeClass(m.yoyPct)}`}>
+                  {m.yoyPct == null ? '—' : fmtPct(m.yoyPct)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : null}
+    </div>
+  )
+}
+
+function IndustryRateTables({
+  rows,
+  focus,
+}: {
+  rows: NonNullable<DashboardData['productionOps']['industryEnergyRates']>
+  focus: Mode | null
+}) {
+  const kinds = (['water', 'electricity', 'gas'] as const).filter((k) => !focus || focus === k)
+  return (
+    <div className="space-y-3">
+      <h3 className="text-sm font-extrabold text-[var(--color-brand)]">میانگین نرخ انرژی به تفکیک صنعت</h3>
+      {kinds.map((kind) => {
+        const label = MODES.find((m) => m.id === kind)?.label || kind
+        const usable = rows.filter((r) => r.energy?.[kind])
+        if (!usable.length) return null
+        return (
+          <div key={kind} className="panel overflow-x-auto p-2 sm:p-3">
+            <h4 className="mb-2 px-2 pt-2 text-sm font-bold">{label}</h4>
+            <table className="data-table min-w-[640px] text-xs">
+              <thead>
+                <tr>
+                  <th>صنعت</th>
+                  <th>شرکت‌ها</th>
+                  <th>آخرین ماه</th>
+                  <th>نرخ ماه</th>
+                  <th>۳ماهه</th>
+                  <th>۶ماهه</th>
+                  <th>۱۲ماهه / سالانه</th>
+                </tr>
+              </thead>
+              <tbody>
+                {usable.map((r) => {
+                  const e = r.energy[kind]!
+                  return (
+                    <tr key={`${r.industry}-${kind}`}>
+                      <td className="font-semibold">{r.industryFa}</td>
+                      <td className="text-[var(--color-muted)]">{r.symbols.join(' · ')}</td>
+                      <td className="whitespace-nowrap">{e.latestLabel || '—'}</td>
+                      <td className="num font-semibold">{fmtRate(e.latestRate)}</td>
+                      <td className="num">{fmtRate(e.avg3m)}</td>
+                      <td className="num">{fmtRate(e.avg6m)}</td>
+                      <td className="num">{fmtRate(e.avg12m)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            <p className="px-2 pb-1 pt-2 text-[0.65rem] text-[var(--color-muted)]">
+              میانگین ساده نرخ ماهانه شرکت‌های همان صنعت · واحد ریال
+            </p>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 

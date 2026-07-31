@@ -360,12 +360,24 @@ export interface OpsProductSeries {
   months: OpsMonthPoint[]
 }
 
+export interface OpsEnergyRates {
+  unit?: string
+  unitFa?: string
+  months: OpsMonthPoint[]
+  latestRate?: number | null
+  latestLabel?: string | null
+  avg3m?: number | null
+  avg6m?: number | null
+  avg12m?: number | null
+}
+
 export interface OpsEnergySeries {
   id: 'water' | 'electricity' | 'gas'
   labelFa: string
   unit: string
   unitFa?: string
   months: OpsMonthPoint[]
+  rates?: OpsEnergyRates
 }
 
 export interface OpsCompany {
@@ -373,6 +385,8 @@ export interface OpsCompany {
   name: string
   isin?: string
   exchange?: string
+  industry?: string
+  industryFa?: string
   ok?: boolean
   latestFiscalYear?: number | null
   latestFiscalMonth?: number | null
@@ -381,15 +395,64 @@ export interface OpsCompany {
   energy: OpsEnergySeries[]
 }
 
+export interface IndustryEnergyRateKind extends OpsEnergyRates {
+  id: 'water' | 'electricity' | 'gas'
+  labelFa: string
+  companyCount?: number
+}
+
+export interface IndustryEnergyRatesRow {
+  industry: string
+  industryFa: string
+  symbols: string[]
+  energy: Partial<Record<'water' | 'electricity' | 'gas', IndustryEnergyRateKind>>
+}
+
 /** تولید ماهانه + مصرف انرژی شرکت‌های پرتفو (بورس‌ویو) */
 export interface ProductionOpsBundle {
   ok?: boolean
   companies: OpsCompany[]
+  industryEnergyRates?: IndustryEnergyRatesRow[]
   updatedAt?: string
   source?: string
   note?: string
   served?: string
   errors?: string[]
+}
+
+/** آیتم صورت سود و زیان برای ویژوال GuruFocus-مانند */
+export interface FinancialLineItem {
+  key: number
+  name: string
+  nameFa: string
+  value: number
+  /** درآمد/سود = درآمدی (سبز) · هزینه = هزینه‌ای (قرمز) */
+  kind: 'income' | 'expense' | 'total'
+}
+
+export interface CompanyFinancials {
+  symbol: string
+  name: string
+  industry?: string
+  industryFa?: string
+  fiscalYear: number
+  fiscalMonth: number
+  periodEndingDate?: number
+  label: string
+  currency?: string | null
+  lines: FinancialLineItem[]
+  /** مقیاس نمایش — معمولاً میلیارد ریال */
+  scale: number
+  scaleLabel: string
+}
+
+export interface FinancialsBundle {
+  ok?: boolean
+  companies: CompanyFinancials[]
+  updatedAt?: string
+  source?: string
+  note?: string
+  served?: string
 }
 
 export interface SourceStatus {
@@ -426,6 +489,8 @@ export interface DashboardData {
   globalMarkets: GlobalMarketsBundle
   /** تولید ماهانه و مصرف آب/برق/گاز شرکت‌های پرتفو */
   productionOps: ProductionOpsBundle
+  /** صورت سود و زیان پرتفو — ویژوال سبز/قرمز */
+  financials: FinancialsBundle
   sources: SourceStatus[]
   updatedAt: string
 }

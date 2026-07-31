@@ -264,6 +264,309 @@ function buildIncomeSankey(company: CompanyFinancials): {
   }
 }
 
+type ChartBundle = {
+  nodes: SankeyNode[]
+  links: SankeyLink[]
+  sales: number
+  bottom?: BottomLine
+  subtitle: string
+}
+
+function makeBuilder() {
+  const nodes: SankeyNode[] = []
+  const links: SankeyLink[] = []
+  const add = (n: SankeyNode) => {
+    nodes.push(n)
+    return nodes.length - 1
+  }
+  const link = (source: number, target: number, value: number, color: string) => {
+    const v = Math.round(Math.abs(value))
+    if (!(v > 0)) return
+    links.push({ source, target, value: v, color })
+  }
+  return { nodes, links, add, link }
+}
+
+function absVal(lines: FinancialLineItem[], key: number) {
+  return Math.abs(lineVal(lines, key))
+}
+
+/** Residual bucket so child sums match a parent total. */
+function withResidual(
+  parts: { name: string; amount: number; fill?: string }[],
+  total: number,
+  residualName: string,
+) {
+  const sum = parts.reduce((a, p) => a + p.amount, 0)
+  const residual = Math.round(total - sum)
+  if (residual > 0) parts.push({ name: residualName, amount: residual })
+  return parts.filter((p) => p.amount > 0)
+}
+
+/**
+ * Balance sheet Sankey (GuruFocus-style):
+ * Current/Non-current assets → Total Assets → Liabilities | Equity → detail
+ */
+function buildBalanceSankey(company: CompanyFinancials): ChartBundle | null {
+  const lines = company.balanceLines || []
+  if (!lines.length) return null
+  const totalAssets = absVal(lines, 18) || absVal(lines, 43)
+  if (!(totalAssets > 0)) return null
+
+  const ca = absVal(lines, 10)
+  const nca = absVal(lines, 17)
+  const totalLiab = absVal(lines, 32)
+  const equity = absVal(lines, 42)
+  const cl = absVal(lines, 27)
+  const ncl = absVal(lines, 31)
+
+  const caParts = withResidual(
+    [
+      { name: 'موجودی نقد', amount: absVal(lines, 1) },
+      { name: 'سرمایه‌گذاری کوتاه‌مدت', amount: absVal(lines, 2) },
+      { name: 'دریافتنی‌ها', amount: absVal(lines, 200) },
+      { name: 'موجودی کالا', amount: absVal(lines, 6) },
+      { name: 'پیش‌پرداخت‌ها', amount: absVal(lines, 7) },
+    ],
+    ca || 0,
+    'سایر دارایی جاری',
+  )
+  const ncaParts = withResidual(
+    [
+      { name: 'سرمایه‌گذاری بلندمدت', amount: absVal(lines, 11) },
+      { name: 'دریافتنی بلندمدت', amount: absVal(lines, 14) },
+      { name: 'دارایی ثابت مشهود', amount: absVal(lines, 12) },
+      { name: 'دارایی نامشهود', amount: absVal(lines, 13) },
+      { name: 'سایر دارایی‌ها', amount: absVal(lines, 16) },
+    ],
+    nca || 0,
+    'سایر دارایی غیرجاری',
+  )
+
+  const caTotal = ca || caParts.reduce((a, p) => a + p.amount, 0)
+  const ncaTotal = nca || ncaParts.reduce((a, p) => a + p.amount, 0)
+  let caFlow = caTotal
+  let ncaFlow = ncaTotal
+  if (caFlow + ncaFlow > 0 && caFlow + ncaFlow !== totalAssets) {
+    const s = totalAssets / (caFlow + ncaFlow)
+    caFlow = Math.round(caFlow * s)
+    ncaFlow = totalAssets - caFlow
+  }
+
+  const { nodes, links, add, link } = makeBuilder()
+  const iTot = add({ name: 'جمع دارایی‌ها', amount: totalAssets, fill: C.revenue, kind: 'revenue' })
+  const iCa = add({ name: 'دارایی جاری', amount: caFlow, fill: '#2563eb', kind: 'revenue' })
+  const iNca = add({ name: 'دارایی غیرجاری', amount: ncaFlow, fill: '#1d4ed8', kind: 'revenue' })
+  link(iCa, iTot, caFlow, C.flowBlue)
+  link(iNca, iTot, ncaFlow, C.flowBlue)
+
+  // Scale part flows to parent
+  const linkPartsToParent = (
+    parts: { name: string; amount: number }[],
+    parentIdx: number,
+    parentFlow: number,
+    color: string,
+  ) => {
+    const sum = parts.reduce((a, p) => a + p.amount, 0) || 1
+    let alloc = 0
+    parts.forEach((p, idx) => {
+      const share =
+        idx === parts.length - 1
+          ? Math.max(parentFlow - alloc, 0)
+          : Math.round((p.amount / sum) * parentFlow)
+      alloc += share
+      const i = add({ name: p.name, amount: p.amount, fill: C.product, kind: 'product' })
+      link(i, parentIdx, share, color)
+    })
+  }
+  if (caParts.length && caFlow > 0) linkPartsToParent(caParts, iCa, caFlow, C.flowBlue)
+  if (ncaParts.length && ncaFlow > 0) linkPartsToParent(ncaParts, iNca, ncaFlow, '#93c5fd')
+
+  // Right: Total → Liabilities | Equity
+  let liabFlow = totalLiab
+  let eqFlow = equity
+  if (liabFlow + eqFlow > 0 && liabFlow + eqFlow !== totalAssets) {
+    const s = totalAssets / (liabFlow + eqFlow)
+    liabFlow = Math.round(liabFlow * s)
+    eqFlow = totalAssets - liabFlow
+  } else if (!(liabFlow + eqFlow > 0)) {
+    eqFlow = totalAssets
+  }
+
+  const iLiab = add({ name: 'جمع بدهی‌ها', amount: liabFlow, fill: C.expense, kind: 'expense' })
+  const iEq = add({ name: 'حقوق صاحبان سهام', amount: eqFlow, fill: C.profit, kind: 'profit' })
+  link(iTot, iLiab, liabFlow, C.flowRed)
+  link(iTot, iEq, eqFlow, C.flowGreen)
+
+  // Liabilities → CL | NCL
+  let clFlow = cl
+  let nclFlow = ncl
+  if (clFlow + nclFlow > 0 && clFlow + nclFlow !== liabFlow) {
+    const s = liabFlow / (clFlow + nclFlow)
+    clFlow = Math.round(clFlow * s)
+    nclFlow = liabFlow - clFlow
+  } else if (!(clFlow + nclFlow > 0) && liabFlow > 0) {
+    clFlow = liabFlow
+  }
+  if (clFlow > 0) {
+    const iCl = add({ name: 'بدهی جاری', amount: clFlow, fill: '#dc2626', kind: 'expense' })
+    link(iLiab, iCl, clFlow, C.flowRed)
+    const clParts = withResidual(
+      [
+        { name: 'پرداختنی‌ها', amount: absVal(lines, 202) },
+        { name: 'حصه جاری تسهیلات', amount: absVal(lines, 25) },
+        { name: 'سود سهام پرداختنی', amount: absVal(lines, 24) },
+        { name: 'ذخیره مالیات', amount: absVal(lines, 23) },
+        { name: 'ذخایر', amount: absVal(lines, 3002) },
+      ],
+      cl || clFlow,
+      'سایر بدهی جاری',
+    )
+    const sum = clParts.reduce((a, p) => a + p.amount, 0) || 1
+    let alloc = 0
+    clParts.forEach((p, idx) => {
+      const share =
+        idx === clParts.length - 1 ? Math.max(clFlow - alloc, 0) : Math.round((p.amount / sum) * clFlow)
+      alloc += share
+      const i = add({ name: p.name, amount: p.amount, fill: C.expense, kind: 'expense' })
+      link(iCl, i, share, C.flowRed)
+    })
+  }
+  if (nclFlow > 0) {
+    const iNcl = add({ name: 'بدهی غیرجاری', amount: nclFlow, fill: '#b91c1c', kind: 'expense' })
+    link(iLiab, iNcl, nclFlow, C.flowRed)
+    const nclParts = withResidual(
+      [
+        { name: 'تسهیلات بلندمدت', amount: absVal(lines, 29) },
+        { name: 'ذخیره پایان خدمت', amount: absVal(lines, 30) },
+      ],
+      ncl || nclFlow,
+      'سایر بدهی غیرجاری',
+    )
+    const sum = nclParts.reduce((a, p) => a + p.amount, 0) || 1
+    let alloc = 0
+    nclParts.forEach((p, idx) => {
+      const share =
+        idx === nclParts.length - 1
+          ? Math.max(nclFlow - alloc, 0)
+          : Math.round((p.amount / sum) * nclFlow)
+      alloc += share
+      const i = add({ name: p.name, amount: p.amount, fill: C.expense, kind: 'expense' })
+      link(iNcl, i, share, C.flowRed)
+    })
+  }
+
+  // Equity detail
+  const eqParts = withResidual(
+    [
+      { name: 'سرمایه', amount: absVal(lines, 33) },
+      { name: 'اندوخته قانونی', amount: absVal(lines, 36) },
+      { name: 'سود انباشته', amount: absVal(lines, 38) },
+    ],
+    equity || eqFlow,
+    'سایر حقوق',
+  )
+  if (eqParts.length && eqFlow > 0) {
+    const sum = eqParts.reduce((a, p) => a + p.amount, 0) || 1
+    let alloc = 0
+    eqParts.forEach((p, idx) => {
+      const share =
+        idx === eqParts.length - 1 ? Math.max(eqFlow - alloc, 0) : Math.round((p.amount / sum) * eqFlow)
+      alloc += share
+      const i = add({ name: p.name, amount: p.amount, fill: C.profit, kind: 'profit' })
+      link(iEq, i, share, C.flowGreen)
+    })
+  }
+
+  if (!links.length) return null
+  return {
+    nodes,
+    links,
+    sales: totalAssets,
+    subtitle: 'ترکیب دارایی‌ها ← جمع دارایی‌ها ← بدهی‌ها / حقوق صاحبان سهام',
+  }
+}
+
+/**
+ * Cash-flow Sankey (conserved pool):
+ * Beginning + inflows → نقد دوره → Ending + outflows
+ * Identity: begin + op + inv + fin + fx ≈ end
+ */
+function buildCashflowSankey(company: CompanyFinancials): ChartBundle | null {
+  const lines = company.cashflowLines || []
+  if (!lines.length) return null
+
+  const op = lineVal(lines, 132)
+  const inv = lineVal(lines, 233)
+  const fin = lineVal(lines, 243)
+  const begin = absVal(lines, 154)
+  const fx = lineVal(lines, 155)
+  const end = absVal(lines, 156)
+  if (!(end > 0) && !(begin > 0)) return null
+
+  const { nodes, links, add, link } = makeBuilder()
+
+  const inflows = [
+    { name: 'نقد ابتدای دوره', value: begin, color: C.flowBlue, fill: C.product, kind: 'product' as const },
+    { name: 'جریان عملیاتی', value: op, color: C.flowGreen, fill: C.profit, kind: 'profit' as const },
+    { name: 'جریان سرمایه‌گذاری', value: inv, color: C.flowGreen, fill: '#b45309', kind: 'other' as const },
+    { name: 'جریان تأمین مالی', value: fin, color: C.flowGreen, fill: C.other, kind: 'other' as const },
+    { name: 'اثر نرخ ارز', value: fx, color: C.flowBlue, fill: C.other, kind: 'other' as const },
+  ].filter((x) => x.value > 0)
+
+  const outflows = [
+    { name: 'جریان عملیاتی (خروج)', value: op < 0 ? -op : 0, fill: C.expense },
+    { name: 'جریان سرمایه‌گذاری', value: inv < 0 ? -inv : 0, fill: C.expense },
+    { name: 'جریان تأمین مالی', value: fin < 0 ? -fin : 0, fill: C.expense },
+    { name: 'اثر نرخ ارز', value: fx < 0 ? -fx : 0, fill: C.expense },
+    { name: 'نقد پایان دوره', value: end, fill: C.profitDark },
+  ].filter((x) => x.value > 0)
+
+  const inSum = inflows.reduce((a, x) => a + x.value, 0)
+  const outSum = outflows.reduce((a, x) => a + x.value, 0)
+  const poolAmt = Math.max(inSum, outSum, 1)
+  const iPool = add({ name: 'نقد دوره', amount: poolAmt, fill: C.revenue, kind: 'revenue' })
+
+  for (const x of inflows) {
+    const i = add({ name: x.name, amount: x.value, fill: x.fill, kind: x.kind })
+    link(i, iPool, x.value, x.color)
+  }
+  for (const x of outflows) {
+    const isEnd = x.name === 'نقد پایان دوره'
+    const i = add({
+      name: x.name,
+      amount: x.value,
+      fill: x.fill,
+      kind: isEnd ? 'profit' : 'expense',
+    })
+    link(iPool, i, x.value, isEnd ? C.flowGreen : C.flowRed)
+  }
+
+  if (!links.length) return null
+  return {
+    nodes,
+    links,
+    sales: end || begin || poolAmt,
+    subtitle: 'ابتدای دوره + جریان‌ها ← نقد دوره ← پایان دوره / مصارف',
+  }
+}
+
+function buildStatementChart(
+  company: CompanyFinancials,
+  stmt: 'income' | 'balance' | 'cashflow',
+): ChartBundle | null {
+  if (stmt === 'income') {
+    const s = buildIncomeSankey(company)
+    if (!s) return null
+    return {
+      ...s,
+      subtitle: 'محصولات ← درآمد ← COGS / سود ناخالص ← هزینه عملیاتی / سود ← مالیات / سود خالص',
+    }
+  }
+  if (stmt === 'balance') return buildBalanceSankey(company)
+  return buildCashflowSankey(company)
+}
+
 function fmtAmt(n: number) {
   const abs = Math.abs(n)
   if (abs >= 1000) return `${fmtNum(n / 1000, 1)} هزار`
@@ -308,11 +611,23 @@ function CompanyChip({
   )
 }
 
+type StmtId = 'income' | 'balance' | 'cashflow'
+
+const STMT_TABS: { id: StmtId; label: string }[] = [
+  { id: 'income', label: 'سود و زیان' },
+  { id: 'balance', label: 'ترازنامه' },
+  { id: 'cashflow', label: 'جریان نقدی' },
+]
+
 export function FinancialsSection({ data }: { data: DashboardData }) {
   const companies = data.financials?.companies || []
   const [symbol, setSymbol] = useState(companies[0]?.symbol || '')
+  const [stmt, setStmt] = useState<StmtId>('income')
   const company = companies.find((c) => c.symbol === symbol) || companies[0]
-  const sankey = useMemo(() => (company ? buildIncomeSankey(company) : null), [company])
+  const sankey = useMemo(
+    () => (company ? buildStatementChart(company, stmt) : null),
+    [company, stmt],
+  )
 
   if (!companies.length) {
     return (
@@ -330,12 +645,26 @@ export function FinancialsSection({ data }: { data: DashboardData }) {
       ? (Math.abs(lineVal(company.lines, 63)) / Math.abs(lineVal(company.lines, 60))) * 100
       : null
 
+  const title =
+    stmt === 'income'
+      ? `چگونه ${company?.name} (${company?.symbol}) درآمد می‌سازد`
+      : stmt === 'balance'
+        ? `ترکیب ترازنامه ${company?.name} (${company?.symbol})`
+        : `جریان وجوه نقد ${company?.name} (${company?.symbol})`
+
+  const stmtAvailable = (id: StmtId) => {
+    if (!company) return false
+    if (id === 'income') return (company.lines || []).length > 0
+    if (id === 'balance') return (company.balanceLines || []).length > 0
+    return (company.cashflowLines || []).length > 0
+  }
+
   return (
     <section id="financials" className="scroll-mt-28 space-y-4">
       <div>
         <h2 className="section-title">صورت‌های مالی پرتفو</h2>
         <p className="section-sub">
-          محصولات ← درآمد ← COGS / سود ناخالص ← هزینه عملیاتی / سود ← مالیات / سود خالص
+          سود و زیان · ترازنامه · جریان نقدی — ویژوال سبک GuruFocus
           {data.financials?.updatedAt
             ? ` · ${new Date(data.financials.updatedAt).toLocaleString('fa-IR')}`
             : ''}
@@ -355,21 +684,40 @@ export function FinancialsSection({ data }: { data: DashboardData }) {
         ))}
       </div>
 
+      <div className="flex flex-wrap gap-1.5">
+        {STMT_TABS.map((t) => {
+          const ok = stmtAvailable(t.id)
+          return (
+            <button
+              key={t.id}
+              type="button"
+              disabled={!ok}
+              onClick={() => setStmt(t.id)}
+              className={`rounded-md border px-3 py-1.5 text-xs font-bold transition ${
+                stmt === t.id
+                  ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white'
+                  : 'border-[var(--color-line)] bg-white text-[var(--color-muted)] hover:border-[var(--color-brand)]/40'
+              } disabled:opacity-40`}
+            >
+              {t.label}
+            </button>
+          )
+        })}
+      </div>
+
       {company && sankey ? (
         <motion.div
-          key={company.symbol}
+          key={`${company.symbol}-${stmt}`}
           initial={{ opacity: 0.45 }}
           animate={{ opacity: 1 }}
           className="panel overflow-hidden p-3 sm:p-4"
         >
           <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
             <div>
-              <h3 className="text-base font-extrabold text-[var(--color-brand)]">
-                چگونه {company.name} ({company.symbol}) درآمد می‌سازد
-              </h3>
+              <h3 className="text-base font-extrabold text-[var(--color-brand)]">{title}</h3>
               <p className="text-xs text-[var(--color-muted)]">
-                تفکیک صورت سود و زیان · {company.label}
-                {taxRate != null ? ` · نرخ مالیات ${fmtNum(taxRate, 1)}٪` : ''}
+                {sankey.subtitle} · {company.label}
+                {stmt === 'income' && taxRate != null ? ` · نرخ مالیات ${fmtNum(taxRate, 1)}٪` : ''}
                 {` · ${company.scaleLabel}`}
               </p>
             </div>
@@ -434,7 +782,7 @@ export function FinancialsSection({ data }: { data: DashboardData }) {
             </ResponsiveContainer>
           </div>
 
-          {sankey.bottom?.opLoss ? (
+          {stmt === 'income' && sankey.bottom?.opLoss ? (
             <div className="mt-3 rounded-md border border-rose-200 bg-rose-50/80 px-3 py-2.5 text-xs leading-6 text-rose-900">
               <span className="font-extrabold">زیان عملیاتی {fmtAmt(sankey.bottom.opLoss)}</span>
               {company.scaleLabel ? ` ${company.scaleLabel}` : ''}
@@ -443,7 +791,8 @@ export function FinancialsSection({ data }: { data: DashboardData }) {
             </div>
           ) : null}
 
-          {sankey.bottom &&
+          {stmt === 'income' &&
+          sankey.bottom &&
           (sankey.bottom.misc ||
             sankey.bottom.finance ||
             sankey.bottom.pretax != null ||
@@ -488,7 +837,7 @@ export function FinancialsSection({ data }: { data: DashboardData }) {
             </div>
           ) : null}
 
-          {(company.segments?.length || 0) > 0 ? (
+          {stmt === 'income' && (company.segments?.length || 0) > 0 ? (
             <div className="mt-3">
               <h4 className="mb-1.5 text-xs font-bold text-[var(--color-brand)]">ترکیب فروش محصولات</h4>
               <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
@@ -521,9 +870,8 @@ export function FinancialsSection({ data }: { data: DashboardData }) {
       ) : null}
 
       <p className="text-[0.65rem] text-[var(--color-muted)]">
-        ساختار مشابه GuruFocus: محصولات وارد «فروش» می‌شوند، سپس فروش به بهای تمام‌شده (قرمز) و سود ناخالص
-        (سبز) شکسته می‌شود و جریان تا سود خالص باریک می‌گردد. ترکیب محصول از گزارش فعالیت ماهانه/سالانه
-        بورس‌ویو؛ ارقام اصلی از صورت سود و زیان.
+        ساختار مشابه GuruFocus برای سه صورت مالی. ارقام از بورس‌ویو (سالانه، سناریوی واقعی)؛ مقیاس{' '}
+        {company?.scaleLabel || 'میلیارد ریال'}.
       </p>
     </section>
   )

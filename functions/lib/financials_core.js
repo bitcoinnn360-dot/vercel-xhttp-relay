@@ -1,4 +1,4 @@
-// Shared BourseView income-statement + product sales for GuruFocus-style Sankey.
+// Shared BourseView income / balance / cash-flow for GuruFocus-style Sankey.
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -15,7 +15,7 @@ const HOLDINGS = [
   { symbol: 'بکام', name: 'شهید قندی', isin: 'IRO1KGND0001', exchange: 'IRTSENO', industry: 'cable', industryFa: 'کابل و مخابرات' },
 ]
 
-const LINE_META = {
+const INCOME_META = {
   44: { nameFa: 'فروش', kind: 'income' },
   48: { nameFa: 'بهای تمام‌شده', kind: 'expense' },
   52: { nameFa: 'سود ناخالص', kind: 'total' },
@@ -27,6 +27,59 @@ const LINE_META = {
   60: { nameFa: 'سود قبل از مالیات', kind: 'total' },
   63: { nameFa: 'مالیات', kind: 'expense' },
   66: { nameFa: 'سود خالص', kind: 'total' },
+}
+
+const BALANCE_META = {
+  1: { nameFa: 'موجودی نقد', kind: 'asset' },
+  2: { nameFa: 'سرمایه‌گذاری کوتاه‌مدت', kind: 'asset' },
+  200: { nameFa: 'دریافتنی‌ها', kind: 'asset' },
+  6: { nameFa: 'موجودی کالا', kind: 'asset' },
+  7: { nameFa: 'پیش‌پرداخت‌ها', kind: 'asset' },
+  10: { nameFa: 'جمع دارایی جاری', kind: 'total' },
+  14: { nameFa: 'دریافتنی بلندمدت', kind: 'asset' },
+  11: { nameFa: 'سرمایه‌گذاری بلندمدت', kind: 'asset' },
+  12: { nameFa: 'دارایی ثابت مشهود', kind: 'asset' },
+  13: { nameFa: 'دارایی نامشهود', kind: 'asset' },
+  16: { nameFa: 'سایر دارایی‌ها', kind: 'asset' },
+  17: { nameFa: 'جمع دارایی غیرجاری', kind: 'total' },
+  18: { nameFa: 'جمع دارایی‌ها', kind: 'total' },
+  202: { nameFa: 'پرداختنی‌ها', kind: 'liability' },
+  22: { nameFa: 'درآمد انتقالی', kind: 'liability' },
+  23: { nameFa: 'ذخیره مالیات', kind: 'liability' },
+  24: { nameFa: 'سود سهام پرداختنی', kind: 'liability' },
+  25: { nameFa: 'حصه جاری تسهیلات', kind: 'liability' },
+  3002: { nameFa: 'ذخایر', kind: 'liability' },
+  27: { nameFa: 'جمع بدهی جاری', kind: 'total' },
+  29: { nameFa: 'تسهیلات بلندمدت', kind: 'liability' },
+  30: { nameFa: 'ذخیره مزایای پایان خدمت', kind: 'liability' },
+  31: { nameFa: 'جمع بدهی غیرجاری', kind: 'total' },
+  32: { nameFa: 'جمع بدهی‌ها', kind: 'total' },
+  33: { nameFa: 'سرمایه', kind: 'equity' },
+  36: { nameFa: 'اندوخته قانونی', kind: 'equity' },
+  38: { nameFa: 'سود انباشته', kind: 'equity' },
+  42: { nameFa: 'جمع حقوق صاحبان سهام', kind: 'total' },
+  43: { nameFa: 'جمع بدهی و حقوق', kind: 'total' },
+}
+
+const CASHFLOW_META = {
+  230: { nameFa: 'دریافت‌های عملیاتی', kind: 'income' },
+  138: { nameFa: 'مالیات پرداختی', kind: 'expense' },
+  132: { nameFa: 'جریان نقد عملیاتی', kind: 'total' },
+  140: { nameFa: 'خرید دارایی ثابت', kind: 'expense' },
+  144: { nameFa: 'خرید سرمایه‌گذاری', kind: 'expense' },
+  133: { nameFa: 'سود سهام دریافتی', kind: 'income' },
+  136: { nameFa: 'سود سرمایه‌گذاری دریافتی', kind: 'income' },
+  233: { nameFa: 'جریان نقد سرمایه‌گذاری', kind: 'total' },
+  150: { nameFa: 'دریافت تسهیلات', kind: 'income' },
+  151: { nameFa: 'بازپرداخت تسهیلات', kind: 'expense' },
+  135: { nameFa: 'بهره پرداختی', kind: 'expense' },
+  134: { nameFa: 'سود سهام پرداختی', kind: 'expense' },
+  149: { nameFa: 'افزایش سرمایه', kind: 'income' },
+  243: { nameFa: 'جریان نقد تأمین مالی', kind: 'total' },
+  153: { nameFa: 'خالص تغییر نقد', kind: 'total' },
+  154: { nameFa: 'نقد ابتدای دوره', kind: 'total' },
+  155: { nameFa: 'اثر نرخ ارز', kind: 'income' },
+  156: { nameFa: 'نقد پایان دوره', kind: 'total' },
 }
 
 const PRODUCT_FA = {
@@ -141,7 +194,6 @@ function extractProductSales(stmt) {
     if (!Number.isFinite(val) || !(val > 0)) continue
     const name = row.productName || ''
     const nameFa = productNameFa(name, pk)
-    // merge duplicate display names (e.g. two pellet grades)
     const key = nameFa
     const prev = byName.get(key)
     if (prev) prev.value += val
@@ -158,84 +210,106 @@ function pickProductionStmt(items, incomeStmt) {
       (x.productionItems || []).length,
   )
   if (!actual.length) return null
-  const end = Number(incomeStmt.periodEndingDate)
-  const fy = Number(incomeStmt.fiscalYear)
-  const byEnd = actual.find((x) => Number(x.periodEndingDate) === end)
-  if (byEnd) return byEnd
-  const byFy = actual.find((x) => Number(x.fiscalYear) === fy && Number(x.fiscalMonth) === 12)
-  if (byFy) return byFy
-  // nearest prior actual year-end
-  const prior = [...actual]
-    .filter((x) => Number(x.periodEndingDate) <= end)
-    .sort((a, b) => Number(b.periodEndingDate) - Number(a.periodEndingDate))
-  return prior[0] || actual[actual.length - 1]
+  return pickClosest(actual, incomeStmt)
 }
 
-function transformStatement(h, stmt, segmentsMr) {
+function pickClosest(items, incomeStmt) {
+  const end = Number(incomeStmt.periodEndingDate)
+  const fy = Number(incomeStmt.fiscalYear)
+  const byEnd = items.find((x) => Number(x.periodEndingDate) === end)
+  if (byEnd) return byEnd
+  const byFy = items.find((x) => Number(x.fiscalYear) === fy && Number(x.fiscalMonth) === 12)
+  if (byFy) return byFy
+  const prior = [...items]
+    .filter((x) => Number(x.periodEndingDate) <= end)
+    .sort((a, b) => Number(b.periodEndingDate) - Number(a.periodEndingDate))
+  return prior[0] || items[items.length - 1]
+}
+
+function pickLatestStmt(payload) {
+  const items = (payload?.items || []).filter((x) => !x.isEmpty && (x.statementItems || []).length)
+  if (!items.length) return null
+  return items[items.length - 1]
+}
+
+function extractLines(stmt, meta, { keepZero = false } = {}) {
   const items = stmt.statementItems || []
   const byKey = new Map(items.map((it) => [Number(it.statementItemKey), it]))
   const lines = []
-  for (const key of Object.keys(LINE_META).map(Number)) {
-    const meta = LINE_META[key]
+  for (const key of Object.keys(meta).map(Number)) {
+    const m = meta[key]
     const row = byKey.get(key)
     if (!row || row.value == null) continue
     const raw = Number(row.value)
     if (!Number.isFinite(raw)) continue
-    const value = Math.abs(raw)
-    if (!(value > 0) && key !== 65) continue
-    let kind = meta.kind
+    if (!keepZero && raw === 0) continue
+    let kind = m.kind
     if (key === 55 || key === 59) kind = raw >= 0 ? 'income' : 'expense'
     lines.push({
       key,
-      name: row.statementItemName || meta.nameFa,
-      nameFa: meta.nameFa,
-      value: raw < 0 ? -value : value,
+      name: row.statementItemName || m.nameFa,
+      nameFa: m.nameFa,
+      value: raw,
       kind,
     })
   }
-  if (!lines.length) return null
+  return lines
+}
 
-  const scale = 1_000_000_000 // rial → billion rial
-  const salesLine = lines.find((l) => l.key === 44)
-  const salesBr = salesLine ? Math.round(Math.abs(salesLine.value) / scale) : 0
+function scaleLines(lines, scale) {
+  return lines.map((l) => ({ ...l, value: Math.round(l.value / scale) }))
+}
 
-  // Scale product sales (Million Rials) → billion rial, renormalize to income-statement sales
-  let segments = []
-  if (segmentsMr?.length && salesBr > 0) {
-    const rawBr = segmentsMr.map((s) => ({
-      ...s,
-      value: Math.round(s.value / 1000), // MR → BR
-    }))
-    const sum = rawBr.reduce((a, s) => a + s.value, 0)
-    if (sum > 0) {
-      segments = rawBr.map((s) => ({
-        productKey: s.productKey,
-        name: s.name,
-        nameFa: s.nameFa,
-        value: Math.round((s.value / sum) * salesBr),
-      }))
-      // fix rounding drift on largest segment
-      const drift = salesBr - segments.reduce((a, s) => a + s.value, 0)
-      if (drift !== 0 && segments.length) {
-        const top = segments.reduce((a, b) => (b.value > a.value ? b : a))
-        top.value += drift
-      }
-      segments = segments.filter((s) => s.value > 0)
-    }
+function buildSegments(segmentsMr, salesBr) {
+  if (!segmentsMr?.length || !(salesBr > 0)) return []
+  const rawBr = segmentsMr.map((s) => ({
+    ...s,
+    value: Math.round(s.value / 1000), // MR → BR
+  }))
+  const sum = rawBr.reduce((a, s) => a + s.value, 0)
+  if (!(sum > 0)) return []
+  let segments = rawBr.map((s) => ({
+    productKey: s.productKey,
+    name: s.name,
+    nameFa: s.nameFa,
+    value: Math.round((s.value / sum) * salesBr),
+  }))
+  const drift = salesBr - segments.reduce((a, s) => a + s.value, 0)
+  if (drift !== 0 && segments.length) {
+    const top = segments.reduce((a, b) => (b.value > a.value ? b : a))
+    top.value += drift
   }
+  return segments.filter((s) => s.value > 0)
+}
+
+function transformCompany(h, incomeStmt, prodStmt, balanceStmt, cashflowStmt) {
+  const scale = 1_000_000_000
+  const incomeLinesRaw = extractLines(incomeStmt, INCOME_META)
+  if (!incomeLinesRaw.length) return null
+
+  const salesLine = incomeLinesRaw.find((l) => l.key === 44)
+  const salesBr = salesLine ? Math.round(Math.abs(salesLine.value) / scale) : 0
+  const segmentsMr = prodStmt ? extractProductSales(prodStmt) : []
+
+  const balanceLines = balanceStmt ? scaleLines(extractLines(balanceStmt, BALANCE_META, { keepZero: false }), scale) : []
+  const cashflowLines = cashflowStmt
+    ? scaleLines(extractLines(cashflowStmt, CASHFLOW_META, { keepZero: true }), scale)
+    : []
 
   return {
     symbol: h.symbol,
     name: h.name,
     industry: h.industry,
     industryFa: h.industryFa,
-    fiscalYear: stmt.fiscalYear,
-    fiscalMonth: stmt.fiscalMonth,
-    periodEndingDate: stmt.periodEndingDate,
-    label: periodLabel(stmt.fiscalYear, stmt.fiscalMonth, stmt.periodEndingDate),
-    currency: stmt.currency || 'IRR',
-    lines: lines.map((l) => ({ ...l, value: Math.round(l.value / scale) })),
-    segments,
+    fiscalYear: incomeStmt.fiscalYear,
+    fiscalMonth: incomeStmt.fiscalMonth,
+    periodEndingDate: incomeStmt.periodEndingDate,
+    label: periodLabel(incomeStmt.fiscalYear, incomeStmt.fiscalMonth, incomeStmt.periodEndingDate),
+    currency: incomeStmt.currency || 'IRR',
+    lines: scaleLines(incomeLinesRaw, scale),
+    balanceLines,
+    cashflowLines,
+    segments: buildSegments(segmentsMr, salesBr),
     scale,
     scaleLabel: 'میلیارد ریال',
   }
@@ -243,19 +317,19 @@ function transformStatement(h, stmt, segmentsMr) {
 
 async function fetchCompany(cookie, h) {
   const base = `/api/v2/exchanges/${h.exchange}/stocks/${h.isin}`
-  const [income, productions] = await Promise.all([
-    bvJson(
-      cookie,
-      `${base}/incomeStatements?timeFrame=yearly&lastN=3&asReported=false&scenario=actual&view=origin`,
-    ),
+  const q = 'timeFrame=yearly&lastN=3&asReported=false&scenario=actual&view=origin'
+  const [income, productions, balance, cashflow] = await Promise.all([
+    bvJson(cookie, `${base}/incomeStatements?${q}`),
     bvJson(cookie, `${base}/productions?timeFrame=yearly&lastN=6`).catch(() => ({ items: [] })),
+    bvJson(cookie, `${base}/balanceSheets?${q}`).catch(() => ({ items: [] })),
+    bvJson(cookie, `${base}/cashFlows?${q}`).catch(() => ({ items: [] })),
   ])
-  const incomeItems = (income.items || []).filter((x) => !x.isEmpty && (x.statementItems || []).length)
-  if (!incomeItems.length) return null
-  const stmt = incomeItems[incomeItems.length - 1]
-  const prodStmt = pickProductionStmt(productions.items || [], stmt)
-  const segmentsMr = prodStmt ? extractProductSales(prodStmt) : []
-  return transformStatement(h, stmt, segmentsMr)
+  const incomeStmt = pickLatestStmt(income)
+  if (!incomeStmt) return null
+  const prodStmt = pickProductionStmt(productions.items || [], incomeStmt)
+  const balanceStmt = pickLatestStmt(balance)
+  const cashflowStmt = pickLatestStmt(cashflow)
+  return transformCompany(h, incomeStmt, prodStmt, balanceStmt, cashflowStmt)
 }
 
 export async function buildFinancialsBundle(cookie) {
@@ -275,7 +349,7 @@ export async function buildFinancialsBundle(cookie) {
     ok: companies.length > 0,
     updatedAt: new Date().toISOString(),
     source: 'bourseview',
-    note: 'محصولات ← فروش ← COGS/سود ناخالص ← هزینه عملیاتی/سود عملیاتی ← مالیات/سود خالص (سبک GuruFocus)',
+    note: 'صورت سود و زیان + ترازنامه + جریان نقدی (سبک GuruFocus)',
     companies,
     errors: errors.slice(0, 12),
   }

@@ -1,8 +1,8 @@
 {
   "ok": true,
-  "updatedAt": "2026-07-31T13:11:58.409Z",
+  "updatedAt": "2026-07-31T13:47:16.404Z",
   "source": "bourseview",
-  "note": "محصولات ← فروش ← COGS/سود ناخالص ← هزینه عملیاتی/سود عملیاتی ← مالیات/سود خالص (سبک GuruFocus)",
+  "note": "صورت سود و زیان + ترازنامه + جریان نقدی (سبک GuruFocus)",
   "companies": [
     {
       "symbol": "کگل",
@@ -90,6 +90,339 @@
           "name": "Net Income (Loss)",
           "nameFa": "سود خالص",
           "value": 189708,
+          "kind": "total"
+        }
+      ],
+      "balanceLines": [
+        {
+          "key": 1,
+          "name": "Cash",
+          "nameFa": "موجودی نقد",
+          "value": 9105,
+          "kind": "asset"
+        },
+        {
+          "key": 2,
+          "name": "Short Term Investments",
+          "nameFa": "سرمایه‌گذاری کوتاه‌مدت",
+          "value": 1,
+          "kind": "asset"
+        },
+        {
+          "key": 6,
+          "name": "Inventories",
+          "nameFa": "موجودی کالا",
+          "value": 233622,
+          "kind": "asset"
+        },
+        {
+          "key": 7,
+          "name": "Prepayments",
+          "nameFa": "پیش‌پرداخت‌ها",
+          "value": 18538,
+          "kind": "asset"
+        },
+        {
+          "key": 10,
+          "name": "Total Current Assets",
+          "nameFa": "جمع دارایی جاری",
+          "value": 648127,
+          "kind": "total"
+        },
+        {
+          "key": 11,
+          "name": "Long Term Investments",
+          "nameFa": "سرمایه‌گذاری بلندمدت",
+          "value": 493626,
+          "kind": "asset"
+        },
+        {
+          "key": 12,
+          "name": "Tangible Fixed Assets",
+          "nameFa": "دارایی ثابت مشهود",
+          "value": 272515,
+          "kind": "asset"
+        },
+        {
+          "key": 13,
+          "name": "Intangible Assets",
+          "nameFa": "دارایی نامشهود",
+          "value": 690,
+          "kind": "asset"
+        },
+        {
+          "key": 14,
+          "name": "Long Term Notes and Accounts Receivable",
+          "nameFa": "دریافتنی بلندمدت",
+          "value": 14195,
+          "kind": "asset"
+        },
+        {
+          "key": 16,
+          "name": "Other Assets",
+          "nameFa": "سایر دارایی‌ها",
+          "value": 35297,
+          "kind": "asset"
+        },
+        {
+          "key": 17,
+          "name": "Total Non-current Assets",
+          "nameFa": "جمع دارایی غیرجاری",
+          "value": 816322,
+          "kind": "total"
+        },
+        {
+          "key": 18,
+          "name": "Total Assets",
+          "nameFa": "جمع دارایی‌ها",
+          "value": 1464450,
+          "kind": "total"
+        },
+        {
+          "key": 22,
+          "name": "Deferred Revenue",
+          "nameFa": "درآمد انتقالی",
+          "value": 6238,
+          "kind": "liability"
+        },
+        {
+          "key": 23,
+          "name": "Allowance for Income Tax",
+          "nameFa": "ذخیره مالیات",
+          "value": 19347,
+          "kind": "liability"
+        },
+        {
+          "key": 24,
+          "name": "Dividends Payable",
+          "nameFa": "سود سهام پرداختنی",
+          "value": 123136,
+          "kind": "liability"
+        },
+        {
+          "key": 25,
+          "name": "Current Portion of Loan Payable",
+          "nameFa": "حصه جاری تسهیلات",
+          "value": 74291,
+          "kind": "liability"
+        },
+        {
+          "key": 27,
+          "name": "Total Current Liabilities",
+          "nameFa": "جمع بدهی جاری",
+          "value": 679483,
+          "kind": "total"
+        },
+        {
+          "key": 29,
+          "name": "Long Term Debt",
+          "nameFa": "تسهیلات بلندمدت",
+          "value": 98000,
+          "kind": "liability"
+        },
+        {
+          "key": 30,
+          "name": "Allowance for Post Retirement",
+          "nameFa": "ذخیره مزایای پایان خدمت",
+          "value": 10663,
+          "kind": "liability"
+        },
+        {
+          "key": 31,
+          "name": "Total Non-current Liabilities",
+          "nameFa": "جمع بدهی غیرجاری",
+          "value": 108663,
+          "kind": "total"
+        },
+        {
+          "key": 32,
+          "name": "Total Liabilities",
+          "nameFa": "جمع بدهی‌ها",
+          "value": 788147,
+          "kind": "total"
+        },
+        {
+          "key": 33,
+          "name": "Common Stock",
+          "nameFa": "سرمایه",
+          "value": 459000,
+          "kind": "equity"
+        },
+        {
+          "key": 36,
+          "name": "Legal Reserve",
+          "nameFa": "اندوخته قانونی",
+          "value": 36863,
+          "kind": "equity"
+        },
+        {
+          "key": 38,
+          "name": "Retained Earnings",
+          "nameFa": "سود انباشته",
+          "value": 180440,
+          "kind": "equity"
+        },
+        {
+          "key": 42,
+          "name": "Total Stockholders' Equity",
+          "nameFa": "جمع حقوق صاحبان سهام",
+          "value": 676303,
+          "kind": "total"
+        },
+        {
+          "key": 43,
+          "name": "Total Liabilities and Stockholders' Equity",
+          "nameFa": "جمع بدهی و حقوق",
+          "value": 1464450,
+          "kind": "total"
+        },
+        {
+          "key": 200,
+          "name": "Trade and Other Receivables",
+          "nameFa": "دریافتنی‌ها",
+          "value": 386862,
+          "kind": "asset"
+        },
+        {
+          "key": 202,
+          "name": "Trade and Other Payables",
+          "nameFa": "پرداختنی‌ها",
+          "value": 419663,
+          "kind": "liability"
+        },
+        {
+          "key": 3002,
+          "name": "Provisions",
+          "nameFa": "ذخایر",
+          "value": 36807,
+          "kind": "liability"
+        }
+      ],
+      "cashflowLines": [
+        {
+          "key": 132,
+          "name": "Net Cash Flow From Operating Activities",
+          "nameFa": "جریان نقد عملیاتی",
+          "value": 159822,
+          "kind": "total"
+        },
+        {
+          "key": 133,
+          "name": "Dividends Received",
+          "nameFa": "سود سهام دریافتی",
+          "value": 82,
+          "kind": "income"
+        },
+        {
+          "key": 134,
+          "name": "Dividends Paid",
+          "nameFa": "سود سهام پرداختی",
+          "value": -48392,
+          "kind": "expense"
+        },
+        {
+          "key": 135,
+          "name": "Interest Paid for Borrowing",
+          "nameFa": "بهره پرداختی",
+          "value": -24490,
+          "kind": "expense"
+        },
+        {
+          "key": 136,
+          "name": "Dividends Received from Other Investment",
+          "nameFa": "سود سرمایه‌گذاری دریافتی",
+          "value": 198,
+          "kind": "income"
+        },
+        {
+          "key": 138,
+          "name": "Income Tax Payments",
+          "nameFa": "مالیات پرداختی",
+          "value": -23603,
+          "kind": "expense"
+        },
+        {
+          "key": 140,
+          "name": "Purchase of Property",
+          "nameFa": "خرید دارایی ثابت",
+          "value": -83430,
+          "kind": "expense"
+        },
+        {
+          "key": 144,
+          "name": "Purchase of Non-current Investments",
+          "nameFa": "خرید سرمایه‌گذاری",
+          "value": -16027,
+          "kind": "expense"
+        },
+        {
+          "key": 149,
+          "name": "Proceeds from Issuing Shares",
+          "nameFa": "افزایش سرمایه",
+          "value": 441,
+          "kind": "income"
+        },
+        {
+          "key": 150,
+          "name": "Proceeds from Borrowings",
+          "nameFa": "دریافت تسهیلات",
+          "value": 72913,
+          "kind": "income"
+        },
+        {
+          "key": 151,
+          "name": "Repayments of Borrowings",
+          "nameFa": "بازپرداخت تسهیلات",
+          "value": -37855,
+          "kind": "expense"
+        },
+        {
+          "key": 153,
+          "name": "Net Increase In Cash",
+          "nameFa": "خالص تغییر نقد",
+          "value": -478,
+          "kind": "total"
+        },
+        {
+          "key": 154,
+          "name": "Cash at Beginning of Period",
+          "nameFa": "نقد ابتدای دوره",
+          "value": 8853,
+          "kind": "total"
+        },
+        {
+          "key": 155,
+          "name": "Exchange Rate Changes on Cash",
+          "nameFa": "اثر نرخ ارز",
+          "value": 729,
+          "kind": "income"
+        },
+        {
+          "key": 156,
+          "name": "Cash at End of Period",
+          "nameFa": "نقد پایان دوره",
+          "value": 9105,
+          "kind": "total"
+        },
+        {
+          "key": 230,
+          "name": "Proceeds from Operating Activities",
+          "nameFa": "دریافت‌های عملیاتی",
+          "value": 183425,
+          "kind": "income"
+        },
+        {
+          "key": 233,
+          "name": "Net Cash Flow from Investing Activities-IFRS",
+          "nameFa": "جریان نقد سرمایه‌گذاری",
+          "value": -122917,
+          "kind": "total"
+        },
+        {
+          "key": 243,
+          "name": "NetCashFlowFromFinancingActivitiesIFRS",
+          "nameFa": "جریان نقد تأمین مالی",
+          "value": -37383,
           "kind": "total"
         }
       ],
@@ -195,6 +528,325 @@
           "name": "Net Income (Loss)",
           "nameFa": "سود خالص",
           "value": 152167,
+          "kind": "total"
+        }
+      ],
+      "balanceLines": [
+        {
+          "key": 1,
+          "name": "Cash",
+          "nameFa": "موجودی نقد",
+          "value": 33006,
+          "kind": "asset"
+        },
+        {
+          "key": 2,
+          "name": "Short Term Investments",
+          "nameFa": "سرمایه‌گذاری کوتاه‌مدت",
+          "value": 3974,
+          "kind": "asset"
+        },
+        {
+          "key": 6,
+          "name": "Inventories",
+          "nameFa": "موجودی کالا",
+          "value": 159614,
+          "kind": "asset"
+        },
+        {
+          "key": 7,
+          "name": "Prepayments",
+          "nameFa": "پیش‌پرداخت‌ها",
+          "value": 39659,
+          "kind": "asset"
+        },
+        {
+          "key": 10,
+          "name": "Total Current Assets",
+          "nameFa": "جمع دارایی جاری",
+          "value": 597144,
+          "kind": "total"
+        },
+        {
+          "key": 11,
+          "name": "Long Term Investments",
+          "nameFa": "سرمایه‌گذاری بلندمدت",
+          "value": 388986,
+          "kind": "asset"
+        },
+        {
+          "key": 12,
+          "name": "Tangible Fixed Assets",
+          "nameFa": "دارایی ثابت مشهود",
+          "value": 248106,
+          "kind": "asset"
+        },
+        {
+          "key": 13,
+          "name": "Intangible Assets",
+          "nameFa": "دارایی نامشهود",
+          "value": 40,
+          "kind": "asset"
+        },
+        {
+          "key": 16,
+          "name": "Other Assets",
+          "nameFa": "سایر دارایی‌ها",
+          "value": 36580,
+          "kind": "asset"
+        },
+        {
+          "key": 17,
+          "name": "Total Non-current Assets",
+          "nameFa": "جمع دارایی غیرجاری",
+          "value": 673711,
+          "kind": "total"
+        },
+        {
+          "key": 18,
+          "name": "Total Assets",
+          "nameFa": "جمع دارایی‌ها",
+          "value": 1270855,
+          "kind": "total"
+        },
+        {
+          "key": 22,
+          "name": "Deferred Revenue",
+          "nameFa": "درآمد انتقالی",
+          "value": 19221,
+          "kind": "liability"
+        },
+        {
+          "key": 23,
+          "name": "Allowance for Income Tax",
+          "nameFa": "ذخیره مالیات",
+          "value": 38028,
+          "kind": "liability"
+        },
+        {
+          "key": 24,
+          "name": "Dividends Payable",
+          "nameFa": "سود سهام پرداختنی",
+          "value": 142443,
+          "kind": "liability"
+        },
+        {
+          "key": 25,
+          "name": "Current Portion of Loan Payable",
+          "nameFa": "حصه جاری تسهیلات",
+          "value": 64535,
+          "kind": "liability"
+        },
+        {
+          "key": 27,
+          "name": "Total Current Liabilities",
+          "nameFa": "جمع بدهی جاری",
+          "value": 570055,
+          "kind": "total"
+        },
+        {
+          "key": 30,
+          "name": "Allowance for Post Retirement",
+          "nameFa": "ذخیره مزایای پایان خدمت",
+          "value": 891,
+          "kind": "liability"
+        },
+        {
+          "key": 31,
+          "name": "Total Non-current Liabilities",
+          "nameFa": "جمع بدهی غیرجاری",
+          "value": 891,
+          "kind": "total"
+        },
+        {
+          "key": 32,
+          "name": "Total Liabilities",
+          "nameFa": "جمع بدهی‌ها",
+          "value": 570946,
+          "kind": "total"
+        },
+        {
+          "key": 33,
+          "name": "Common Stock",
+          "nameFa": "سرمایه",
+          "value": 515000,
+          "kind": "equity"
+        },
+        {
+          "key": 36,
+          "name": "Legal Reserve",
+          "nameFa": "اندوخته قانونی",
+          "value": 44758,
+          "kind": "equity"
+        },
+        {
+          "key": 38,
+          "name": "Retained Earnings",
+          "nameFa": "سود انباشته",
+          "value": 144781,
+          "kind": "equity"
+        },
+        {
+          "key": 42,
+          "name": "Total Stockholders' Equity",
+          "nameFa": "جمع حقوق صاحبان سهام",
+          "value": 699909,
+          "kind": "total"
+        },
+        {
+          "key": 43,
+          "name": "Total Liabilities and Stockholders' Equity",
+          "nameFa": "جمع بدهی و حقوق",
+          "value": 1270855,
+          "kind": "total"
+        },
+        {
+          "key": 200,
+          "name": "Trade and Other Receivables",
+          "nameFa": "دریافتنی‌ها",
+          "value": 360892,
+          "kind": "asset"
+        },
+        {
+          "key": 202,
+          "name": "Trade and Other Payables",
+          "nameFa": "پرداختنی‌ها",
+          "value": 290633,
+          "kind": "liability"
+        },
+        {
+          "key": 3002,
+          "name": "Provisions",
+          "nameFa": "ذخایر",
+          "value": 15194,
+          "kind": "liability"
+        }
+      ],
+      "cashflowLines": [
+        {
+          "key": 132,
+          "name": "Net Cash Flow From Operating Activities",
+          "nameFa": "جریان نقد عملیاتی",
+          "value": 38273,
+          "kind": "total"
+        },
+        {
+          "key": 133,
+          "name": "Dividends Received",
+          "nameFa": "سود سهام دریافتی",
+          "value": 12012,
+          "kind": "income"
+        },
+        {
+          "key": 134,
+          "name": "Dividends Paid",
+          "nameFa": "سود سهام پرداختی",
+          "value": -57115,
+          "kind": "expense"
+        },
+        {
+          "key": 135,
+          "name": "Interest Paid for Borrowing",
+          "nameFa": "بهره پرداختی",
+          "value": -6126,
+          "kind": "expense"
+        },
+        {
+          "key": 136,
+          "name": "Dividends Received from Other Investment",
+          "nameFa": "سود سرمایه‌گذاری دریافتی",
+          "value": 27178,
+          "kind": "income"
+        },
+        {
+          "key": 138,
+          "name": "Income Tax Payments",
+          "nameFa": "مالیات پرداختی",
+          "value": -11378,
+          "kind": "expense"
+        },
+        {
+          "key": 140,
+          "name": "Purchase of Property",
+          "nameFa": "خرید دارایی ثابت",
+          "value": -35585,
+          "kind": "expense"
+        },
+        {
+          "key": 144,
+          "name": "Purchase of Non-current Investments",
+          "nameFa": "خرید سرمایه‌گذاری",
+          "value": -11903,
+          "kind": "expense"
+        },
+        {
+          "key": 149,
+          "name": "Proceeds from Issuing Shares",
+          "nameFa": "افزایش سرمایه",
+          "value": 4010,
+          "kind": "income"
+        },
+        {
+          "key": 150,
+          "name": "Proceeds from Borrowings",
+          "nameFa": "دریافت تسهیلات",
+          "value": 68000,
+          "kind": "income"
+        },
+        {
+          "key": 151,
+          "name": "Repayments of Borrowings",
+          "nameFa": "بازپرداخت تسهیلات",
+          "value": -53000,
+          "kind": "expense"
+        },
+        {
+          "key": 153,
+          "name": "Net Increase In Cash",
+          "nameFa": "خالص تغییر نقد",
+          "value": -14273,
+          "kind": "total"
+        },
+        {
+          "key": 154,
+          "name": "Cash at Beginning of Period",
+          "nameFa": "نقد ابتدای دوره",
+          "value": 41361,
+          "kind": "total"
+        },
+        {
+          "key": 155,
+          "name": "Exchange Rate Changes on Cash",
+          "nameFa": "اثر نرخ ارز",
+          "value": 5918,
+          "kind": "income"
+        },
+        {
+          "key": 156,
+          "name": "Cash at End of Period",
+          "nameFa": "نقد پایان دوره",
+          "value": 33006,
+          "kind": "total"
+        },
+        {
+          "key": 230,
+          "name": "Proceeds from Operating Activities",
+          "nameFa": "دریافت‌های عملیاتی",
+          "value": 49651,
+          "kind": "income"
+        },
+        {
+          "key": 233,
+          "name": "Net Cash Flow from Investing Activities-IFRS",
+          "nameFa": "جریان نقد سرمایه‌گذاری",
+          "value": -8297,
+          "kind": "total"
+        },
+        {
+          "key": 243,
+          "name": "NetCashFlowFromFinancingActivitiesIFRS",
+          "nameFa": "جریان نقد تأمین مالی",
+          "value": -44249,
           "kind": "total"
         }
       ],
@@ -337,6 +989,339 @@
           "name": "Net Income (Loss)",
           "nameFa": "سود خالص",
           "value": 160387,
+          "kind": "total"
+        }
+      ],
+      "balanceLines": [
+        {
+          "key": 1,
+          "name": "Cash",
+          "nameFa": "موجودی نقد",
+          "value": 26135,
+          "kind": "asset"
+        },
+        {
+          "key": 2,
+          "name": "Short Term Investments",
+          "nameFa": "سرمایه‌گذاری کوتاه‌مدت",
+          "value": 8775,
+          "kind": "asset"
+        },
+        {
+          "key": 6,
+          "name": "Inventories",
+          "nameFa": "موجودی کالا",
+          "value": 113722,
+          "kind": "asset"
+        },
+        {
+          "key": 7,
+          "name": "Prepayments",
+          "nameFa": "پیش‌پرداخت‌ها",
+          "value": 25624,
+          "kind": "asset"
+        },
+        {
+          "key": 10,
+          "name": "Total Current Assets",
+          "nameFa": "جمع دارایی جاری",
+          "value": 456740,
+          "kind": "total"
+        },
+        {
+          "key": 11,
+          "name": "Long Term Investments",
+          "nameFa": "سرمایه‌گذاری بلندمدت",
+          "value": 179516,
+          "kind": "asset"
+        },
+        {
+          "key": 12,
+          "name": "Tangible Fixed Assets",
+          "nameFa": "دارایی ثابت مشهود",
+          "value": 427518,
+          "kind": "asset"
+        },
+        {
+          "key": 13,
+          "name": "Intangible Assets",
+          "nameFa": "دارایی نامشهود",
+          "value": 1740,
+          "kind": "asset"
+        },
+        {
+          "key": 14,
+          "name": "Long Term Notes and Accounts Receivable",
+          "nameFa": "دریافتنی بلندمدت",
+          "value": 5770,
+          "kind": "asset"
+        },
+        {
+          "key": 16,
+          "name": "Other Assets",
+          "nameFa": "سایر دارایی‌ها",
+          "value": 16678,
+          "kind": "asset"
+        },
+        {
+          "key": 17,
+          "name": "Total Non-current Assets",
+          "nameFa": "جمع دارایی غیرجاری",
+          "value": 631222,
+          "kind": "total"
+        },
+        {
+          "key": 18,
+          "name": "Total Assets",
+          "nameFa": "جمع دارایی‌ها",
+          "value": 1087962,
+          "kind": "total"
+        },
+        {
+          "key": 22,
+          "name": "Deferred Revenue",
+          "nameFa": "درآمد انتقالی",
+          "value": 6682,
+          "kind": "liability"
+        },
+        {
+          "key": 23,
+          "name": "Allowance for Income Tax",
+          "nameFa": "ذخیره مالیات",
+          "value": 32382,
+          "kind": "liability"
+        },
+        {
+          "key": 24,
+          "name": "Dividends Payable",
+          "nameFa": "سود سهام پرداختنی",
+          "value": 24357,
+          "kind": "liability"
+        },
+        {
+          "key": 25,
+          "name": "Current Portion of Loan Payable",
+          "nameFa": "حصه جاری تسهیلات",
+          "value": 133010,
+          "kind": "liability"
+        },
+        {
+          "key": 27,
+          "name": "Total Current Liabilities",
+          "nameFa": "جمع بدهی جاری",
+          "value": 672038,
+          "kind": "total"
+        },
+        {
+          "key": 29,
+          "name": "Long Term Debt",
+          "nameFa": "تسهیلات بلندمدت",
+          "value": 14583,
+          "kind": "liability"
+        },
+        {
+          "key": 30,
+          "name": "Allowance for Post Retirement",
+          "nameFa": "ذخیره مزایای پایان خدمت",
+          "value": 2440,
+          "kind": "liability"
+        },
+        {
+          "key": 31,
+          "name": "Total Non-current Liabilities",
+          "nameFa": "جمع بدهی غیرجاری",
+          "value": 17023,
+          "kind": "total"
+        },
+        {
+          "key": 32,
+          "name": "Total Liabilities",
+          "nameFa": "جمع بدهی‌ها",
+          "value": 689061,
+          "kind": "total"
+        },
+        {
+          "key": 33,
+          "name": "Common Stock",
+          "nameFa": "سرمایه",
+          "value": 150000,
+          "kind": "equity"
+        },
+        {
+          "key": 36,
+          "name": "Legal Reserve",
+          "nameFa": "اندوخته قانونی",
+          "value": 15000,
+          "kind": "equity"
+        },
+        {
+          "key": 38,
+          "name": "Retained Earnings",
+          "nameFa": "سود انباشته",
+          "value": 177601,
+          "kind": "equity"
+        },
+        {
+          "key": 42,
+          "name": "Total Stockholders' Equity",
+          "nameFa": "جمع حقوق صاحبان سهام",
+          "value": 398901,
+          "kind": "total"
+        },
+        {
+          "key": 43,
+          "name": "Total Liabilities and Stockholders' Equity",
+          "nameFa": "جمع بدهی و حقوق",
+          "value": 1087962,
+          "kind": "total"
+        },
+        {
+          "key": 200,
+          "name": "Trade and Other Receivables",
+          "nameFa": "دریافتنی‌ها",
+          "value": 282484,
+          "kind": "asset"
+        },
+        {
+          "key": 202,
+          "name": "Trade and Other Payables",
+          "nameFa": "پرداختنی‌ها",
+          "value": 329294,
+          "kind": "liability"
+        },
+        {
+          "key": 3002,
+          "name": "Provisions",
+          "nameFa": "ذخایر",
+          "value": 146312,
+          "kind": "liability"
+        }
+      ],
+      "cashflowLines": [
+        {
+          "key": 132,
+          "name": "Net Cash Flow From Operating Activities",
+          "nameFa": "جریان نقد عملیاتی",
+          "value": 138848,
+          "kind": "total"
+        },
+        {
+          "key": 133,
+          "name": "Dividends Received",
+          "nameFa": "سود سهام دریافتی",
+          "value": 0,
+          "kind": "income"
+        },
+        {
+          "key": 134,
+          "name": "Dividends Paid",
+          "nameFa": "سود سهام پرداختی",
+          "value": -48509,
+          "kind": "expense"
+        },
+        {
+          "key": 135,
+          "name": "Interest Paid for Borrowing",
+          "nameFa": "بهره پرداختی",
+          "value": -5070,
+          "kind": "expense"
+        },
+        {
+          "key": 136,
+          "name": "Dividends Received from Other Investment",
+          "nameFa": "سود سرمایه‌گذاری دریافتی",
+          "value": 1507,
+          "kind": "income"
+        },
+        {
+          "key": 138,
+          "name": "Income Tax Payments",
+          "nameFa": "مالیات پرداختی",
+          "value": -15840,
+          "kind": "expense"
+        },
+        {
+          "key": 140,
+          "name": "Purchase of Property",
+          "nameFa": "خرید دارایی ثابت",
+          "value": -179922,
+          "kind": "expense"
+        },
+        {
+          "key": 144,
+          "name": "Purchase of Non-current Investments",
+          "nameFa": "خرید سرمایه‌گذاری",
+          "value": -12787,
+          "kind": "expense"
+        },
+        {
+          "key": 149,
+          "name": "Proceeds from Issuing Shares",
+          "nameFa": "افزایش سرمایه",
+          "value": 75000,
+          "kind": "income"
+        },
+        {
+          "key": 150,
+          "name": "Proceeds from Borrowings",
+          "nameFa": "دریافت تسهیلات",
+          "value": 131200,
+          "kind": "income"
+        },
+        {
+          "key": 151,
+          "name": "Repayments of Borrowings",
+          "nameFa": "بازپرداخت تسهیلات",
+          "value": -88992,
+          "kind": "expense"
+        },
+        {
+          "key": 153,
+          "name": "Net Increase In Cash",
+          "nameFa": "خالص تغییر نقد",
+          "value": 10893,
+          "kind": "total"
+        },
+        {
+          "key": 154,
+          "name": "Cash at Beginning of Period",
+          "nameFa": "نقد ابتدای دوره",
+          "value": 15858,
+          "kind": "total"
+        },
+        {
+          "key": 155,
+          "name": "Exchange Rate Changes on Cash",
+          "nameFa": "اثر نرخ ارز",
+          "value": -616,
+          "kind": "income"
+        },
+        {
+          "key": 156,
+          "name": "Cash at End of Period",
+          "nameFa": "نقد پایان دوره",
+          "value": 26135,
+          "kind": "total"
+        },
+        {
+          "key": 230,
+          "name": "Proceeds from Operating Activities",
+          "nameFa": "دریافت‌های عملیاتی",
+          "value": 154688,
+          "kind": "income"
+        },
+        {
+          "key": 233,
+          "name": "Net Cash Flow from Investing Activities-IFRS",
+          "nameFa": "جریان نقد سرمایه‌گذاری",
+          "value": -191241,
+          "kind": "total"
+        },
+        {
+          "key": 243,
+          "name": "NetCashFlowFromFinancingActivitiesIFRS",
+          "nameFa": "جریان نقد تأمین مالی",
+          "value": 63286,
           "kind": "total"
         }
       ],
@@ -506,6 +1491,339 @@
           "kind": "total"
         }
       ],
+      "balanceLines": [
+        {
+          "key": 1,
+          "name": "Cash",
+          "nameFa": "موجودی نقد",
+          "value": 43237,
+          "kind": "asset"
+        },
+        {
+          "key": 2,
+          "name": "Short Term Investments",
+          "nameFa": "سرمایه‌گذاری کوتاه‌مدت",
+          "value": 42,
+          "kind": "asset"
+        },
+        {
+          "key": 6,
+          "name": "Inventories",
+          "nameFa": "موجودی کالا",
+          "value": 49015,
+          "kind": "asset"
+        },
+        {
+          "key": 7,
+          "name": "Prepayments",
+          "nameFa": "پیش‌پرداخت‌ها",
+          "value": 2867,
+          "kind": "asset"
+        },
+        {
+          "key": 10,
+          "name": "Total Current Assets",
+          "nameFa": "جمع دارایی جاری",
+          "value": 118268,
+          "kind": "total"
+        },
+        {
+          "key": 11,
+          "name": "Long Term Investments",
+          "nameFa": "سرمایه‌گذاری بلندمدت",
+          "value": 63990,
+          "kind": "asset"
+        },
+        {
+          "key": 12,
+          "name": "Tangible Fixed Assets",
+          "nameFa": "دارایی ثابت مشهود",
+          "value": 54286,
+          "kind": "asset"
+        },
+        {
+          "key": 13,
+          "name": "Intangible Assets",
+          "nameFa": "دارایی نامشهود",
+          "value": 112,
+          "kind": "asset"
+        },
+        {
+          "key": 14,
+          "name": "Long Term Notes and Accounts Receivable",
+          "nameFa": "دریافتنی بلندمدت",
+          "value": 219,
+          "kind": "asset"
+        },
+        {
+          "key": 16,
+          "name": "Other Assets",
+          "nameFa": "سایر دارایی‌ها",
+          "value": 17338,
+          "kind": "asset"
+        },
+        {
+          "key": 17,
+          "name": "Total Non-current Assets",
+          "nameFa": "جمع دارایی غیرجاری",
+          "value": 135945,
+          "kind": "total"
+        },
+        {
+          "key": 18,
+          "name": "Total Assets",
+          "nameFa": "جمع دارایی‌ها",
+          "value": 254213,
+          "kind": "total"
+        },
+        {
+          "key": 22,
+          "name": "Deferred Revenue",
+          "nameFa": "درآمد انتقالی",
+          "value": 2388,
+          "kind": "liability"
+        },
+        {
+          "key": 23,
+          "name": "Allowance for Income Tax",
+          "nameFa": "ذخیره مالیات",
+          "value": 2797,
+          "kind": "liability"
+        },
+        {
+          "key": 24,
+          "name": "Dividends Payable",
+          "nameFa": "سود سهام پرداختنی",
+          "value": 21792,
+          "kind": "liability"
+        },
+        {
+          "key": 25,
+          "name": "Current Portion of Loan Payable",
+          "nameFa": "حصه جاری تسهیلات",
+          "value": 31838,
+          "kind": "liability"
+        },
+        {
+          "key": 27,
+          "name": "Total Current Liabilities",
+          "nameFa": "جمع بدهی جاری",
+          "value": 102964,
+          "kind": "total"
+        },
+        {
+          "key": 29,
+          "name": "Long Term Debt",
+          "nameFa": "تسهیلات بلندمدت",
+          "value": 25059,
+          "kind": "liability"
+        },
+        {
+          "key": 30,
+          "name": "Allowance for Post Retirement",
+          "nameFa": "ذخیره مزایای پایان خدمت",
+          "value": 1366,
+          "kind": "liability"
+        },
+        {
+          "key": 31,
+          "name": "Total Non-current Liabilities",
+          "nameFa": "جمع بدهی غیرجاری",
+          "value": 26425,
+          "kind": "total"
+        },
+        {
+          "key": 32,
+          "name": "Total Liabilities",
+          "nameFa": "جمع بدهی‌ها",
+          "value": 129389,
+          "kind": "total"
+        },
+        {
+          "key": 33,
+          "name": "Common Stock",
+          "nameFa": "سرمایه",
+          "value": 69300,
+          "kind": "equity"
+        },
+        {
+          "key": 36,
+          "name": "Legal Reserve",
+          "nameFa": "اندوخته قانونی",
+          "value": 5202,
+          "kind": "equity"
+        },
+        {
+          "key": 38,
+          "name": "Retained Earnings",
+          "nameFa": "سود انباشته",
+          "value": 51142,
+          "kind": "equity"
+        },
+        {
+          "key": 42,
+          "name": "Total Stockholders' Equity",
+          "nameFa": "جمع حقوق صاحبان سهام",
+          "value": 124824,
+          "kind": "total"
+        },
+        {
+          "key": 43,
+          "name": "Total Liabilities and Stockholders' Equity",
+          "nameFa": "جمع بدهی و حقوق",
+          "value": 254213,
+          "kind": "total"
+        },
+        {
+          "key": 200,
+          "name": "Trade and Other Receivables",
+          "nameFa": "دریافتنی‌ها",
+          "value": 23106,
+          "kind": "asset"
+        },
+        {
+          "key": 202,
+          "name": "Trade and Other Payables",
+          "nameFa": "پرداختنی‌ها",
+          "value": 29048,
+          "kind": "liability"
+        },
+        {
+          "key": 3002,
+          "name": "Provisions",
+          "nameFa": "ذخایر",
+          "value": 15101,
+          "kind": "liability"
+        }
+      ],
+      "cashflowLines": [
+        {
+          "key": 132,
+          "name": "Net Cash Flow From Operating Activities",
+          "nameFa": "جریان نقد عملیاتی",
+          "value": 41058,
+          "kind": "total"
+        },
+        {
+          "key": 133,
+          "name": "Dividends Received",
+          "nameFa": "سود سهام دریافتی",
+          "value": 0,
+          "kind": "income"
+        },
+        {
+          "key": 134,
+          "name": "Dividends Paid",
+          "nameFa": "سود سهام پرداختی",
+          "value": -3859,
+          "kind": "expense"
+        },
+        {
+          "key": 135,
+          "name": "Interest Paid for Borrowing",
+          "nameFa": "بهره پرداختی",
+          "value": -2178,
+          "kind": "expense"
+        },
+        {
+          "key": 136,
+          "name": "Dividends Received from Other Investment",
+          "nameFa": "سود سرمایه‌گذاری دریافتی",
+          "value": 692,
+          "kind": "income"
+        },
+        {
+          "key": 138,
+          "name": "Income Tax Payments",
+          "nameFa": "مالیات پرداختی",
+          "value": -718,
+          "kind": "expense"
+        },
+        {
+          "key": 140,
+          "name": "Purchase of Property",
+          "nameFa": "خرید دارایی ثابت",
+          "value": -22714,
+          "kind": "expense"
+        },
+        {
+          "key": 144,
+          "name": "Purchase of Non-current Investments",
+          "nameFa": "خرید سرمایه‌گذاری",
+          "value": -17446,
+          "kind": "expense"
+        },
+        {
+          "key": 149,
+          "name": "Proceeds from Issuing Shares",
+          "nameFa": "افزایش سرمایه",
+          "value": 3626,
+          "kind": "income"
+        },
+        {
+          "key": 150,
+          "name": "Proceeds from Borrowings",
+          "nameFa": "دریافت تسهیلات",
+          "value": 62331,
+          "kind": "income"
+        },
+        {
+          "key": 151,
+          "name": "Repayments of Borrowings",
+          "nameFa": "بازپرداخت تسهیلات",
+          "value": -21499,
+          "kind": "expense"
+        },
+        {
+          "key": 153,
+          "name": "Net Increase In Cash",
+          "nameFa": "خالص تغییر نقد",
+          "value": 39667,
+          "kind": "total"
+        },
+        {
+          "key": 154,
+          "name": "Cash at Beginning of Period",
+          "nameFa": "نقد ابتدای دوره",
+          "value": 3515,
+          "kind": "total"
+        },
+        {
+          "key": 155,
+          "name": "Exchange Rate Changes on Cash",
+          "nameFa": "اثر نرخ ارز",
+          "value": 55,
+          "kind": "income"
+        },
+        {
+          "key": 156,
+          "name": "Cash at End of Period",
+          "nameFa": "نقد پایان دوره",
+          "value": 43237,
+          "kind": "total"
+        },
+        {
+          "key": 230,
+          "name": "Proceeds from Operating Activities",
+          "nameFa": "دریافت‌های عملیاتی",
+          "value": 41776,
+          "kind": "income"
+        },
+        {
+          "key": 233,
+          "name": "Net Cash Flow from Investing Activities-IFRS",
+          "nameFa": "جریان نقد سرمایه‌گذاری",
+          "value": -39532,
+          "kind": "total"
+        },
+        {
+          "key": 243,
+          "name": "NetCashFlowFromFinancingActivitiesIFRS",
+          "nameFa": "جریان نقد تأمین مالی",
+          "value": 38140,
+          "kind": "total"
+        }
+      ],
       "segments": [
         {
           "productKey": 131,
@@ -627,6 +1945,332 @@
           "name": "Net Income (Loss)",
           "nameFa": "سود خالص",
           "value": 1506012,
+          "kind": "total"
+        }
+      ],
+      "balanceLines": [
+        {
+          "key": 1,
+          "name": "Cash",
+          "nameFa": "موجودی نقد",
+          "value": 119979,
+          "kind": "asset"
+        },
+        {
+          "key": 2,
+          "name": "Short Term Investments",
+          "nameFa": "سرمایه‌گذاری کوتاه‌مدت",
+          "value": 26901,
+          "kind": "asset"
+        },
+        {
+          "key": 6,
+          "name": "Inventories",
+          "nameFa": "موجودی کالا",
+          "value": 685660,
+          "kind": "asset"
+        },
+        {
+          "key": 7,
+          "name": "Prepayments",
+          "nameFa": "پیش‌پرداخت‌ها",
+          "value": 217881,
+          "kind": "asset"
+        },
+        {
+          "key": 10,
+          "name": "Total Current Assets",
+          "nameFa": "جمع دارایی جاری",
+          "value": 2094140,
+          "kind": "total"
+        },
+        {
+          "key": 11,
+          "name": "Long Term Investments",
+          "nameFa": "سرمایه‌گذاری بلندمدت",
+          "value": 389715,
+          "kind": "asset"
+        },
+        {
+          "key": 12,
+          "name": "Tangible Fixed Assets",
+          "nameFa": "دارایی ثابت مشهود",
+          "value": 2345371,
+          "kind": "asset"
+        },
+        {
+          "key": 13,
+          "name": "Intangible Assets",
+          "nameFa": "دارایی نامشهود",
+          "value": 1688,
+          "kind": "asset"
+        },
+        {
+          "key": 14,
+          "name": "Long Term Notes and Accounts Receivable",
+          "nameFa": "دریافتنی بلندمدت",
+          "value": 73938,
+          "kind": "asset"
+        },
+        {
+          "key": 16,
+          "name": "Other Assets",
+          "nameFa": "سایر دارایی‌ها",
+          "value": 69859,
+          "kind": "asset"
+        },
+        {
+          "key": 17,
+          "name": "Total Non-current Assets",
+          "nameFa": "جمع دارایی غیرجاری",
+          "value": 2880570,
+          "kind": "total"
+        },
+        {
+          "key": 18,
+          "name": "Total Assets",
+          "nameFa": "جمع دارایی‌ها",
+          "value": 4974710,
+          "kind": "total"
+        },
+        {
+          "key": 22,
+          "name": "Deferred Revenue",
+          "nameFa": "درآمد انتقالی",
+          "value": 16604,
+          "kind": "liability"
+        },
+        {
+          "key": 23,
+          "name": "Allowance for Income Tax",
+          "nameFa": "ذخیره مالیات",
+          "value": 288839,
+          "kind": "liability"
+        },
+        {
+          "key": 24,
+          "name": "Dividends Payable",
+          "nameFa": "سود سهام پرداختنی",
+          "value": 31179,
+          "kind": "liability"
+        },
+        {
+          "key": 25,
+          "name": "Current Portion of Loan Payable",
+          "nameFa": "حصه جاری تسهیلات",
+          "value": 51994,
+          "kind": "liability"
+        },
+        {
+          "key": 27,
+          "name": "Total Current Liabilities",
+          "nameFa": "جمع بدهی جاری",
+          "value": 1841048,
+          "kind": "total"
+        },
+        {
+          "key": 30,
+          "name": "Allowance for Post Retirement",
+          "nameFa": "ذخیره مزایای پایان خدمت",
+          "value": 43466,
+          "kind": "liability"
+        },
+        {
+          "key": 31,
+          "name": "Total Non-current Liabilities",
+          "nameFa": "جمع بدهی غیرجاری",
+          "value": 64046,
+          "kind": "total"
+        },
+        {
+          "key": 32,
+          "name": "Total Liabilities",
+          "nameFa": "جمع بدهی‌ها",
+          "value": 1905094,
+          "kind": "total"
+        },
+        {
+          "key": 33,
+          "name": "Common Stock",
+          "nameFa": "سرمایه",
+          "value": 1050000,
+          "kind": "equity"
+        },
+        {
+          "key": 36,
+          "name": "Legal Reserve",
+          "nameFa": "اندوخته قانونی",
+          "value": 105000,
+          "kind": "equity"
+        },
+        {
+          "key": 38,
+          "name": "Retained Earnings",
+          "nameFa": "سود انباشته",
+          "value": 1911981,
+          "kind": "equity"
+        },
+        {
+          "key": 42,
+          "name": "Total Stockholders' Equity",
+          "nameFa": "جمع حقوق صاحبان سهام",
+          "value": 3069617,
+          "kind": "total"
+        },
+        {
+          "key": 43,
+          "name": "Total Liabilities and Stockholders' Equity",
+          "nameFa": "جمع بدهی و حقوق",
+          "value": 4974710,
+          "kind": "total"
+        },
+        {
+          "key": 200,
+          "name": "Trade and Other Receivables",
+          "nameFa": "دریافتنی‌ها",
+          "value": 1043718,
+          "kind": "asset"
+        },
+        {
+          "key": 202,
+          "name": "Trade and Other Payables",
+          "nameFa": "پرداختنی‌ها",
+          "value": 1184919,
+          "kind": "liability"
+        },
+        {
+          "key": 3002,
+          "name": "Provisions",
+          "nameFa": "ذخایر",
+          "value": 267512,
+          "kind": "liability"
+        }
+      ],
+      "cashflowLines": [
+        {
+          "key": 132,
+          "name": "Net Cash Flow From Operating Activities",
+          "nameFa": "جریان نقد عملیاتی",
+          "value": 1620265,
+          "kind": "total"
+        },
+        {
+          "key": 133,
+          "name": "Dividends Received",
+          "nameFa": "سود سهام دریافتی",
+          "value": 0,
+          "kind": "income"
+        },
+        {
+          "key": 134,
+          "name": "Dividends Paid",
+          "nameFa": "سود سهام پرداختی",
+          "value": -360862,
+          "kind": "expense"
+        },
+        {
+          "key": 135,
+          "name": "Interest Paid for Borrowing",
+          "nameFa": "بهره پرداختی",
+          "value": -12814,
+          "kind": "expense"
+        },
+        {
+          "key": 136,
+          "name": "Dividends Received from Other Investment",
+          "nameFa": "سود سرمایه‌گذاری دریافتی",
+          "value": 5529,
+          "kind": "income"
+        },
+        {
+          "key": 138,
+          "name": "Income Tax Payments",
+          "nameFa": "مالیات پرداختی",
+          "value": -118246,
+          "kind": "expense"
+        },
+        {
+          "key": 140,
+          "name": "Purchase of Property",
+          "nameFa": "خرید دارایی ثابت",
+          "value": -1094440,
+          "kind": "expense"
+        },
+        {
+          "key": 144,
+          "name": "Purchase of Non-current Investments",
+          "nameFa": "خرید سرمایه‌گذاری",
+          "value": -35556,
+          "kind": "expense"
+        },
+        {
+          "key": 149,
+          "name": "Proceeds from Issuing Shares",
+          "nameFa": "افزایش سرمایه",
+          "value": 0,
+          "kind": "income"
+        },
+        {
+          "key": 150,
+          "name": "Proceeds from Borrowings",
+          "nameFa": "دریافت تسهیلات",
+          "value": 190457,
+          "kind": "income"
+        },
+        {
+          "key": 151,
+          "name": "Repayments of Borrowings",
+          "nameFa": "بازپرداخت تسهیلات",
+          "value": -196124,
+          "kind": "expense"
+        },
+        {
+          "key": 153,
+          "name": "Net Increase In Cash",
+          "nameFa": "خالص تغییر نقد",
+          "value": 60940,
+          "kind": "total"
+        },
+        {
+          "key": 154,
+          "name": "Cash at Beginning of Period",
+          "nameFa": "نقد ابتدای دوره",
+          "value": 58840,
+          "kind": "total"
+        },
+        {
+          "key": 155,
+          "name": "Exchange Rate Changes on Cash",
+          "nameFa": "اثر نرخ ارز",
+          "value": 199,
+          "kind": "income"
+        },
+        {
+          "key": 156,
+          "name": "Cash at End of Period",
+          "nameFa": "نقد پایان دوره",
+          "value": 119979,
+          "kind": "total"
+        },
+        {
+          "key": 230,
+          "name": "Proceeds from Operating Activities",
+          "nameFa": "دریافت‌های عملیاتی",
+          "value": 1738512,
+          "kind": "income"
+        },
+        {
+          "key": 233,
+          "name": "Net Cash Flow from Investing Activities-IFRS",
+          "nameFa": "جریان نقد سرمایه‌گذاری",
+          "value": -1179982,
+          "kind": "total"
+        },
+        {
+          "key": 243,
+          "name": "NetCashFlowFromFinancingActivitiesIFRS",
+          "nameFa": "جریان نقد تأمین مالی",
+          "value": -379343,
           "kind": "total"
         }
       ],
@@ -778,6 +2422,311 @@
           "kind": "total"
         }
       ],
+      "balanceLines": [
+        {
+          "key": 1,
+          "name": "Cash",
+          "nameFa": "موجودی نقد",
+          "value": 9060,
+          "kind": "asset"
+        },
+        {
+          "key": 2,
+          "name": "Short Term Investments",
+          "nameFa": "سرمایه‌گذاری کوتاه‌مدت",
+          "value": 200,
+          "kind": "asset"
+        },
+        {
+          "key": 6,
+          "name": "Inventories",
+          "nameFa": "موجودی کالا",
+          "value": 63856,
+          "kind": "asset"
+        },
+        {
+          "key": 7,
+          "name": "Prepayments",
+          "nameFa": "پیش‌پرداخت‌ها",
+          "value": 17430,
+          "kind": "asset"
+        },
+        {
+          "key": 10,
+          "name": "Total Current Assets",
+          "nameFa": "جمع دارایی جاری",
+          "value": 146554,
+          "kind": "total"
+        },
+        {
+          "key": 11,
+          "name": "Long Term Investments",
+          "nameFa": "سرمایه‌گذاری بلندمدت",
+          "value": 7377,
+          "kind": "asset"
+        },
+        {
+          "key": 12,
+          "name": "Tangible Fixed Assets",
+          "nameFa": "دارایی ثابت مشهود",
+          "value": 78342,
+          "kind": "asset"
+        },
+        {
+          "key": 13,
+          "name": "Intangible Assets",
+          "nameFa": "دارایی نامشهود",
+          "value": 1985,
+          "kind": "asset"
+        },
+        {
+          "key": 17,
+          "name": "Total Non-current Assets",
+          "nameFa": "جمع دارایی غیرجاری",
+          "value": 87704,
+          "kind": "total"
+        },
+        {
+          "key": 18,
+          "name": "Total Assets",
+          "nameFa": "جمع دارایی‌ها",
+          "value": 234258,
+          "kind": "total"
+        },
+        {
+          "key": 22,
+          "name": "Deferred Revenue",
+          "nameFa": "درآمد انتقالی",
+          "value": 8783,
+          "kind": "liability"
+        },
+        {
+          "key": 24,
+          "name": "Dividends Payable",
+          "nameFa": "سود سهام پرداختنی",
+          "value": 17380,
+          "kind": "liability"
+        },
+        {
+          "key": 25,
+          "name": "Current Portion of Loan Payable",
+          "nameFa": "حصه جاری تسهیلات",
+          "value": 18905,
+          "kind": "liability"
+        },
+        {
+          "key": 27,
+          "name": "Total Current Liabilities",
+          "nameFa": "جمع بدهی جاری",
+          "value": 151001,
+          "kind": "total"
+        },
+        {
+          "key": 30,
+          "name": "Allowance for Post Retirement",
+          "nameFa": "ذخیره مزایای پایان خدمت",
+          "value": 890,
+          "kind": "liability"
+        },
+        {
+          "key": 31,
+          "name": "Total Non-current Liabilities",
+          "nameFa": "جمع بدهی غیرجاری",
+          "value": 890,
+          "kind": "total"
+        },
+        {
+          "key": 32,
+          "name": "Total Liabilities",
+          "nameFa": "جمع بدهی‌ها",
+          "value": 151891,
+          "kind": "total"
+        },
+        {
+          "key": 33,
+          "name": "Common Stock",
+          "nameFa": "سرمایه",
+          "value": 32000,
+          "kind": "equity"
+        },
+        {
+          "key": 36,
+          "name": "Legal Reserve",
+          "nameFa": "اندوخته قانونی",
+          "value": 1200,
+          "kind": "equity"
+        },
+        {
+          "key": 38,
+          "name": "Retained Earnings",
+          "nameFa": "سود انباشته",
+          "value": 49567,
+          "kind": "equity"
+        },
+        {
+          "key": 42,
+          "name": "Total Stockholders' Equity",
+          "nameFa": "جمع حقوق صاحبان سهام",
+          "value": 82367,
+          "kind": "total"
+        },
+        {
+          "key": 43,
+          "name": "Total Liabilities and Stockholders' Equity",
+          "nameFa": "جمع بدهی و حقوق",
+          "value": 234258,
+          "kind": "total"
+        },
+        {
+          "key": 200,
+          "name": "Trade and Other Receivables",
+          "nameFa": "دریافتنی‌ها",
+          "value": 56009,
+          "kind": "asset"
+        },
+        {
+          "key": 202,
+          "name": "Trade and Other Payables",
+          "nameFa": "پرداختنی‌ها",
+          "value": 94200,
+          "kind": "liability"
+        },
+        {
+          "key": 3002,
+          "name": "Provisions",
+          "nameFa": "ذخایر",
+          "value": 11732,
+          "kind": "liability"
+        }
+      ],
+      "cashflowLines": [
+        {
+          "key": 132,
+          "name": "Net Cash Flow From Operating Activities",
+          "nameFa": "جریان نقد عملیاتی",
+          "value": 67914,
+          "kind": "total"
+        },
+        {
+          "key": 133,
+          "name": "Dividends Received",
+          "nameFa": "سود سهام دریافتی",
+          "value": 70,
+          "kind": "income"
+        },
+        {
+          "key": 134,
+          "name": "Dividends Paid",
+          "nameFa": "سود سهام پرداختی",
+          "value": -29241,
+          "kind": "expense"
+        },
+        {
+          "key": 135,
+          "name": "Interest Paid for Borrowing",
+          "nameFa": "بهره پرداختی",
+          "value": -4694,
+          "kind": "expense"
+        },
+        {
+          "key": 136,
+          "name": "Dividends Received from Other Investment",
+          "nameFa": "سود سرمایه‌گذاری دریافتی",
+          "value": 84,
+          "kind": "income"
+        },
+        {
+          "key": 138,
+          "name": "Income Tax Payments",
+          "nameFa": "مالیات پرداختی",
+          "value": -5294,
+          "kind": "expense"
+        },
+        {
+          "key": 140,
+          "name": "Purchase of Property",
+          "nameFa": "خرید دارایی ثابت",
+          "value": -28183,
+          "kind": "expense"
+        },
+        {
+          "key": 144,
+          "name": "Purchase of Non-current Investments",
+          "nameFa": "خرید سرمایه‌گذاری",
+          "value": -1482,
+          "kind": "expense"
+        },
+        {
+          "key": 149,
+          "name": "Proceeds from Issuing Shares",
+          "nameFa": "افزایش سرمایه",
+          "value": 0,
+          "kind": "income"
+        },
+        {
+          "key": 150,
+          "name": "Proceeds from Borrowings",
+          "nameFa": "دریافت تسهیلات",
+          "value": 23475,
+          "kind": "income"
+        },
+        {
+          "key": 151,
+          "name": "Repayments of Borrowings",
+          "nameFa": "بازپرداخت تسهیلات",
+          "value": -26126,
+          "kind": "expense"
+        },
+        {
+          "key": 153,
+          "name": "Net Increase In Cash",
+          "nameFa": "خالص تغییر نقد",
+          "value": 2554,
+          "kind": "total"
+        },
+        {
+          "key": 154,
+          "name": "Cash at Beginning of Period",
+          "nameFa": "نقد ابتدای دوره",
+          "value": 5475,
+          "kind": "total"
+        },
+        {
+          "key": 155,
+          "name": "Exchange Rate Changes on Cash",
+          "nameFa": "اثر نرخ ارز",
+          "value": 1031,
+          "kind": "income"
+        },
+        {
+          "key": 156,
+          "name": "Cash at End of Period",
+          "nameFa": "نقد پایان دوره",
+          "value": 9060,
+          "kind": "total"
+        },
+        {
+          "key": 230,
+          "name": "Proceeds from Operating Activities",
+          "nameFa": "دریافت‌های عملیاتی",
+          "value": 73208,
+          "kind": "income"
+        },
+        {
+          "key": 233,
+          "name": "Net Cash Flow from Investing Activities-IFRS",
+          "nameFa": "جریان نقد سرمایه‌گذاری",
+          "value": -28675,
+          "kind": "total"
+        },
+        {
+          "key": 243,
+          "name": "NetCashFlowFromFinancingActivitiesIFRS",
+          "nameFa": "جریان نقد تأمین مالی",
+          "value": -36686,
+          "kind": "total"
+        }
+      ],
       "segments": [
         {
           "productKey": 2606,
@@ -875,6 +2824,325 @@
           "name": "Net Income (Loss)",
           "nameFa": "سود خالص",
           "value": 33307,
+          "kind": "total"
+        }
+      ],
+      "balanceLines": [
+        {
+          "key": 1,
+          "name": "Cash",
+          "nameFa": "موجودی نقد",
+          "value": 15791,
+          "kind": "asset"
+        },
+        {
+          "key": 2,
+          "name": "Short Term Investments",
+          "nameFa": "سرمایه‌گذاری کوتاه‌مدت",
+          "value": 119,
+          "kind": "asset"
+        },
+        {
+          "key": 6,
+          "name": "Inventories",
+          "nameFa": "موجودی کالا",
+          "value": 112969,
+          "kind": "asset"
+        },
+        {
+          "key": 7,
+          "name": "Prepayments",
+          "nameFa": "پیش‌پرداخت‌ها",
+          "value": 15419,
+          "kind": "asset"
+        },
+        {
+          "key": 10,
+          "name": "Total Current Assets",
+          "nameFa": "جمع دارایی جاری",
+          "value": 255611,
+          "kind": "total"
+        },
+        {
+          "key": 11,
+          "name": "Long Term Investments",
+          "nameFa": "سرمایه‌گذاری بلندمدت",
+          "value": 46447,
+          "kind": "asset"
+        },
+        {
+          "key": 12,
+          "name": "Tangible Fixed Assets",
+          "nameFa": "دارایی ثابت مشهود",
+          "value": 61468,
+          "kind": "asset"
+        },
+        {
+          "key": 13,
+          "name": "Intangible Assets",
+          "nameFa": "دارایی نامشهود",
+          "value": 359,
+          "kind": "asset"
+        },
+        {
+          "key": 16,
+          "name": "Other Assets",
+          "nameFa": "سایر دارایی‌ها",
+          "value": 7,
+          "kind": "asset"
+        },
+        {
+          "key": 17,
+          "name": "Total Non-current Assets",
+          "nameFa": "جمع دارایی غیرجاری",
+          "value": 108280,
+          "kind": "total"
+        },
+        {
+          "key": 18,
+          "name": "Total Assets",
+          "nameFa": "جمع دارایی‌ها",
+          "value": 363891,
+          "kind": "total"
+        },
+        {
+          "key": 22,
+          "name": "Deferred Revenue",
+          "nameFa": "درآمد انتقالی",
+          "value": 37058,
+          "kind": "liability"
+        },
+        {
+          "key": 23,
+          "name": "Allowance for Income Tax",
+          "nameFa": "ذخیره مالیات",
+          "value": 2109,
+          "kind": "liability"
+        },
+        {
+          "key": 24,
+          "name": "Dividends Payable",
+          "nameFa": "سود سهام پرداختنی",
+          "value": 11765,
+          "kind": "liability"
+        },
+        {
+          "key": 25,
+          "name": "Current Portion of Loan Payable",
+          "nameFa": "حصه جاری تسهیلات",
+          "value": 66597,
+          "kind": "liability"
+        },
+        {
+          "key": 27,
+          "name": "Total Current Liabilities",
+          "nameFa": "جمع بدهی جاری",
+          "value": 184079,
+          "kind": "total"
+        },
+        {
+          "key": 30,
+          "name": "Allowance for Post Retirement",
+          "nameFa": "ذخیره مزایای پایان خدمت",
+          "value": 8162,
+          "kind": "liability"
+        },
+        {
+          "key": 31,
+          "name": "Total Non-current Liabilities",
+          "nameFa": "جمع بدهی غیرجاری",
+          "value": 8162,
+          "kind": "total"
+        },
+        {
+          "key": 32,
+          "name": "Total Liabilities",
+          "nameFa": "جمع بدهی‌ها",
+          "value": 192241,
+          "kind": "total"
+        },
+        {
+          "key": 33,
+          "name": "Common Stock",
+          "nameFa": "سرمایه",
+          "value": 124500,
+          "kind": "equity"
+        },
+        {
+          "key": 36,
+          "name": "Legal Reserve",
+          "nameFa": "اندوخته قانونی",
+          "value": 9186,
+          "kind": "equity"
+        },
+        {
+          "key": 38,
+          "name": "Retained Earnings",
+          "nameFa": "سود انباشته",
+          "value": 37964,
+          "kind": "equity"
+        },
+        {
+          "key": 42,
+          "name": "Total Stockholders' Equity",
+          "nameFa": "جمع حقوق صاحبان سهام",
+          "value": 171650,
+          "kind": "total"
+        },
+        {
+          "key": 43,
+          "name": "Total Liabilities and Stockholders' Equity",
+          "nameFa": "جمع بدهی و حقوق",
+          "value": 363891,
+          "kind": "total"
+        },
+        {
+          "key": 200,
+          "name": "Trade and Other Receivables",
+          "nameFa": "دریافتنی‌ها",
+          "value": 111312,
+          "kind": "asset"
+        },
+        {
+          "key": 202,
+          "name": "Trade and Other Payables",
+          "nameFa": "پرداختنی‌ها",
+          "value": 63121,
+          "kind": "liability"
+        },
+        {
+          "key": 3002,
+          "name": "Provisions",
+          "nameFa": "ذخایر",
+          "value": 3429,
+          "kind": "liability"
+        }
+      ],
+      "cashflowLines": [
+        {
+          "key": 132,
+          "name": "Net Cash Flow From Operating Activities",
+          "nameFa": "جریان نقد عملیاتی",
+          "value": 54910,
+          "kind": "total"
+        },
+        {
+          "key": 133,
+          "name": "Dividends Received",
+          "nameFa": "سود سهام دریافتی",
+          "value": 75,
+          "kind": "income"
+        },
+        {
+          "key": 134,
+          "name": "Dividends Paid",
+          "nameFa": "سود سهام پرداختی",
+          "value": -13555,
+          "kind": "expense"
+        },
+        {
+          "key": 135,
+          "name": "Interest Paid for Borrowing",
+          "nameFa": "بهره پرداختی",
+          "value": -17653,
+          "kind": "expense"
+        },
+        {
+          "key": 136,
+          "name": "Dividends Received from Other Investment",
+          "nameFa": "سود سرمایه‌گذاری دریافتی",
+          "value": 575,
+          "kind": "income"
+        },
+        {
+          "key": 138,
+          "name": "Income Tax Payments",
+          "nameFa": "مالیات پرداختی",
+          "value": -5975,
+          "kind": "expense"
+        },
+        {
+          "key": 140,
+          "name": "Purchase of Property",
+          "nameFa": "خرید دارایی ثابت",
+          "value": -18163,
+          "kind": "expense"
+        },
+        {
+          "key": 144,
+          "name": "Purchase of Non-current Investments",
+          "nameFa": "خرید سرمایه‌گذاری",
+          "value": -5353,
+          "kind": "expense"
+        },
+        {
+          "key": 149,
+          "name": "Proceeds from Issuing Shares",
+          "nameFa": "افزایش سرمایه",
+          "value": 0,
+          "kind": "income"
+        },
+        {
+          "key": 150,
+          "name": "Proceeds from Borrowings",
+          "nameFa": "دریافت تسهیلات",
+          "value": 190176,
+          "kind": "income"
+        },
+        {
+          "key": 151,
+          "name": "Repayments of Borrowings",
+          "nameFa": "بازپرداخت تسهیلات",
+          "value": -170600,
+          "kind": "expense"
+        },
+        {
+          "key": 153,
+          "name": "Net Increase In Cash",
+          "nameFa": "خالص تغییر نقد",
+          "value": 7159,
+          "kind": "total"
+        },
+        {
+          "key": 154,
+          "name": "Cash at Beginning of Period",
+          "nameFa": "نقد ابتدای دوره",
+          "value": 8632,
+          "kind": "total"
+        },
+        {
+          "key": 155,
+          "name": "Exchange Rate Changes on Cash",
+          "nameFa": "اثر نرخ ارز",
+          "value": 0,
+          "kind": "income"
+        },
+        {
+          "key": 156,
+          "name": "Cash at End of Period",
+          "nameFa": "نقد پایان دوره",
+          "value": 15791,
+          "kind": "total"
+        },
+        {
+          "key": 230,
+          "name": "Proceeds from Operating Activities",
+          "nameFa": "دریافت‌های عملیاتی",
+          "value": 60885,
+          "kind": "income"
+        },
+        {
+          "key": 233,
+          "name": "Net Cash Flow from Investing Activities-IFRS",
+          "nameFa": "جریان نقد سرمایه‌گذاری",
+          "value": -36118,
+          "kind": "total"
+        },
+        {
+          "key": 243,
+          "name": "NetCashFlowFromFinancingActivitiesIFRS",
+          "nameFa": "جریان نقد تأمین مالی",
+          "value": -11633,
           "kind": "total"
         }
       ],
@@ -993,6 +3261,311 @@
           "name": "Net Income (Loss)",
           "nameFa": "سود خالص",
           "value": 112,
+          "kind": "total"
+        }
+      ],
+      "balanceLines": [
+        {
+          "key": 1,
+          "name": "Cash",
+          "nameFa": "موجودی نقد",
+          "value": 1816,
+          "kind": "asset"
+        },
+        {
+          "key": 6,
+          "name": "Inventories",
+          "nameFa": "موجودی کالا",
+          "value": 3378,
+          "kind": "asset"
+        },
+        {
+          "key": 7,
+          "name": "Prepayments",
+          "nameFa": "پیش‌پرداخت‌ها",
+          "value": 660,
+          "kind": "asset"
+        },
+        {
+          "key": 10,
+          "name": "Total Current Assets",
+          "nameFa": "جمع دارایی جاری",
+          "value": 15486,
+          "kind": "total"
+        },
+        {
+          "key": 11,
+          "name": "Long Term Investments",
+          "nameFa": "سرمایه‌گذاری بلندمدت",
+          "value": 456,
+          "kind": "asset"
+        },
+        {
+          "key": 12,
+          "name": "Tangible Fixed Assets",
+          "nameFa": "دارایی ثابت مشهود",
+          "value": 112678,
+          "kind": "asset"
+        },
+        {
+          "key": 13,
+          "name": "Intangible Assets",
+          "nameFa": "دارایی نامشهود",
+          "value": 50,
+          "kind": "asset"
+        },
+        {
+          "key": 16,
+          "name": "Other Assets",
+          "nameFa": "سایر دارایی‌ها",
+          "value": 1,
+          "kind": "asset"
+        },
+        {
+          "key": 17,
+          "name": "Total Non-current Assets",
+          "nameFa": "جمع دارایی غیرجاری",
+          "value": 113185,
+          "kind": "total"
+        },
+        {
+          "key": 18,
+          "name": "Total Assets",
+          "nameFa": "جمع دارایی‌ها",
+          "value": 128671,
+          "kind": "total"
+        },
+        {
+          "key": 22,
+          "name": "Deferred Revenue",
+          "nameFa": "درآمد انتقالی",
+          "value": 1302,
+          "kind": "liability"
+        },
+        {
+          "key": 23,
+          "name": "Allowance for Income Tax",
+          "nameFa": "ذخیره مالیات",
+          "value": 23,
+          "kind": "liability"
+        },
+        {
+          "key": 24,
+          "name": "Dividends Payable",
+          "nameFa": "سود سهام پرداختنی",
+          "value": 82,
+          "kind": "liability"
+        },
+        {
+          "key": 25,
+          "name": "Current Portion of Loan Payable",
+          "nameFa": "حصه جاری تسهیلات",
+          "value": 27,
+          "kind": "liability"
+        },
+        {
+          "key": 27,
+          "name": "Total Current Liabilities",
+          "nameFa": "جمع بدهی جاری",
+          "value": 3448,
+          "kind": "total"
+        },
+        {
+          "key": 30,
+          "name": "Allowance for Post Retirement",
+          "nameFa": "ذخیره مزایای پایان خدمت",
+          "value": 456,
+          "kind": "liability"
+        },
+        {
+          "key": 31,
+          "name": "Total Non-current Liabilities",
+          "nameFa": "جمع بدهی غیرجاری",
+          "value": 456,
+          "kind": "total"
+        },
+        {
+          "key": 32,
+          "name": "Total Liabilities",
+          "nameFa": "جمع بدهی‌ها",
+          "value": 3904,
+          "kind": "total"
+        },
+        {
+          "key": 33,
+          "name": "Common Stock",
+          "nameFa": "سرمایه",
+          "value": 13679,
+          "kind": "equity"
+        },
+        {
+          "key": 36,
+          "name": "Legal Reserve",
+          "nameFa": "اندوخته قانونی",
+          "value": 351,
+          "kind": "equity"
+        },
+        {
+          "key": 38,
+          "name": "Retained Earnings",
+          "nameFa": "سود انباشته",
+          "value": 2383,
+          "kind": "equity"
+        },
+        {
+          "key": 42,
+          "name": "Total Stockholders' Equity",
+          "nameFa": "جمع حقوق صاحبان سهام",
+          "value": 124768,
+          "kind": "total"
+        },
+        {
+          "key": 43,
+          "name": "Total Liabilities and Stockholders' Equity",
+          "nameFa": "جمع بدهی و حقوق",
+          "value": 128671,
+          "kind": "total"
+        },
+        {
+          "key": 200,
+          "name": "Trade and Other Receivables",
+          "nameFa": "دریافتنی‌ها",
+          "value": 9303,
+          "kind": "asset"
+        },
+        {
+          "key": 202,
+          "name": "Trade and Other Payables",
+          "nameFa": "پرداختنی‌ها",
+          "value": 2014,
+          "kind": "liability"
+        }
+      ],
+      "cashflowLines": [
+        {
+          "key": 132,
+          "name": "Net Cash Flow From Operating Activities",
+          "nameFa": "جریان نقد عملیاتی",
+          "value": 1308,
+          "kind": "total"
+        },
+        {
+          "key": 133,
+          "name": "Dividends Received",
+          "nameFa": "سود سهام دریافتی",
+          "value": 0,
+          "kind": "income"
+        },
+        {
+          "key": 134,
+          "name": "Dividends Paid",
+          "nameFa": "سود سهام پرداختی",
+          "value": 0,
+          "kind": "expense"
+        },
+        {
+          "key": 135,
+          "name": "Interest Paid for Borrowing",
+          "nameFa": "بهره پرداختی",
+          "value": -38,
+          "kind": "expense"
+        },
+        {
+          "key": 136,
+          "name": "Dividends Received from Other Investment",
+          "nameFa": "سود سرمایه‌گذاری دریافتی",
+          "value": 3,
+          "kind": "income"
+        },
+        {
+          "key": 138,
+          "name": "Income Tax Payments",
+          "nameFa": "مالیات پرداختی",
+          "value": -493,
+          "kind": "expense"
+        },
+        {
+          "key": 140,
+          "name": "Purchase of Property",
+          "nameFa": "خرید دارایی ثابت",
+          "value": -91,
+          "kind": "expense"
+        },
+        {
+          "key": 144,
+          "name": "Purchase of Non-current Investments",
+          "nameFa": "خرید سرمایه‌گذاری",
+          "value": 0,
+          "kind": "expense"
+        },
+        {
+          "key": 149,
+          "name": "Proceeds from Issuing Shares",
+          "nameFa": "افزایش سرمایه",
+          "value": 97,
+          "kind": "income"
+        },
+        {
+          "key": 150,
+          "name": "Proceeds from Borrowings",
+          "nameFa": "دریافت تسهیلات",
+          "value": 0,
+          "kind": "income"
+        },
+        {
+          "key": 151,
+          "name": "Repayments of Borrowings",
+          "nameFa": "بازپرداخت تسهیلات",
+          "value": -469,
+          "kind": "expense"
+        },
+        {
+          "key": 153,
+          "name": "Net Increase In Cash",
+          "nameFa": "خالص تغییر نقد",
+          "value": 773,
+          "kind": "total"
+        },
+        {
+          "key": 154,
+          "name": "Cash at Beginning of Period",
+          "nameFa": "نقد ابتدای دوره",
+          "value": 595,
+          "kind": "total"
+        },
+        {
+          "key": 155,
+          "name": "Exchange Rate Changes on Cash",
+          "nameFa": "اثر نرخ ارز",
+          "value": 449,
+          "kind": "income"
+        },
+        {
+          "key": 156,
+          "name": "Cash at End of Period",
+          "nameFa": "نقد پایان دوره",
+          "value": 1816,
+          "kind": "total"
+        },
+        {
+          "key": 230,
+          "name": "Proceeds from Operating Activities",
+          "nameFa": "دریافت‌های عملیاتی",
+          "value": 1800,
+          "kind": "income"
+        },
+        {
+          "key": 233,
+          "name": "Net Cash Flow from Investing Activities-IFRS",
+          "nameFa": "جریان نقد سرمایه‌گذاری",
+          "value": -124,
+          "kind": "total"
+        },
+        {
+          "key": 243,
+          "name": "NetCashFlowFromFinancingActivitiesIFRS",
+          "nameFa": "جریان نقد تأمین مالی",
+          "value": -411,
           "kind": "total"
         }
       ],

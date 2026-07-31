@@ -19,6 +19,59 @@
   --color-warn: #b45309;
 }
 
+/*
+ * Critical layout — UNLAYERED so the shell still paints if a Tailwind
+ * @layer / @supports block fails to parse in a given browser.
+ */
+.app-shell {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  min-height: 100vh;
+}
+.side-nav {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  background: linear-gradient(180deg, #0b3d6e 0%, #0a2f54 100%);
+  color: #e2e8f0;
+  padding: 1.1rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.mobile-nav {
+  display: none;
+}
+.main-wrap {
+  width: min(1280px, calc(100% - 2rem));
+  margin-inline: auto;
+  padding: 1rem 0 2.5rem;
+  min-width: 0;
+  overflow-x: hidden;
+}
+.side-extra {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+@media (max-width: 960px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+  .side-nav {
+    display: none !important;
+  }
+  .mobile-nav {
+    display: block !important;
+  }
+  .main-wrap {
+    width: min(1280px, calc(100% - 1.25rem));
+  }
+}
+
 @layer base {
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }

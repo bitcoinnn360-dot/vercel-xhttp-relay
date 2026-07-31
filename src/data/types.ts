@@ -420,14 +420,13 @@ export interface ProductionOpsBundle {
   errors?: string[]
 }
 
-/** آیتم صورت سود و زیان برای ویژوال GuruFocus-مانند */
+/** آیتم صورت مالی برای ویژوال GuruFocus-مانند */
 export interface FinancialLineItem {
   key: number
   name: string
   nameFa: string
   value: number
-  /** درآمد/سود = درآمدی (سبز) · هزینه = هزینه‌ای (قرمز) */
-  kind: 'income' | 'expense' | 'total'
+  kind: 'income' | 'expense' | 'total' | 'asset' | 'liability' | 'equity'
 }
 
 /** فروش به تفکیک محصول — ورودی سمت چپ Sankey */
@@ -448,7 +447,12 @@ export interface CompanyFinancials {
   periodEndingDate?: number
   label: string
   currency?: string | null
+  /** صورت سود و زیان */
   lines: FinancialLineItem[]
+  /** ترازنامه */
+  balanceLines?: FinancialLineItem[]
+  /** جریان وجوه نقد */
+  cashflowLines?: FinancialLineItem[]
   /** فروش محصولی (نرمال‌شده به رقم فروش صورت سود) */
   segments?: FinancialSegment[]
   /** مقیاس نمایش — معمولاً میلیارد ریال */

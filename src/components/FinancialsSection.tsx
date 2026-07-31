@@ -35,28 +35,72 @@ function lineVal(lines: FinancialLineItem[], key: number): number {
   return row ? Number(row.value) || 0 : 0
 }
 
+/** Merge tiny / unnamed product rows so the left side stays readable. */
+function consolidateSegments(
+  segments: { productKey: number; name: string; nameFa: string; value: number }[],
+  sales: number,
+) {
+  const kept: { productKey: number; name: string; nameFa: string; value: number }[] = []
+  let other = 0
+  for (const s of segments) {
+    if (!(s.value > 0)) continue
+    const pct = sales > 0 ? s.value / sales : 0
+    const unnamed = /^سایر\s*\(\d+\)$/.test(s.nameFa) || s.nameFa === 'سایر'
+    if (unnamed || pct < 0.03) other += s.value
+    else kept.push({ ...s })
+  }
+  if (other > 0) {
+    kept.push({ productKey: 0, name: 'Other', nameFa: 'سایر محصولات', value: Math.round(other) })
+  }
+  kept.sort((a, b) => b.value - a.value)
+  return kept
+}
+
+type BottomLine = {
+  opLoss?: number
+  misc?: number
+  finance?: number
+  pretax?: number
+  tax?: number
+  net?: number
+}
+
 /**
  * GuruFocus-style income Sankey:
  * Products → Revenue → COGS | Gross Profit → OpEx | Operating Income → … → Tax | Net Income
+ *
+ * Operating-loss issuers (e.g. بکام): keep the Sankey conserved through OpEx only.
+ * Non-operating recovery (misc → pretax → net) is returned as bottom-line KPIs so
+ * Recharts does not place a second depth-0 source on the left and tangle the diagram.
  */
 function buildIncomeSankey(company: CompanyFinancials): {
   nodes: SankeyNode[]
   links: SankeyLink[]
   sales: number
+  bottom?: BottomLine
 } | null {
   const lines = company.lines || []
   const sales = Math.abs(lineVal(lines, 44))
   const cogs = Math.abs(lineVal(lines, 48))
-  const gross = Math.abs(lineVal(lines, 52))
+  const grossRaw = Math.abs(lineVal(lines, 52))
   const sga = Math.abs(lineVal(lines, 54))
   const otherOp = lineVal(lines, 55)
-  const op = Math.abs(lineVal(lines, 56))
+  const opRaw = lineVal(lines, 56)
+  const opProfit = opRaw > 0 ? opRaw : 0
+  const opLoss = opRaw < 0 ? Math.abs(opRaw) : 0
   const fin = Math.abs(lineVal(lines, 57))
   const misc = lineVal(lines, 59)
-  const pretax = Math.abs(lineVal(lines, 60))
+  const pretaxRaw = lineVal(lines, 60)
+  const pretax = pretaxRaw > 0 ? pretaxRaw : 0
   const tax = Math.abs(lineVal(lines, 63))
-  const net = Math.abs(lineVal(lines, 66))
+  const netRaw = lineVal(lines, 66)
+  const net = netRaw > 0 ? netRaw : 0
   if (!(sales > 0)) return null
+
+  // Conserve Revenue → COGS | Gross (IS rounding can be ±1)
+  const cogsFlow = Math.min(cogs, sales)
+  const grossFlow = Math.max(sales - cogsFlow, 0)
+  const gross = grossFlow || grossRaw
 
   const nodes: SankeyNode[] = []
   const links: SankeyLink[] = []
@@ -71,76 +115,126 @@ function buildIncomeSankey(company: CompanyFinancials): {
   }
 
   // ── 1) Products → Revenue ─────────────────────────────────────────
-  const segments = (company.segments || []).filter((s) => s.value > 0)
+  const segments = consolidateSegments(company.segments || [], sales)
+  let segSum = segments.reduce((a, s) => a + s.value, 0)
+  if (segments.length && segSum !== sales) {
+    const last = segments[segments.length - 1]
+    last.value = Math.max(0, last.value + (sales - segSum))
+    segSum = sales
+  }
   const iRev = add({ name: 'فروش (درآمد)', amount: sales, fill: C.revenue, kind: 'revenue' })
   if (segments.length) {
     for (const s of segments) {
-      const i = add({
-        name: s.nameFa,
-        amount: s.value,
-        fill: C.product,
-        kind: 'product',
-      })
+      const i = add({ name: s.nameFa, amount: s.value, fill: C.product, kind: 'product' })
       link(i, iRev, s.value, C.flowBlue)
     }
+  } else {
+    const i = add({ name: 'فروش کل', amount: sales, fill: C.product, kind: 'product' })
+    link(i, iRev, sales, C.flowBlue)
   }
 
   // ── 2) Revenue → COGS | Gross Profit ──────────────────────────────
-  const iCogs = add({ name: 'بهای تمام‌شده (COGS)', amount: cogs, fill: C.expense, kind: 'expense' })
+  const iCogs = add({ name: 'بهای تمام‌شده (COGS)', amount: cogsFlow, fill: C.expense, kind: 'expense' })
   const iGross = add({ name: 'سود ناخالص', amount: gross, fill: C.profit, kind: 'profit' })
-  link(iRev, iCogs, cogs, C.flowRed)
-  link(iRev, iGross, Math.min(gross, Math.max(sales - cogs, 0)) || gross, C.flowGreen)
+  link(iRev, iCogs, cogsFlow, C.flowRed)
+  link(iRev, iGross, gross, C.flowGreen)
 
-  // ── 3) Gross → Total OpEx | Operating Income ──────────────────────
+  // ── 3) Gross → OpEx | Operating Income (or loss) ──────────────────
   const otherOpExp = otherOp < 0 ? Math.abs(otherOp) : 0
   const otherOpInc = otherOp > 0 ? otherOp : 0
   const totalOpEx = sga + otherOpExp
-  const iOpEx =
-    totalOpEx > 0
-      ? add({ name: 'جمع هزینه عملیاتی', amount: totalOpEx, fill: C.expense, kind: 'expense' })
-      : -1
-  const iOp = add({ name: 'سود عملیاتی', amount: op, fill: C.profit, kind: 'profit' })
 
-  if (iOpEx >= 0) {
-    link(iGross, iOpEx, totalOpEx, C.flowRed)
-    if (sga > 0) {
-      const iSga = add({ name: 'هزینه عمومی و اداری', amount: sga, fill: C.expense, kind: 'expense' })
-      link(iOpEx, iSga, sga, C.flowRed)
-    }
-    if (otherOpExp > 0) {
-      const iOe = add({
-        name: 'سایر هزینه عملیاتی',
-        amount: otherOpExp,
-        fill: C.expense,
-        kind: 'expense',
-      })
-      link(iOpEx, iOe, otherOpExp, C.flowRed)
+  if (opLoss > 0) {
+    // All gross is consumed by OpEx. Children scaled to gross (conserved).
+    const opexAmt = totalOpEx > 0 ? totalOpEx : gross + opLoss
+    const iOpEx = add({
+      name: 'جمع هزینه عملیاتی',
+      amount: opexAmt,
+      fill: C.expense,
+      kind: 'expense',
+    })
+    link(iGross, iOpEx, gross, C.flowRed)
+
+    const parts: { name: string; amount: number }[] = []
+    if (sga > 0) parts.push({ name: 'هزینه عمومی و اداری', amount: sga })
+    if (otherOpExp > 0) parts.push({ name: 'سایر هزینه عملیاتی', amount: otherOpExp })
+    if (!parts.length) parts.push({ name: 'هزینه عملیاتی', amount: opexAmt })
+
+    const partSum = parts.reduce((a, p) => a + p.amount, 0) || 1
+    let allocated = 0
+    parts.forEach((p, idx) => {
+      const share =
+        idx === parts.length - 1
+          ? Math.max(gross - allocated, 0)
+          : Math.round((p.amount / partSum) * gross)
+      allocated += share
+      const i = add({ name: p.name, amount: p.amount, fill: C.expense, kind: 'expense' })
+      link(iOpEx, i, share, C.flowRed)
+    })
+
+    if (!links.length) return null
+    return {
+      nodes,
+      links,
+      sales,
+      bottom: {
+        opLoss,
+        misc: misc || undefined,
+        finance: fin || undefined,
+        pretax: pretax || pretaxRaw || undefined,
+        tax: tax || undefined,
+        net: net || netRaw || undefined,
+      },
     }
   }
 
-  const fromGrossToOp = Math.max(gross - totalOpEx, 0)
+  if (totalOpEx > 0) {
+    const iOpEx = add({ name: 'جمع هزینه عملیاتی', amount: totalOpEx, fill: C.expense, kind: 'expense' })
+    const toOpEx = Math.min(totalOpEx, gross)
+    link(iGross, iOpEx, toOpEx, C.flowRed)
+    // Keep OpEx → children conserved with the inbound toOpEx
+    const parts: { name: string; amount: number }[] = []
+    if (sga > 0) parts.push({ name: 'هزینه عمومی و اداری', amount: sga })
+    if (otherOpExp > 0) parts.push({ name: 'سایر هزینه عملیاتی', amount: otherOpExp })
+    const partSum = parts.reduce((a, p) => a + p.amount, 0) || 1
+    let allocated = 0
+    parts.forEach((p, idx) => {
+      const share =
+        idx === parts.length - 1
+          ? Math.max(toOpEx - allocated, 0)
+          : Math.round((p.amount / partSum) * toOpEx)
+      allocated += share
+      const i = add({ name: p.name, amount: p.amount, fill: C.expense, kind: 'expense' })
+      link(iOpEx, i, share, C.flowRed)
+    })
+  }
+
+  const iOp = add({ name: 'سود عملیاتی', amount: opProfit, fill: C.profit, kind: 'profit' })
+  const fromGrossToOp = Math.max(gross - Math.min(totalOpEx, gross), 0)
   link(iGross, iOp, fromGrossToOp, C.flowGreen)
   if (otherOpInc > 0) {
-    const iOi = add({
-      name: 'سایر درآمد عملیاتی',
-      amount: otherOpInc,
-      fill: C.other,
-      kind: 'other',
-    })
-    link(iOi, iOp, otherOpInc, C.flowBlue)
+    // otherOpInc as mid inflow would become a left-side source in Recharts;
+    // fold it into the operating-profit node label amount only when it already
+    // sits inside opProfit via the IS identity. If it is incremental, skip link.
+    if (fromGrossToOp + otherOpInc <= opProfit + 1) {
+      /* covered by IS identity — no extra source node */
+    }
   }
 
-  // ── 4) Operating Income → finance / misc → Pretax ─────────────────
-  const iPretax = add({ name: 'سود قبل از مالیات', amount: pretax, fill: C.profit, kind: 'profit' })
-  let fromOp = op
+  // ── 4) Operating profit → pretax → tax | net ────────────────────
+  // Finance / misc expense come out of op profit; misc income is shown only
+  // when it does not require a second depth-0 source. If misc income is large,
+  // surface it in bottom KPIs instead of tangling the Sankey.
+  const miscExp = misc < 0 ? Math.abs(misc) : 0
+  const miscInc = misc > 0 ? misc : 0
+  const iPretax = add({ name: 'سود قبل از مالیات', amount: pretax || opProfit, fill: C.profit, kind: 'profit' })
+  let fromOp = opProfit
   if (fin > 0) {
     const iFin = add({ name: 'هزینه مالی (بهره)', amount: fin, fill: C.expense, kind: 'expense' })
     const take = Math.min(fin, fromOp)
     link(iOp, iFin, take, C.flowRed)
     fromOp -= take
   }
-  const miscExp = misc < 0 ? Math.abs(misc) : 0
-  const miscInc = misc > 0 ? misc : 0
   if (miscExp > 0) {
     const iMe = add({ name: 'سایر هزینه‌ها', amount: miscExp, fill: C.expense, kind: 'expense' })
     const take = Math.min(miscExp, fromOp)
@@ -148,23 +242,26 @@ function buildIncomeSankey(company: CompanyFinancials): {
     fromOp -= take
   }
   link(iOp, iPretax, Math.max(fromOp, 0), C.flowGreen)
-  if (miscInc > 0) {
-    const iMi = add({ name: 'سایر درآمدها', amount: miscInc, fill: C.other, kind: 'other' })
-    link(iMi, iPretax, miscInc, C.flowBlue)
-  }
 
-  // ── 5) Pretax → Tax | Net Income ──────────────────────────────────
-  if (tax > 0) {
+  const pretaxNode = pretax || Math.max(fromOp, 0)
+  if (tax > 0 && pretaxNode > 0) {
     const iTax = add({ name: 'مالیات', amount: tax, fill: C.expense, kind: 'expense' })
-    link(iPretax, iTax, Math.min(tax, pretax), C.flowRed)
+    link(iPretax, iTax, Math.min(tax, pretaxNode), C.flowRed)
   }
-  if (net > 0) {
+  if (net > 0 && pretaxNode > 0) {
     const iNet = add({ name: 'سود خالص', amount: net, fill: C.profitDark, kind: 'profit' })
-    link(iPretax, iNet, Math.min(net, Math.max(pretax - tax, 0)) || net, C.flowGreen)
+    link(iPretax, iNet, Math.min(net, Math.max(pretaxNode - tax, 0)) || net, C.flowGreen)
   }
 
   if (!links.length) return null
-  return { nodes, links, sales }
+  // Misc income as a freestanding Sankey source tangles Recharts layout; when
+  // present on a profitable issuer, surface a small note only.
+  return {
+    nodes,
+    links,
+    sales,
+    bottom: miscInc > 0 ? { misc: miscInc } : undefined,
+  }
 }
 
 function fmtAmt(n: number) {
@@ -336,6 +433,60 @@ export function FinancialsSection({ data }: { data: DashboardData }) {
               </Sankey>
             </ResponsiveContainer>
           </div>
+
+          {sankey.bottom?.opLoss ? (
+            <div className="mt-3 rounded-md border border-rose-200 bg-rose-50/80 px-3 py-2.5 text-xs leading-6 text-rose-900">
+              <span className="font-extrabold">زیان عملیاتی {fmtAmt(sankey.bottom.opLoss)}</span>
+              {company.scaleLabel ? ` ${company.scaleLabel}` : ''}
+              {' — '}
+              هزینه عملیاتی از سود ناخالص بیشتر است. سود نهایی از محل سایر درآمدهای غیرعملیاتی تأمین شده.
+            </div>
+          ) : null}
+
+          {sankey.bottom &&
+          (sankey.bottom.misc ||
+            sankey.bottom.finance ||
+            sankey.bottom.pretax != null ||
+            sankey.bottom.net != null) ? (
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+              {[
+                sankey.bottom.misc != null
+                  ? { label: 'سایر درآمدها', value: sankey.bottom.misc, tone: 'good' as const }
+                  : null,
+                sankey.bottom.finance != null
+                  ? { label: 'هزینه مالی', value: -Math.abs(sankey.bottom.finance), tone: 'bad' as const }
+                  : null,
+                sankey.bottom.pretax != null
+                  ? { label: 'سود قبل از مالیات', value: sankey.bottom.pretax, tone: 'good' as const }
+                  : null,
+                sankey.bottom.tax != null
+                  ? { label: 'مالیات', value: -Math.abs(sankey.bottom.tax), tone: 'bad' as const }
+                  : null,
+                sankey.bottom.net != null
+                  ? { label: 'سود خالص', value: sankey.bottom.net, tone: 'good' as const }
+                  : null,
+              ]
+                .filter(Boolean)
+                .map((item) => {
+                  const row = item!
+                  return (
+                    <div
+                      key={row.label}
+                      className="rounded-md border border-[var(--color-line)] px-2.5 py-2 text-right"
+                    >
+                      <div className="text-[10px] text-[var(--color-muted)]">{row.label}</div>
+                      <div
+                        className={`num text-sm font-extrabold ${
+                          row.tone === 'bad' ? 'text-rose-700' : 'text-emerald-700'
+                        }`}
+                      >
+                        {fmtAmt(row.value)}
+                      </div>
+                    </div>
+                  )
+                })}
+            </div>
+          ) : null}
 
           {(company.segments?.length || 0) > 0 ? (
             <div className="mt-3">

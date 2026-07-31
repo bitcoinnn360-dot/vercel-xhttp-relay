@@ -2,7 +2,8 @@ import { Activity, RefreshCw } from 'lucide-react'
 import type { DashboardData } from '../../data/types'
 import { jalaliTodayTehran, timeFa } from '../../lib/format'
 
-const NAV = [
+/** Primary sidebar items — ends at periodic changes. */
+const MAIN_NAV = [
   { id: 'overview', label: 'نمای بازار' },
   { id: 'stocks', label: 'سهام معدنی و فلزی ایران' },
   { id: 'global', label: 'بازار جهانی' },
@@ -10,6 +11,10 @@ const NAV = [
   { id: 'commodities', label: 'کامودیتی' },
   { id: 'steel', label: 'زنجیره فولاد' },
   { id: 'periodic', label: 'تغییرات دوره‌ای' },
+]
+
+/** Extra / WIP sections — pinned to the bottom-right of the sidebar. */
+const EXTRA_NAV = [
   { id: 'production', label: 'تولید و انرژی' },
   { id: 'financials', label: 'صورت‌های مالی' },
 ]
@@ -49,12 +54,25 @@ export function Sidebar({ active }: { active: string }) {
           <div className="text-[0.65rem] text-slate-300">Market Terminal</div>
         </div>
       </div>
-      {NAV.map((n) => (
+      {MAIN_NAV.map((n) => (
         <a key={n.id} href={`#${n.id}`} data-active={active === n.id} className="side-link">
           {n.label}
         </a>
       ))}
-      <div className="mt-auto px-2 pt-4 text-[0.65rem] leading-5 text-slate-400">
+      <div className="side-extra">
+        <div className="side-extra-label">ابزارهای تکمیلی</div>
+        {EXTRA_NAV.map((n) => (
+          <a
+            key={n.id}
+            href={`#${n.id}`}
+            data-active={active === n.id}
+            className="side-link side-link-extra"
+          >
+            {n.label}
+          </a>
+        ))}
+      </div>
+      <div className="side-foot px-2 pt-3 text-[0.65rem] leading-5 text-slate-400">
         سبک الهام‌گرفته از ترمینال‌های تحلیلی مثل GuruFocus
         <br />
         بروزرسانی خودکار هر ۱ دقیقه
@@ -77,7 +95,14 @@ export function MobileNav({ active }: { active: string }) {
         </div>
       </div>
       <div className="mobile-nav-links">
-        {NAV.map((n) => (
+        {MAIN_NAV.map((n) => (
+          <a key={n.id} href={`#${n.id}`} data-active={active === n.id}>
+            {n.label}
+          </a>
+        ))}
+      </div>
+      <div className="mobile-nav-extra">
+        {EXTRA_NAV.map((n) => (
           <a key={n.id} href={`#${n.id}`} data-active={active === n.id}>
             {n.label}
           </a>

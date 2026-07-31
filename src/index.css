@@ -93,6 +93,37 @@
     color: #fff;
   }
 
+  /* Extra / WIP tabs — pinned to the bottom of the (RTL) right sidebar */
+  .side-extra {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(255,255,255,0.12);
+  }
+  .side-extra-label {
+    padding: 0 0.7rem 0.15rem;
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: #94a3b8;
+  }
+  .side-link-extra {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #94a3b8;
+    padding: 0.4rem 0.7rem;
+  }
+  .side-link-extra:hover,
+  .side-link-extra[data-active='true'] {
+    background: rgba(255,255,255,0.08);
+    color: #e2e8f0;
+  }
+  .side-foot {
+    flex: none;
+  }
+
   /* Mobile top nav — shown only when sidebar is hidden */
   .mobile-nav {
     display: none;
@@ -135,6 +166,28 @@
   .mobile-nav-links a[data-active='true'] {
     background: rgba(255,255,255,0.12);
     color: #fff;
+  }
+  .mobile-nav-extra {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.25rem;
+    padding: 0 0.65rem 0.5rem;
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+  .mobile-nav-extra a {
+    flex: none;
+    white-space: nowrap;
+    border-radius: 8px;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.68rem;
+    font-weight: 500;
+    color: #94a3b8;
+    text-decoration: none;
+  }
+  .mobile-nav-extra a:hover,
+  .mobile-nav-extra a[data-active='true'] {
+    background: rgba(255,255,255,0.1);
+    color: #e2e8f0;
   }
 
   .main-wrap {

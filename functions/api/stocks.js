@@ -353,13 +353,13 @@ function detailValue(item, code) {
   return num(hit?.value)
 }
 
-function sessionPrice(row) {
+function bvSessionPrice(row) {
   if (!row) return null
   return num(row.vwap) || num(row.close) || null
 }
 
-function adjSessionPrice(row) {
-  const p = sessionPrice(row)
+function bvAdjSessionPrice(row) {
+  const p = bvSessionPrice(row)
   if (p == null) return null
   const coef = num(row?.adjustingCoef)
   return p * (coef != null && coef > 0 ? coef : 1)
@@ -369,13 +369,13 @@ function snapFromBv(meta, items, stockMeta = null) {
   // Newest first from BV. After capital increases, `close` is often null while `vwap` is set.
   const head = items[0] || {}
   const sessionHead =
-    items.find((r) => sessionPrice(r) != null) || head
+    items.find((r) => bvSessionPrice(r) != null) || head
   const volume = num(head.volume) || 0
   const halted = !(volume > 0)
 
   // Display / MV price = latest session vwap (or close), never an old close-only row.
-  const closePrice = sessionPrice(sessionHead)
-  const currentForReturn = adjSessionPrice(sessionHead) ?? closePrice
+  const closePrice = bvSessionPrice(sessionHead)
+  const currentForReturn = bvAdjSessionPrice(sessionHead) ?? closePrice
   const rets = returnsFromBvItems(items, currentForReturn)
 
   // خالص خرید حقیقی (ریال) → میلیارد تومان
@@ -384,7 +384,7 @@ function snapFromBv(meta, items, stockMeta = null) {
     netIndRial != null ? Math.round((netIndRial / 1e10) * 100) / 100 : null
 
   // Last 7 sessions with a price (oldest → newest), billion toman
-  const pricedDays = items.filter((r) => sessionPrice(r) != null)
+  const pricedDays = items.filter((r) => bvSessionPrice(r) != null)
   const weekSlice = pricedDays.slice(0, 7).reverse()
   const netIndividualWeekBt = weekSlice
     .map((r) => {
@@ -399,7 +399,7 @@ function snapFromBv(meta, items, stockMeta = null) {
 
   // Daily % on adjusted scale (vwap×coef) so capital-increase days stay sane.
   const prevRow = items[1]
-  const prevAdj = adjSessionPrice(prevRow)
+  const prevAdj = bvAdjSessionPrice(prevRow)
   if (currentForReturn != null && prevAdj != null && prevAdj > 0) {
     dailyPct = pct(prevAdj, currentForReturn)
   } else {

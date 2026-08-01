@@ -86,19 +86,33 @@ function round0(n) {
   return Math.round(Number(n))
 }
 
-async function bvJson(cookie, path) {
-  const res = await fetch(`${BV_BASE}${path}`, {
-    headers: {
-      Cookie: cookie,
-      Accept: 'application/json',
-      'User-Agent': UA,
-      Referer: 'https://www.bourseview.com/',
-      Origin: 'https://www.bourseview.com',
-    },
-    redirect: 'follow',
-  })
-  if (!res.ok) throw new Error(`bourseview ${res.status} ${path}`)
-  return res.json()
+async function bvJson(cookie, path, attempts = 3) {
+  let lastErr
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fetch(`${BV_BASE}${path}`, {
+        headers: {
+          Cookie: cookie,
+          Accept: 'application/json',
+          'User-Agent': UA,
+          Referer: 'https://www.bourseview.com/',
+          Origin: 'https://www.bourseview.com',
+        },
+        redirect: 'follow',
+      })
+      if (res.status === 403 || res.status === 429) {
+        await new Promise((r) => setTimeout(r, 400 * (i + 1) + Math.floor(Math.random() * 300)))
+        lastErr = new Error(`bourseview ${res.status} ${path}`)
+        continue
+      }
+      if (!res.ok) throw new Error(`bourseview ${res.status} ${path}`)
+      return await res.json()
+    } catch (e) {
+      lastErr = e
+      await new Promise((r) => setTimeout(r, 250 * (i + 1)))
+    }
+  }
+  throw lastErr || new Error(`bourseview failed ${path}`)
 }
 
 async function fetchStockMeta(cookie, exchange, isin, symbol = '') {

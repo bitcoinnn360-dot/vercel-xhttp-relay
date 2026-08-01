@@ -558,6 +558,56 @@ async function scrapeRahavardImpacts() {
 /** Farabourse movers from Rahavard «شاخص قیمت فرابورس» (index id 109) — ستون تغییر. */
 const RAHAVARD_IFB_PRICE_INDEX_ID = 109
 
+/** Core market indices on Rahavard (replaces Shakhesban for overview KPIs). */
+const RAHAVARD_INDEX = {
+  tedpix: { id: 1, name: 'شاخص کل بورس' },
+  equalWeight: { id: 57, name: 'شاخص کل (هم وزن)' },
+  ifb: { id: 60, name: 'شاخص کل فرابورس' },
+}
+
+async function scrapeRahavardMarketIndices() {
+  const hdrs = {
+    Accept: 'application/json, text/plain, */*',
+    'User-Agent': UA,
+    Referer: 'https://rahavard365.com/',
+    Origin: 'https://rahavard365.com',
+  }
+  const out = {}
+  const errors = []
+  await Promise.all(
+    Object.entries(RAHAVARD_INDEX).map(async ([key, meta]) => {
+      try {
+        const res = await fetch(`${RAHAVARD_API}/index/${meta.id}`, {
+          headers: hdrs,
+          signal: AbortSignal.timeout(UPSTREAM_MS),
+        })
+        if (!res.ok) throw new Error(`rahavard index ${meta.id} ${res.status}`)
+        const payload = await res.json()
+        const value = payload?.data?.value || {}
+        const close = Number(value.close_value)
+        const change = Number(value.close_value_change)
+        const changePct = Number(value.close_value_change_percent)
+        if (!Number.isFinite(close) || !(close > 0)) throw new Error('empty close')
+        out[key] = {
+          name: meta.name,
+          value: close,
+          change: Number.isFinite(change) ? change : 0,
+          // Rahavard stores fraction (−0.0066); UI expects percent (−0.66)
+          changePct: Number.isFinite(changePct) ? changePct * 100 : 0,
+          source: 'rahavard365',
+        }
+      } catch (e) {
+        errors.push(`${key}: ${e}`)
+      }
+    }),
+  )
+  return {
+    ok: Boolean(out.tedpix || out.equalWeight || out.ifb),
+    ...out,
+    errors,
+  }
+}
+
 async function scrapeRahavardIfbMovers() {
   const hdrs = {
     Accept: 'application/json, text/plain, */*',
@@ -1094,12 +1144,12 @@ export async function onRequestGet(context) {
   const tasks = await Promise.allSettled([
     fetchJson(TGJU_AJAX),
     fetchJson(TGJU_TODAY),
-    fetchText(SHAKH_INDEX),
+    scrapeRahavardMarketIndices(),
     scrapeParsistahlil(),
     scrapeSourceArena(token),
     fetchJson(`${origin}/data/money_flow_ytd.json`).catch(() => null),
     scrapeRahavardImpacts(),
-    scrapeShakhesbanBoardLite(4),
+    scrapeShakhesbanBoardLite(4), // silent board fallback only — not shown as a data source
     fetchJson(`${origin}/data/market_pulse.json`).catch(() => null),
     fetchJson(`${origin}/data/impacts_cache.json`).catch(() => null),
     fetchTradersArenaPulse(),
@@ -1120,9 +1170,17 @@ export async function onRequestGet(context) {
     intraday = parseIntraday(tasks[1].value)
   } else errors.push(`intraday: ${tasks[1].reason}`)
 
-  if (tasks[2].status === 'fulfilled') {
-    indices = parseShakhesbanIndices(tasks[2].value)
-  } else errors.push(`shakhesban: ${tasks[2].reason}`)
+  if (tasks[2].status === 'fulfilled' && tasks[2].value?.ok) {
+    const rh = tasks[2].value
+    indices = {
+      tedpix: rh.tedpix || null,
+      equalWeight: rh.equalWeight || null,
+      ifb: rh.ifb || null,
+    }
+    if (rh.errors?.length) errors.push(...rh.errors.map((e) => `rahavard-index: ${e}`))
+  } else {
+    errors.push(`rahavard-index: ${tasks[2].reason || 'empty'}`)
+  }
 
   if (tasks[3].status === 'fulfilled') {
     parsistahlil = tasks[3].value

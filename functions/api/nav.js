@@ -66,8 +66,8 @@ const NAV_STATIC = {
   },
 }
 
-const CACHE_TTL_MS = 5 * 60 * 1000
-const CACHE_KEY = 'https://cache.local/midco-nav-bv-v5'
+const CACHE_TTL_MS = 2 * 60 * 1000
+const CACHE_KEY = 'https://cache.local/midco-nav-bv-v6'
 
 function normalizeCookie(raw) {
   let c = String(raw || '').trim()
@@ -109,8 +109,15 @@ async function fetchStockMeta(cookie, exchange, isin, symbol = '') {
       `/api/v2/exchanges/${exchange}/stocks/${isin}/quotes?timeFrame=daily&lastN=3&expand=shamsiDate`,
     ),
   ])
-  const items = Array.isArray(quotes?.items) ? quotes.items : []
-  const last = items[0] || {}
+  const items = Array.isArray(quotes?.items) ? [...quotes.items] : []
+  // Prefer newest session with a usable price (vwap first — close is often null post CI).
+  items.sort((a, b) => Number(b?.date || 0) - Number(a?.date || 0))
+  const last =
+    items.find((r) => {
+      const v = Number(r?.vwap)
+      const c = Number(r?.close)
+      return (Number.isFinite(v) && v > 0) || (Number.isFinite(c) && c > 0)
+    }) || items[0] || {}
   let outstanding =
     Number(meta?.numberOfOutstandingShares) || Number(last?.numberOfOutstandingShares) || null
   // Capital-increase filings can land on stock meta before quote history catches up.

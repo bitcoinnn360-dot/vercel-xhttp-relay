@@ -51,8 +51,8 @@ const MINERAL_STOCKS = [
   { name: 'کارخانجات تولیدی شهید قندی', symbol: 'بکام', isin: 'IRO1KGND0001', exchange: 'IRTSENO' },
 ]
 
-const CACHE_TTL_MS = 20 * 60 * 1000
-const CACHE_KEY = 'https://cache.local/mineral-stocks-bv-v10'
+const CACHE_TTL_MS = 2 * 60 * 1000
+const CACHE_KEY = 'https://cache.local/mineral-stocks-bv-v11'
 
 /** Manual share-count overrides when quote history lags capital-increase filings. */
 const OUTSTANDING_SHARES = {
@@ -353,34 +353,39 @@ function detailValue(item, code) {
   return num(hit?.value)
 }
 
+function sessionPrice(row) {
+  if (!row) return null
+  return num(row.vwap) || num(row.close) || null
+}
+
+function adjSessionPrice(row) {
+  const p = sessionPrice(row)
+  if (p == null) return null
+  const coef = num(row?.adjustingCoef)
+  return p * (coef != null && coef > 0 ? coef : 1)
+}
+
 function snapFromBv(meta, items, stockMeta = null) {
+  // Newest first from BV. After capital increases, `close` is often null while `vwap` is set.
   const head = items[0] || {}
-  const tradedHead = items.find((r) => num(r?.close) != null && num(r.close) > 0)
-  const halted = !(num(head?.close) > 0)
+  const sessionHead =
+    items.find((r) => sessionPrice(r) != null) || head
+  const volume = num(head.volume) || 0
+  const halted = !(volume > 0)
 
-  // قیمت پایانی نمایشی = vwap؛ برای نماد متوقف: آخرین پایانیِ روز معاملاتی
-  const closePrice = halted
-    ? num(tradedHead?.vwap) || num(tradedHead?.close)
-    : num(head.vwap) || num(tradedHead?.vwap) || num(tradedHead?.close)
-
-  // صورت کسر بازدهی روی مقیاس تعدیلی (vwap×coef آخرین معامله)
-  const lastCoef = num(tradedHead?.adjustingCoef)
-  const lastVwap = num(tradedHead?.vwap) || num(tradedHead?.close)
-  const currentForReturn =
-    lastVwap != null
-      ? lastVwap * (lastCoef != null && lastCoef > 0 ? lastCoef : 1)
-      : closePrice
-
+  // Display / MV price = latest session vwap (or close), never an old close-only row.
+  const closePrice = sessionPrice(sessionHead)
+  const currentForReturn = adjSessionPrice(sessionHead) ?? closePrice
   const rets = returnsFromBvItems(items, currentForReturn)
 
   // خالص خرید حقیقی (ریال) → میلیارد تومان
-  const netIndRial = detailValue(halted ? tradedHead : head, 'netIndividual')
+  const netIndRial = detailValue(sessionHead, 'netIndividual')
   const netIndividualBt =
     netIndRial != null ? Math.round((netIndRial / 1e10) * 100) / 100 : null
 
-  // Last 7 trading days of net individual flow (oldest → newest), billion toman
-  const tradedDays = items.filter((r) => num(r?.close) != null && num(r.close) > 0)
-  const weekSlice = tradedDays.slice(0, 7).reverse()
+  // Last 7 sessions with a price (oldest → newest), billion toman
+  const pricedDays = items.filter((r) => sessionPrice(r) != null)
+  const weekSlice = pricedDays.slice(0, 7).reverse()
   const netIndividualWeekBt = weekSlice
     .map((r) => {
       const v = detailValue(r, 'netIndividual')
@@ -389,33 +394,34 @@ function snapFromBv(meta, items, stockMeta = null) {
     .filter((v) => v != null)
 
   let dailyPct = null
-  let volume = 0
   let tradeValueMr = 0
   let marketValueBr
 
-  if (halted) {
-    dailyPct = 0
-    volume = 0
-    tradeValueMr = 0
-    const mv = num(tradedHead?.marketCap) || num(head?.marketCap)
-    marketValueBr = mv != null ? Math.round(mv / 1e9) : undefined
+  // Daily % on adjusted scale (vwap×coef) so capital-increase days stay sane.
+  const prevRow = items[1]
+  const prevAdj = adjSessionPrice(prevRow)
+  if (currentForReturn != null && prevAdj != null && prevAdj > 0) {
+    dailyPct = pct(prevAdj, currentForReturn)
   } else {
     const vwap = num(head.vwap)
     const prev = num(head.previousVwap)
     dailyPct = pct(prev, vwap)
-    volume = num(head.volume) || 0
-    const tv = num(head.value)
-    tradeValueMr = tv != null ? Math.round(tv / 1e6) : 0
-    const mv = num(head.marketCap)
-    marketValueBr = mv != null ? Math.round(mv / 1e9) : undefined
   }
 
-  const freeFloat =
-    num(halted ? tradedHead?.freeFloat : head.freeFloat) ?? num(tradedHead?.freeFloat) ?? null
+  if (halted) {
+    tradeValueMr = 0
+  } else {
+    const tv = num(head.value)
+    tradeValueMr = tv != null ? Math.round(tv / 1e6) : 0
+  }
+  const mv = num(sessionHead?.marketCap) || num(head?.marketCap)
+  marketValueBr = mv != null ? Math.round(mv / 1e9) : undefined
+
+  const freeFloat = num(sessionHead.freeFloat) ?? num(head.freeFloat) ?? null
   let outstanding =
     num(stockMeta?.numberOfOutstandingShares) ||
-    num(halted ? tradedHead?.numberOfOutstandingShares : head.numberOfOutstandingShares) ||
-    num(tradedHead?.numberOfOutstandingShares) ||
+    num(sessionHead?.numberOfOutstandingShares) ||
+    num(head?.numberOfOutstandingShares) ||
     null
   const overrideShares = OUTSTANDING_SHARES[meta.symbol]
   if (overrideShares) outstanding = overrideShares
@@ -451,11 +457,11 @@ function snapFromBv(meta, items, stockMeta = null) {
     marketValueBr,
     volume,
     tradeValueMr,
-    netIndividualBt: halted ? 0 : netIndividualBt,
+    netIndividualBt,
     netIndividualWeekBt,
     freeFloatPct: freeFloat != null ? Math.round(freeFloat * 10000) / 100 : null,
     outstandingShares: outstanding,
-    volumeToFloatPct: halted ? 0 : volumeToFloatPct,
+    volumeToFloatPct,
     returnsAdjusted: true,
     returnsSource: 'bourseview-adjusted',
     historyCount: rets.historyCount || 0,
@@ -552,29 +558,12 @@ export async function onRequestGet(context) {
     'access-control-allow-origin': '*',
   }
 
-  // Static-first: never block SPA on a slow BourseView scrape.
+  // Edge cache briefly; do NOT serve multi-day-old mineral_stocks.json as "live".
   let staticBundle = null
   try {
     staticBundle = await loadStaticFallback(origin)
   } catch {
     /* ignore */
-  }
-  const staticFlowOk = Boolean(
-    staticBundle?.stocks?.some(
-      (s) => Array.isArray(s.netIndividualWeekBt) && s.netIndividualWeekBt.length >= 5,
-    ),
-  )
-  if (!forceRefresh && staticBundle?.stocks?.length && staticFlowOk) {
-    return new Response(
-      JSON.stringify({
-        ...staticBundle,
-        ok: true,
-        updatedAt: staticBundle.updatedAt || new Date().toISOString(),
-        served: 'static-fast',
-        note: staticBundle.note || 'static mineral_stocks (ورود پول از snapshot)',
-      }),
-      { headers },
-    )
   }
 
   if (cache && !forceRefresh) {

@@ -522,6 +522,7 @@ type OverviewApi = {
     dateJalali?: string
     error?: string
   }
+  rahavard?: { ok?: boolean }
   blocked?: string[]
   errors?: string[]
 }
@@ -795,8 +796,12 @@ function applyFreshOverview(base: DashboardData, api: OverviewApi | null, intrad
 
   if (api?.indices) {
     if (patchIndex(o.tedpix, api.indices.tedpix)) sources.tedpix = api.indices.tedpix?.source || 'live'
-    if (patchIndex(o.equalWeight, api.indices.equalWeight)) sources.equalWeight = 'shakhesban-live'
-    if (patchIndex(o.ifb, api.indices.ifb)) sources.ifb = 'shakhesban-live'
+    if (patchIndex(o.equalWeight, api.indices.equalWeight)) {
+      sources.equalWeight = api.indices.equalWeight?.source || 'rahavard365'
+    }
+    if (patchIndex(o.ifb, api.indices.ifb)) {
+      sources.ifb = api.indices.ifb?.source || 'rahavard365'
+    }
   }
 
   if (api?.totalMarketValueHmt != null && Number.isFinite(api.totalMarketValueHmt)) {
@@ -913,9 +918,11 @@ function applyOverviewLive(
   const sources: Record<string, string> = {}
 
   if (live.indices) {
-    if (patchIndex(o.tedpix, live.indices.tedpix)) sources.tedpix = live.indices.tedpix?.source || 'shakhesban'
-    if (patchIndex(o.equalWeight, live.indices.equalWeight)) sources.equalWeight = 'shakhesban'
-    if (patchIndex(o.ifb, live.indices.ifb)) sources.ifb = 'shakhesban'
+    if (patchIndex(o.tedpix, live.indices.tedpix)) sources.tedpix = live.indices.tedpix?.source || 'rahavard365'
+    if (patchIndex(o.equalWeight, live.indices.equalWeight)) {
+      sources.equalWeight = live.indices.equalWeight?.source || 'rahavard365'
+    }
+    if (patchIndex(o.ifb, live.indices.ifb)) sources.ifb = live.indices.ifb?.source || 'rahavard365'
   }
 
   if (live.totalMarketValueHmt != null) {
@@ -984,7 +991,7 @@ function applyOverviewLive(
 
   if (live.topTrades?.length) {
     base.topTrades = live.topTrades
-    sources.topTrades = live.topTradesSource || 'shakhesban'
+    sources.topTrades = live.topTradesSource || 'tradersarena'
   }
 
   if (candles?.length) o.candles1401 = candles
@@ -1396,7 +1403,7 @@ async function fetchMineralStocksApi(): Promise<MineralStockSnap[] | null> {
     return stocks?.length ? stocks : null
   }
 
-  // Static first so a slow /api/stocks scrape never blocks the whole SPA.
+  // Prefer live /api/stocks (today's close). Static snapshot is fallback only.
   let staticStocks: MineralStockSnap[] | null = null
   try {
     staticStocks = await read('/data/mineral_stocks.json', 4000)
@@ -1404,10 +1411,10 @@ async function fetchMineralStocksApi(): Promise<MineralStockSnap[] | null> {
     /* ignore */
   }
 
-  // Prefer live only when it clearly has richer money-flow / returns; keep timeout short.
   try {
-    const live = await read('/api/stocks', 5000)
-    if (live && score(live) > score(staticStocks || [])) return live
+    const live = await read('/api/stocks', 15000)
+    if (live && score(live) >= Math.max(8, Math.floor(score(staticStocks || []) * 0.5))) return live
+    if (live && score(live) > 0) return live
   } catch {
     /* fall through */
   }
@@ -1725,7 +1732,12 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   if (overviewLiveOk || freshOk) {
     base.sources = [
       ...base.sources.filter(
-        (s) => s.id !== 'shakhesban' && s.id !== 'parsistahlil' && s.id !== 'tsetmc' && s.id !== 'sourcearena',
+        (s) =>
+          s.id !== 'shakhesban' &&
+          s.id !== 'parsistahlil' &&
+          s.id !== 'tsetmc' &&
+          s.id !== 'sourcearena' &&
+          s.id !== 'rahavard',
       ),
       {
         id: 'sourcearena',
@@ -1739,11 +1751,13 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
         lastOk: hasArenaMv ? overviewApi?.updatedAt || scraped?.overviewLive?.asOf || now : undefined,
       },
       {
-        id: 'shakhesban',
-        name: 'شاخص‌بان',
-        status: 'live',
-        note: 'هم‌وزن + فرابورس (API زنده / اسکرپر)',
-        lastOk: overviewApi?.updatedAt || scraped?.overviewLive?.asOf || now,
+        id: 'rahavard',
+        name: 'رهاورد',
+        status: overviewApi?.indices?.equalWeight || overviewApi?.indices?.ifb || overviewApi?.rahavard?.ok
+          ? 'live'
+          : 'seed',
+        note: 'شاخص کل / هم‌وزن / فرابورس + تأثیر در شاخص',
+        lastOk: overviewApi?.updatedAt || now,
       },
       {
         id: 'parsistahlil',

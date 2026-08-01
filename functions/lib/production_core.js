@@ -229,6 +229,8 @@ function extractProducts(items) {
       const pk = Number(row.productKey)
       if (!Number.isFinite(pk) || pk === 999999) continue
       if (!row.productName) continue
+      // Skip minor/non-core products (e.g. کچاد آپاتیت)
+      if (/^apatite$/i.test(String(row.productName)) || /آپاتیت/.test(String(row.productName))) continue
       const val = row.value == null ? null : Number(row.value)
       if (!map.has(pk)) {
         map.set(pk, {

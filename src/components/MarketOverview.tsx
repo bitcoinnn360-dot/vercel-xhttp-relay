@@ -150,7 +150,7 @@ export function MarketOverview({
           change={o.tedpix.change}
           changePct={o.tedpix.changePct}
           delay={0.02}
-          hint={src.tedpix === 'tgju' ? 'TGJU' : 'شاخص‌بان / TGJU'}
+          hint={src.tedpix === 'tgju' ? 'TGJU' : src.tedpix?.includes('rahavard') ? 'رهاورد' : 'TGJU / رهاورد'}
         />
         <Kpi
           label={o.equalWeight.name}
@@ -158,7 +158,7 @@ export function MarketOverview({
           change={o.equalWeight.change}
           changePct={o.equalWeight.changePct}
           delay={0.05}
-          hint={src.equalWeight ? 'شاخص‌بان (زنده)' : 'seed'}
+          hint={src.equalWeight ? 'رهاورد (زنده)' : 'seed'}
         />
         <Kpi
           label={o.ifb.name}
@@ -166,7 +166,7 @@ export function MarketOverview({
           change={o.ifb.change}
           changePct={o.ifb.changePct}
           delay={0.08}
-          hint={src.ifb ? 'شاخص‌بان (زنده)' : 'seed'}
+          hint={src.ifb ? 'رهاورد (زنده)' : 'seed'}
         />
         <Kpi
           label="مجموع ارزش بازار"
@@ -179,7 +179,8 @@ export function MarketOverview({
               : (src.marketValue || '').includes('sourcearena')
                 ? 'بورس + فرابورس · SourceArena'
                 : (src.marketValue || '').includes('shakhesban')
-                  ? 'تابلو شاخص‌بان (پشتیبان)'
+                  ? 'پشتیبان تابلو'
+
                   : (src.marketValue || '').includes('cache') || (src.marketValue || '').includes('deployed')
                     ? 'آخرین مقدار معتبر (کش)'
                     : blocked.includes('sourcearena')
@@ -207,7 +208,7 @@ export function MarketOverview({
               : (src.totalTrade || '').includes('tradersarena')
                 ? 'TradersArena · ارزش معاملات بازار'
                 : (src.totalTrade || '').includes('shakhesban')
-                  ? 'تابلو شاخص‌بان'
+                  ? 'پشتیبان تابلو'
                   : src.totalTrade === 'parsistahlil'
                     ? 'پارسیس (کل بازار گزارش)'
                     : src.totalTrade || '—'
@@ -459,12 +460,12 @@ function ImpactPanel({
     sourceHint?.includes('rahavard365-ifb')
       ? 'رهاورد · شاخص قیمت فرابورس · ستون تغییر · نمودار واگرا'
       : sourceHint?.includes('rahavard')
-      ? 'رهاورد ۳۶۵ · تأثیر بر شاخص · نمودار واگرا'
-      : sourceHint?.includes('shakhesban')
-        ? 'محاسبه از تابلو · قیمت پایانی · نمودار واگرا'
-        : live
-          ? 'سورت تأثیر بر شاخص · زنده · نمودار واگرا'
-          : 'فعلاً از گزارش PDF — در انتظار داده زنده'
+        ? 'رهاورد ۳۶۵ · تأثیر بر شاخص · نمودار واگرا'
+        : sourceHint?.includes('shakhesban')
+          ? 'محاسبه از تابلو · قیمت پایانی · نمودار واگرا'
+          : live
+            ? 'سورت تأثیر بر شاخص · زنده · نمودار واگرا'
+            : 'فعلاً از گزارش PDF — در انتظار داده زنده'
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}

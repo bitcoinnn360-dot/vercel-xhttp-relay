@@ -17,31 +17,48 @@
       "flowGoldFunds": 0.0,
       "perCapitaBuy": 85.99,
       "perCapitaSell": 87.09
+    },
+    {
+      "time": "13:04",
+      "positive": 448,
+      "negative": 366,
+      "flat": 86,
+      "orderBuy": 4276.3,
+      "orderSell": 2669.4,
+      "retailFlow": -2296.2,
+      "flowStocks": -691.4,
+      "flowEquityFunds": -720.8,
+      "flowFixedIncome": -884.0,
+      "flowBasicMetals": 367.9,
+      "flowMetalOres": -40.0,
+      "flowGoldFunds": 253.5,
+      "perCapitaBuy": 91.54,
+      "perCapitaSell": 90.97
     }
   ],
   "current": {
-    "asOf": "2026-08-01T07:31:12.739431+00:00",
-    "time": "11:01",
+    "asOf": "2026-08-01T09:34:41.384610+00:00",
+    "time": "13:04",
     "dateJalali": "1405/05/10",
     "source": "tradersarena",
     "breadth": {
-      "positive": 501,
-      "negative": 291,
-      "flat": 97,
-      "total": 889
+      "positive": 448,
+      "negative": 366,
+      "flat": 86,
+      "total": 900
     },
-    "orderBuyBillionToman": 6690.4,
-    "orderSellBillionToman": 3398.0,
-    "retailMoneyFlowBillionToman": -1391.4,
-    "flowStocksBillionToman": -574.1,
-    "flowEquityFundsBillionToman": -410.7,
-    "flowFixedIncomeBillionToman": -406.7,
-    "flowBasicMetalsBillionToman": -35.7,
-    "flowMetalOresBillionToman": -9.7,
-    "flowGoldFundsBillionToman": 0.0,
-    "perCapitaBuyMillionToman": 85.99,
-    "perCapitaSellMillionToman": 87.09,
+    "orderBuyBillionToman": 4276.3,
+    "orderSellBillionToman": 2669.4,
+    "retailMoneyFlowBillionToman": -2296.2,
+    "flowStocksBillionToman": -691.4,
+    "flowEquityFundsBillionToman": -720.8,
+    "flowFixedIncomeBillionToman": -884.0,
+    "flowBasicMetalsBillionToman": 367.9,
+    "flowMetalOresBillionToman": -40.0,
+    "flowGoldFundsBillionToman": 253.5,
+    "perCapitaBuyMillionToman": 91.54,
+    "perCapitaSellMillionToman": 90.97,
     "note": "داده زنده TradersArena · ورود پول بازار + صنایع"
   },
-  "updatedAt": "2026-08-01T07:31:12.739859+00:00"
+  "updatedAt": "2026-08-01T09:34:41.384987+00:00"
 }

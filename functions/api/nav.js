@@ -199,11 +199,12 @@ function buildHoldings(liveRows) {
 }
 
 export async function onRequestGet(context) {
-  const { env } = context
+  const { request, env } = context
+  const forceRefresh = new URL(request.url).searchParams.has('fresh') || new URL(request.url).searchParams.has('refresh')
   const cookie = normalizeCookie(env?.BOURSEVIEW_COOKIE || env?.BOURSEVIEW_TOKEN || '')
 
   const cache = typeof caches !== 'undefined' ? caches.default : null
-  if (cache) {
+  if (cache && !forceRefresh) {
     const hit = await cache.match(CACHE_KEY)
     if (hit) return hit
   }
@@ -216,12 +217,14 @@ export async function onRequestGet(context) {
   }
 
   const errors = []
-  const holderNeedles = ['معادن و فلزات', 'ومعادن', 'توسعه معادن']
 
-  const liveRows = await mapPool(HOLDINGS, 4, async (h) => {
+  // Sequential + short pause: parallel bursts from CF IPs often get BV 403.
+  // Skip /shareholders (broken endpoint) to cut request volume in half.
+  const liveRows = await mapPool(HOLDINGS, 1, async (h) => {
     try {
+      await new Promise((r) => setTimeout(r, 180))
       const meta = await fetchStockMeta(cookie, h.exchange, h.isin, h.symbol)
-      const liveOwn = await tryFetchOwnershipPct(cookie, h.exchange, h.isin, holderNeedles)
+      const liveOwn = null
       const outstanding = meta.outstanding
       if (!outstanding || !meta.price) throw new Error('missing outstanding/price')
       // Prefer explicit post-capital-increase share count (e.g. فملی 52.17B → 71.55B).

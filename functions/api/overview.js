@@ -1114,7 +1114,7 @@ function mergeMoneyFlowStore(store, days) {
   return { store: next, added }
 }
 
-const OVERVIEW_CACHE_URL = 'https://pulse-cache.internal/midco-overview-v2'
+const OVERVIEW_CACHE_URL = 'https://pulse-cache.internal/midco-overview-v3'
 const OVERVIEW_CACHE_TTL_MS = 45_000
 
 export async function onRequestGet(context) {
@@ -1177,8 +1177,10 @@ export async function onRequestGet(context) {
     fetchEquityFundSymbolSet(),
     // Keep IFB sample small — Pages Functions have a tight subrequest budget (~50).
     bvCookie
-      ? scrapeBourseViewIfbMovers(bvCookie, { indexValue: 41000, topN: 12, concurrency: 4 })
+      ? scrapeBourseViewIfbMovers(bvCookie, { indexValue: 41000, topN: 10, concurrency: 5 })
       : Promise.resolve({ ok: false, error: 'BOURSEVIEW_COOKIE missing', ifbPos: [], ifbNeg: [] }),
+    // Fetch top-trades in the same wave so we don't exceed the subrequest budget afterwards.
+    fetchMainWatchTradeRows().catch(() => []),
   ])
 
   if (tasks[0].status === 'fulfilled') {
@@ -1294,13 +1296,20 @@ export async function onRequestGet(context) {
 
   let topTrades = []
   let topTradesSource = null
-  try {
-    const liveTop = await buildLiveTopTrades(equityFundSet)
-    topTrades = liveTop.topTrades || []
-    topTradesSource = liveTop.topTradesSource
-  } catch (e) {
-    errors.push(`top-trades: ${e}`)
-    // last-resort: board equities only (may be stale/wrong — better than empty)
+  if (tasks[14]?.status === 'fulfilled' && Array.isArray(tasks[14].value) && tasks[14].value.length) {
+    const byKey = new Map()
+    for (const row of tasks[14].value) {
+      const key = normalizeSymbolKey(row.name)
+      const prev = byKey.get(key)
+      if (!prev || row.valueBr > prev.valueBr) byKey.set(key, row)
+    }
+    topTrades = [...byKey.values()]
+      .sort((a, b) => b.valueBr - a.valueBr)
+      .slice(0, TOP_TRADES_LIMIT)
+      .map(({ name, valueBr }) => ({ name, valueBr }))
+    topTradesSource = topTrades.length ? 'tradersarena-mainwatch-symbols' : null
+  } else {
+    if (tasks[14]?.status === 'rejected') errors.push(`top-trades: ${tasks[14].reason}`)
     const fallbackRows = boardRows.filter((s) => (!s.marketFa || s.marketFa === 'سهام') && s.tradeValue > 0)
     topTrades = buildTopTradesFromBoard(fallbackRows, equityFundSet, TOP_TRADES_LIMIT)
     topTradesSource = topTrades.length ? 'shakhesban-board-fallback' : null
@@ -1335,12 +1344,13 @@ export async function onRequestGet(context) {
   }
   const marketPulseHistory = Array.isArray(pulseStore?.history) ? pulseStore.history : []
 
-  // Money-flow: keep historical parsistahlil series, append/update from TradersArena
-  // (live pulse + archived pulse days). Site/Telegram of پارسیس is often stale.
+  // Money-flow: keep historical parsistahlil series through 1405/05/07, then
+  // append/update only newer days from TradersArena (Parsis site is stale/down).
+  const PARSIS_HANDOFF = '1405/05/07'
   const taFlowDays = [
     ...moneyFlowDaysFromPulseStore(pulseStore),
     ...(tradersPulse ? [moneyFlowDayFromPulse(tradersPulse, tradersPulse.dateJalali)].filter(Boolean) : []),
-  ]
+  ].filter((d) => d && String(d.dateJalali) > PARSIS_HANDOFF)
   const parsisDays = Array.isArray(parsistahlil?.days) ? parsistahlil.days : []
   const mergedParsis = mergeMoneyFlowStore(moneyFlowStore, parsisDays)
   moneyFlowStore = { ...mergedParsis.store, source: 'parsistahlil+tradersarena' }

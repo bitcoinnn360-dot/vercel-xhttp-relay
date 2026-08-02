@@ -21,7 +21,7 @@ export function normalizeCookie(raw) {
   return c
 }
 
-async function bvJson(cookie, path, { attempts = 3, timeoutMs = 12000 } = {}) {
+async function bvJson(cookie, path, { attempts = 2, timeoutMs = 10000 } = {}) {
   let lastErr
   for (let i = 0; i < attempts; i++) {
     try {
@@ -35,16 +35,12 @@ async function bvJson(cookie, path, { attempts = 3, timeoutMs = 12000 } = {}) {
         },
         signal: AbortSignal.timeout(timeoutMs),
       })
-      if (res.status === 403 || res.status === 429) {
-        await new Promise((r) => setTimeout(r, 350 * (i + 1)))
-        lastErr = new Error(`bourseview ${res.status} ${path}`)
-        continue
-      }
+      // Do not retry 403/429 — each attempt burns a Worker subrequest.
       if (!res.ok) throw new Error(`bourseview ${res.status} ${path}`)
       return await res.json()
     } catch (e) {
       lastErr = e
-      await new Promise((r) => setTimeout(r, 200 * (i + 1)))
+      if (i + 1 < attempts) await new Promise((r) => setTimeout(r, 150 * (i + 1)))
     }
   }
   throw lastErr || new Error(`bourseview failed ${path}`)

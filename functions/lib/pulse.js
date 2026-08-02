@@ -172,6 +172,23 @@ export function parseTradersArenaMarket(data, industryFlows = null) {
   const flowFixedIncome = segFlow(nsf)
   const ind = industryFlows || {}
 
+  // Live index snapshots: iw = TEDPIX, ia = equal-weight (value, change, pct%)
+  const iw = Array.isArray(data.iw) ? data.iw : []
+  const ia = Array.isArray(data.ia) ? data.ia : []
+  const indexSnap = (arr, name) => {
+    const value = Number(arr[0])
+    const change = Number(arr[1])
+    const changePct = Number(arr[2])
+    if (!Number.isFinite(value) || !(value > 0)) return null
+    return {
+      name,
+      value,
+      change: Number.isFinite(change) ? change : 0,
+      changePct: Number.isFinite(changePct) ? changePct : 0,
+      source: 'tradersarena',
+    }
+  }
+
   return {
     asOf: new Date().toISOString(),
     time: clampPulseHistoryTime(today.time) || (today.time > PULSE_HIST_END ? PULSE_HIST_END : today.time),
@@ -204,6 +221,10 @@ export function parseTradersArenaMarket(data, industryFlows = null) {
     perCapitaBuyMillionToman: mt(m[2]),
     perCapitaSellMillionToman: mt(m[3]),
     buyPower: Number.isFinite(Number(m[4])) ? Number(m[4]) : null,
+    indices: {
+      tedpix: indexSnap(iw, 'شاخص کل بورس'),
+      equalWeight: indexSnap(ia, 'شاخص کل (هم وزن)'),
+    },
     note: 'داده زنده TradersArena · ورود پول بازار + صنایع',
   }
 }

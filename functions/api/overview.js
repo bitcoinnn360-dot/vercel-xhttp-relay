@@ -18,8 +18,6 @@ import {
 } from '../lib/pulse.js'
 import {
   scrapeBourseViewIfbMovers,
-  scrapeBourseViewIndex,
-  BV_EQUAL_WEIGHT,
   normalizeCookie as normalizeBvCookie,
 } from '../lib/bourseview_market.js'
 
@@ -1165,23 +1163,22 @@ export async function onRequestGet(context) {
     fetchJson(TGJU_AJAX),
     fetchJson(TGJU_TODAY),
     scrapeRahavardMarketIndices(),
-    // Parsistahlil site has been stale for days — keep as soft fallback only.
-    scrapeParsistahlil().catch((e) => ({ ok: false, error: String(e), days: [] })),
+    // Parsistahlil has been stale for days and burns subrequests — disabled in live path.
+    Promise.resolve({ ok: false, days: [], error: 'skipped; using tradersarena' }),
     scrapeSourceArena(token),
     fetchJson(`${origin}/data/money_flow_ytd.json`).catch(() => null),
     scrapeRahavardImpacts(),
-    scrapeShakhesbanBoardLite(4), // silent board fallback only — not shown as a data source
+    // Skip heavy Shakhesban board when BourseView IFB movers are available (subrequest budget).
+    bvCookie ? Promise.resolve([]) : scrapeShakhesbanBoardLite(3),
     fetchJson(`${origin}/data/market_pulse.json`).catch(() => null),
     fetchJson(`${origin}/data/impacts_cache.json`).catch(() => null),
     fetchTradersArenaPulse(),
     fetchJson(`${origin}/data/market.json`).catch(() => null),
     fetchEquityFundSymbolSet(),
+    // Keep IFB sample small — Pages Functions have a tight subrequest budget (~50).
     bvCookie
-      ? scrapeBourseViewIfbMovers(bvCookie, { indexValue: 41000, topN: 36, concurrency: 3 })
+      ? scrapeBourseViewIfbMovers(bvCookie, { indexValue: 41000, topN: 12, concurrency: 4 })
       : Promise.resolve({ ok: false, error: 'BOURSEVIEW_COOKIE missing', ifbPos: [], ifbNeg: [] }),
-    bvCookie
-      ? scrapeBourseViewIndex(bvCookie, BV_EQUAL_WEIGHT)
-      : Promise.resolve({ ok: false, error: 'no cookie' }),
   ])
 
   if (tasks[0].status === 'fulfilled') {
@@ -1206,24 +1203,6 @@ export async function onRequestGet(context) {
     if (rh.errors?.length) errors.push(...rh.errors.map((e) => `rahavard-index: ${e}`))
   } else {
     errors.push(`rahavard-index: ${tasks[2].reason || 'empty'}`)
-  }
-
-  // Prefer BourseView equal-weight when available (avoids Rahavard/Shakhesban flicker).
-  if (tasks[14]?.status === 'fulfilled' && tasks[14].value?.ok) {
-    indices = {
-      ...indices,
-      equalWeight: {
-        name: tasks[14].value.name,
-        value: tasks[14].value.value,
-        change: tasks[14].value.change,
-        changePct: tasks[14].value.changePct,
-        source: 'bourseview',
-      },
-    }
-  } else if (tasks[14]?.status === 'rejected') {
-    errors.push(`bourseview-equalWeight: ${tasks[14].reason}`)
-  } else if (tasks[14]?.value && !tasks[14].value.ok) {
-    errors.push(`bourseview-equalWeight: ${tasks[14].value.error || 'empty'}`)
   }
 
   if (tasks[3].status === 'fulfilled') {
@@ -1270,6 +1249,15 @@ export async function onRequestGet(context) {
     tradersPulse = tasks[10].value
   } else {
     errors.push(`tradersarena: ${tasks[10].reason}`)
+  }
+
+  // Prefer TradersArena equal-weight (same poll as pulse) — avoids stale Shakhesban flash
+  // and saves BourseView subrequests inside the overview Worker.
+  if (tradersPulse?.indices?.equalWeight?.value) {
+    indices = { ...indices, equalWeight: tradersPulse.indices.equalWeight }
+  }
+  if (tradersPulse?.indices?.tedpix?.value && !indices?.tedpix?.value) {
+    indices = { ...indices, tedpix: tradersPulse.indices.tedpix }
   }
 
   const marketJson = tasks[11].status === 'fulfilled' ? tasks[11].value : null

@@ -159,11 +159,13 @@ export function MarketOverview({
           changePct={o.equalWeight.changePct}
           delay={0.05}
           hint={
-            src.equalWeight?.includes('bourseview')
-              ? 'بورس‌ویو (زنده)'
-              : src.equalWeight
-                ? 'رهاورد / بورس‌ویو'
-                : 'seed'
+            src.equalWeight?.includes('tradersarena')
+              ? 'تریدرزآرنا (زنده)'
+              : src.equalWeight?.includes('bourseview')
+                ? 'بورس‌ویو (زنده)'
+                : src.equalWeight
+                  ? 'زنده'
+                  : 'seed'
           }
         />
         <Kpi

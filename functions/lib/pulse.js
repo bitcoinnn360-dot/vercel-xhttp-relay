@@ -382,6 +382,39 @@ export async function savePulseStore(cache, store) {
   }
 }
 
+/**
+ * Fill missing 5-minute slots between known samples by carrying forward the
+ * previous point. Does NOT invent pre-first-sample history (cron must collect
+ * from 09:00); only densifies gaps after the first real tick of the day.
+ */
+function densifyHistoryGaps(history, untilTime, stepMinutes = 5) {
+  if (!Array.isArray(history) || history.length < 1) return history || []
+  const sorted = [...history]
+    .filter((h) => h?.time && String(h.time) >= PULSE_HIST_START)
+    .sort((a, b) => String(a.time).localeCompare(String(b.time)))
+  if (!sorted.length) return []
+
+  const toMin = (hhmm) => {
+    const [h, m] = String(hhmm).split(':').map(Number)
+    return h * 60 + m
+  }
+  const fromMin = (n) =>
+    `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`
+
+  const end = toMin(clampPulseHistoryTime(untilTime) || sorted[sorted.length - 1].time)
+  const byTime = new Map(sorted.map((p) => [p.time, p]))
+  let cursor = toMin(sorted[0].time)
+  let last = sorted[0]
+  const out = []
+  while (cursor <= end) {
+    const t = fromMin(cursor)
+    if (byTime.has(t)) last = { ...byTime.get(t), time: t }
+    out.push({ ...last, time: t })
+    cursor += stepMinutes
+  }
+  return out
+}
+
 export function mergePulseHistory(store, pulse, { maxPoints = 720 } = {}) {
   const today = pulse?.dateJalali || jalaliTodayTehran().dateJalali
   const prev = normalizeStore(store)
@@ -402,6 +435,7 @@ export function mergePulseHistory(store, pulse, { maxPoints = 720 } = {}) {
     point.time = t
     history = history.filter((h) => h?.time !== t)
     history.push(point)
+    history = densifyHistoryGaps(history, t, 5)
     history = history
       .filter((h) => {
         const ht = String(h?.time || '')

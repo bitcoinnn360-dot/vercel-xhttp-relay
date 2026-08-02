@@ -2,17 +2,19 @@ name: Collect market pulse
 
 # Samples TradersArena every 5 minutes during Tehran trading.
 # TradersArena /data/market is a live snapshot only (no intraday history API),
-# so this cron + client polling are the only way to rebuild 09:00→now series.
+# so this cron + edge /api/pulse warming are the only way to rebuild 09:00→now
+# even when nobody has the dashboard open.
 # Cash board ~08:45–12:30; gold commodity ETFs continue until ~17:00.
-# Writes public/data/market_pulse.json to the pulse-data branch so /api/pulse
-# can load a full-day series even if nobody opened the dashboard.
+# 1) Warms https://www.arz-digital.xyz/api/pulse (Cloudflare Cache API history)
+# 2) Writes public/data/market_pulse.json to the pulse-data branch as backup
 
 on:
   schedule:
     # GitHub cron is UTC. Tehran = UTC+3:30
     # 08:45–17:00 Tehran ≈ 05:15–13:30 UTC
-    # Note: GitHub may coalesce schedules; */5 is the practical minimum.
-    - cron: '*/5 5-13 * * 0-3,6'
+    # Extra early/late slots because GitHub often delays */5 schedules.
+    - cron: '*/5 4-14 * * 0-3,6'
+    - cron: '0,10,20,30,40,50 5-13 * * 0-3,6'
   workflow_dispatch:
 
 permissions:
@@ -26,6 +28,38 @@ jobs:
   collect:
     runs-on: ubuntu-latest
     steps:
+      - name: Warm live /api/pulse (edge history from 09:00)
+        continue-on-error: true
+        run: |
+          set -e
+          url="${PULSE_API_URL:-https://www.arz-digital.xyz/api/pulse}"
+          echo "GET $url"
+          body=$(curl -fsS --max-time 45 "$url")
+          echo "$body" | python3 -c "
+          import json,sys
+          d=json.load(sys.stdin)
+          h=d.get('marketPulseHistory') or []
+          print('ok=', d.get('ok'), 'date=', d.get('dateJalali'), 'hist=', len(h),
+                'first=', (h[0] or {}).get('time') if h else None,
+                'last=', (h[-1] or {}).get('time') if h else None,
+                'source=', d.get('source'))
+          "
+
+      - name: Warm live /api/nav (BourseView portfolio prices)
+        continue-on-error: true
+        run: |
+          set -e
+          url="${NAV_API_URL:-https://www.arz-digital.xyz/api/nav}"
+          echo "GET $url"
+          body=$(curl -fsS --max-time 90 "$url")
+          echo "$body" | python3 -c "
+          import json,sys
+          d=json.load(sys.stdin)
+          print('ok=', d.get('ok'), 'live=', d.get('liveCount'), 'source=', d.get('source'))
+          h=next((x for x in (d.get('holdings') or []) if x.get('symbol')=='فملی'), None)
+          if h: print('فملی', h.get('pricePerShare'), h.get('asOf'))
+          "
+
       - name: Checkout pulse-data branch
         uses: actions/checkout@v4
         with:
@@ -41,7 +75,7 @@ jobs:
           fi
           mkdir -p public/data/pulse-days
 
-      - name: Collect pulse sample
+      - name: Collect pulse sample into pulse-data branch
         id: collect
         run: |
           set -e

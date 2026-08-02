@@ -356,6 +356,7 @@ async function fetchScrapedMarket(): Promise<{
     impactsFromTsetmc?: boolean
     impactsFromSourceArena?: boolean
     impactsFromRahavard?: boolean
+    impactsFromBourseView?: boolean
     impactsSource?: string
     dateJalali?: string
     marketPulse?: DashboardData['overview']['marketPulse']
@@ -505,6 +506,7 @@ type OverviewApi = {
   impacts?: DashboardData['impacts'] | null
   impactsFromSourceArena?: boolean
   impactsFromRahavard?: boolean
+  impactsFromBourseView?: boolean
   impactsSource?: string
   topTrades?: DashboardData['topTrades']
   topTradesSource?: string
@@ -517,6 +519,7 @@ type OverviewApi = {
   intraday?: { points?: IntradayPoint[]; note?: string; source?: string }
   parsistahlil?: {
     ok?: boolean
+    source?: string
     retailTradeValueBillionToman?: number
     retailMoneyFlowDailyBillionToman?: number
     dateJalali?: string
@@ -529,7 +532,7 @@ type OverviewApi = {
 
 async function fetchOverviewApi(): Promise<OverviewApi | null> {
   try {
-    const res = await fetchWithTimeout('/api/overview', 6000, { cache: 'no-store' })
+    const res = await fetchWithTimeout('/api/overview', 22000, { cache: 'no-store' })
     if (!res.ok) return null
     return (await res.json()) as OverviewApi
   } catch {
@@ -797,7 +800,7 @@ function applyFreshOverview(base: DashboardData, api: OverviewApi | null, intrad
   if (api?.indices) {
     if (patchIndex(o.tedpix, api.indices.tedpix)) sources.tedpix = api.indices.tedpix?.source || 'live'
     if (patchIndex(o.equalWeight, api.indices.equalWeight)) {
-      sources.equalWeight = api.indices.equalWeight?.source || 'rahavard365'
+      sources.equalWeight = api.indices.equalWeight?.source || 'bourseview'
     }
     if (patchIndex(o.ifb, api.indices.ifb)) {
       sources.ifb = api.indices.ifb?.source || 'rahavard365'
@@ -838,6 +841,10 @@ function applyFreshOverview(base: DashboardData, api: OverviewApi | null, intrad
     o.impactsLive = true
     sources.impacts = api.impactsSource || 'rahavard365'
   }
+  if ((api as { impactsFromBourseView?: boolean } | null)?.impactsFromBourseView && api?.impacts) {
+    o.impactsLive = true
+    sources.impacts = api.impactsSource || 'bourseview-ifb'
+  }
   if (api?.dateJalali) {
     o.dateJalali = api.dateJalali
     sources.dateJalali = 'tehran-live'
@@ -858,27 +865,29 @@ function applyFreshOverview(base: DashboardData, api: OverviewApi | null, intrad
   }
 
   const pars = api?.parsistahlil
+  const retailSrc = String(pars?.source || '')
+  const retailIsTa = /tradersarena/i.test(retailSrc) || /tradersarena/i.test(String(api?.retailMoneyFlowYtdSource || ''))
   if (pars?.ok) {
     if (pars.retailTradeValueBillionToman != null) {
       o.retailTradeValueBillionToman = pars.retailTradeValueBillionToman
       o.retailTradeValueHmt = pars.retailTradeValueBillionToman / 1000
-      sources.retailTrade = 'parsistahlil-live'
+      sources.retailTrade = retailIsTa ? 'tradersarena' : 'parsistahlil-live'
     }
     if (pars.retailMoneyFlowDailyBillionToman != null) {
       o.retailMoneyFlowDaily = pars.retailMoneyFlowDailyBillionToman
-      sources.retailMoneyFlowDaily = 'parsistahlil-live'
+      sources.retailMoneyFlowDaily = retailIsTa ? 'tradersarena' : 'parsistahlil-live'
     }
     notes.unshift(
-      `پارسیس زنده: خرد=${pars.retailTradeValueBillionToman ?? '—'} · پول حقیقی=${pars.retailMoneyFlowDailyBillionToman ?? '—'} میلیارد تومان` +
+      `${retailIsTa ? 'تریدرزآرنا' : 'پارسیس'} زنده: خرد=${pars.retailTradeValueBillionToman ?? '—'} · پول حقیقی=${pars.retailMoneyFlowDailyBillionToman ?? '—'} میلیارد تومان` +
         (pars.dateJalali ? ` (${pars.dateJalali})` : ''),
     )
   } else if (api) {
-    notes.unshift(`پارسیس در API زنده خوانده نشد${pars?.error ? `: ${pars.error}` : ''}`)
+    notes.unshift(`جریان پول حقیقی در API زنده خوانده نشد${pars?.error ? `: ${pars.error}` : ''}`)
   }
 
   if (api?.retailMoneyFlowYtd != null && Number.isFinite(api.retailMoneyFlowYtd)) {
     o.retailMoneyFlowYtd = api.retailMoneyFlowYtd
-    sources.retailMoneyFlowYtd = api.retailMoneyFlowYtdSource || 'parsistahlil-cumulative'
+    sources.retailMoneyFlowYtd = api.retailMoneyFlowYtdSource || 'tradersarena+parsistahlil'
     notes.unshift(
       `YTD پول حقیقی از ابتدای ۱۴۰۴: ${api.retailMoneyFlowYtd}` +
         (api.moneyFlowAsOfJalali ? ` (تا ${api.moneyFlowAsOfJalali})` : ''),
@@ -918,11 +927,21 @@ function applyOverviewLive(
   const sources: Record<string, string> = {}
 
   if (live.indices) {
-    if (patchIndex(o.tedpix, live.indices.tedpix)) sources.tedpix = live.indices.tedpix?.source || 'rahavard365'
-    if (patchIndex(o.equalWeight, live.indices.equalWeight)) {
-      sources.equalWeight = live.indices.equalWeight?.source || 'rahavard365'
+    // Never flash stale Shakhesban snapshots from market.json (equal-weight used to
+    // jump back to ~1.426M for a second before /api/overview corrected it).
+    const allowIdx = (idx?: { source?: string } | null) => {
+      const src = String(idx?.source || '')
+      return src && !/shakhesban/i.test(src)
     }
-    if (patchIndex(o.ifb, live.indices.ifb)) sources.ifb = live.indices.ifb?.source || 'rahavard365'
+    if (allowIdx(live.indices.tedpix) && patchIndex(o.tedpix, live.indices.tedpix)) {
+      sources.tedpix = live.indices.tedpix?.source || 'live'
+    }
+    if (allowIdx(live.indices.equalWeight) && patchIndex(o.equalWeight, live.indices.equalWeight)) {
+      sources.equalWeight = live.indices.equalWeight?.source || 'live'
+    }
+    if (allowIdx(live.indices.ifb) && patchIndex(o.ifb, live.indices.ifb)) {
+      sources.ifb = live.indices.ifb?.source || 'live'
+    }
   }
 
   if (live.totalMarketValueHmt != null) {
@@ -1228,7 +1247,8 @@ type NavApiBundle = {
 
 async function fetchNavApi(): Promise<NavApiBundle | null> {
   try {
-    const res = await fetchWithTimeout('/api/nav', 6000, { cache: 'no-store' })
+    // Sequential BourseView holdings often need 15–40s from edge; keep under Pages limit.
+    const res = await fetchWithTimeout('/api/nav', 45000, { cache: 'no-store' })
     if (!res.ok) return null
     const json = (await res.json()) as NavApiBundle
     if (!json?.ok || !json.holdings?.length || !json.nav) return null
@@ -1735,6 +1755,7 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
         (s) =>
           s.id !== 'shakhesban' &&
           s.id !== 'parsistahlil' &&
+          s.id !== 'tradersarena' &&
           s.id !== 'tsetmc' &&
           s.id !== 'sourcearena' &&
           s.id !== 'rahavard',
@@ -1752,21 +1773,25 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
       },
       {
         id: 'rahavard',
-        name: 'رهاورد',
-        status: overviewApi?.indices?.equalWeight || overviewApi?.indices?.ifb || overviewApi?.rahavard?.ok
-          ? 'live'
-          : 'seed',
-        note: 'شاخص کل / هم‌وزن / فرابورس + تأثیر در شاخص',
+        name: 'رهاورد / بورس‌ویو',
+        status:
+          overviewApi?.indices?.equalWeight ||
+          overviewApi?.indices?.ifb ||
+          overviewApi?.rahavard?.ok ||
+          overviewApi?.impactsFromBourseView
+            ? 'live'
+            : 'seed',
+        note: 'شاخص‌ها + تأثیر مثبت/منفی فرابورس از بورس‌ویو',
         lastOk: overviewApi?.updatedAt || now,
       },
       {
-        id: 'parsistahlil',
-        name: 'پارسیس‌تحلیل',
-        status: hasPars ? 'live' : 'blocked',
+        id: 'tradersarena',
+        name: 'تریدرزآرنا',
+        status: hasPars || overviewApi?.marketPulse ? 'live' : 'blocked',
         note: hasPars
-          ? `معاملات خرد + پول حقیقی${overviewApi?.parsistahlil?.dateJalali ? ` · ${overviewApi.parsistahlil.dateJalali}` : ''}`
-          : overviewApi?.parsistahlil?.error || 'گزارش وضعیت بازار خوانده نشد',
-        lastOk: hasPars ? overviewApi?.updatedAt || now : undefined,
+          ? `پول حقیقی + پالس لحظه‌ای${overviewApi?.parsistahlil?.dateJalali ? ` · ${overviewApi.parsistahlil.dateJalali}` : ''}`
+          : overviewApi?.parsistahlil?.error || 'داده بازار خوانده نشد',
+        lastOk: hasPars || overviewApi?.marketPulse ? overviewApi?.updatedAt || now : undefined,
       },
     ]
   }

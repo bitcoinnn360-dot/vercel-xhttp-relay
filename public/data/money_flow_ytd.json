@@ -1,11 +1,11 @@
 {
   "baselineYtdBillionToman": -25271,
   "baselineThroughJalali": "1405/04/29",
-  "ytdBillionToman": -15905,
-  "asOfJalali": "1405/05/04",
-  "asOfLabel": "05/04",
-  "updatedAt": "2026-07-26T14:06:45.148215+00:00",
-  "source": "parsistahlil.ir",
+  "ytdBillionToman": -16824,
+  "asOfJalali": "1405/05/11",
+  "asOfLabel": "05/11",
+  "updatedAt": "2026-08-02T07:32:10.846236+00:00",
+  "source": "tradersarena+parsistahlil",
   "series": [
     {
       "date": "02/29",
@@ -190,6 +190,34 @@
       "dateJalali": "1405/05/04",
       "value": 6193,
       "contentId": "1180"
+    },
+    {
+      "date": "05/05",
+      "dateJalali": "1405/05/05",
+      "value": 41,
+      "contentId": "1181"
+    },
+    {
+      "date": "05/06",
+      "dateJalali": "1405/05/06",
+      "value": 1664,
+      "contentId": "1182"
+    },
+    {
+      "date": "05/07",
+      "dateJalali": "1405/05/07",
+      "value": -2169,
+      "contentId": "1183"
+    },
+    {
+      "date": "05/10",
+      "dateJalali": "1405/05/10",
+      "value": -497
+    },
+    {
+      "date": "05/11",
+      "dateJalali": "1405/05/11",
+      "value": 42
     }
   ],
   "notes": [

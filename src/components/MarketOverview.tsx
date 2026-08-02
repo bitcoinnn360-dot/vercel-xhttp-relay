@@ -158,7 +158,13 @@ export function MarketOverview({
           change={o.equalWeight.change}
           changePct={o.equalWeight.changePct}
           delay={0.05}
-          hint={src.equalWeight ? 'رهاورد (زنده)' : 'seed'}
+          hint={
+            src.equalWeight?.includes('bourseview')
+              ? 'بورس‌ویو (زنده)'
+              : src.equalWeight
+                ? 'رهاورد / بورس‌ویو'
+                : 'seed'
+          }
         />
         <Kpi
           label={o.ifb.name}

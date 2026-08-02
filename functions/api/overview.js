@@ -5,10 +5,10 @@
  * Pulls fresh:
  *  - TGJU quotes (TEDPIX, USD)
  *  - TGJU today-table-data (intraday index path)
- *  - shakhesban indices (equal-weight, IFB)
+ *  - Rahavard / BourseView market indices
  *  - SourceArena market_bourse + market_farabourse (official MV sum)
- *  - parsistahlil.ir latest retail / money-flow report
- *  - TradersArena /data/market for order-book + per-capita pulse
+ *  - TradersArena retail money-flow + order-book pulse (parsistahlil fallback)
+ *  - BourseView IFB positive/negative movers
  */
 import {
   fetchTradersArenaPulse,
@@ -16,6 +16,12 @@ import {
   savePulseStore,
   mergePulseHistory,
 } from '../lib/pulse.js'
+import {
+  scrapeBourseViewIfbMovers,
+  scrapeBourseViewIndex,
+  BV_EQUAL_WEIGHT,
+  normalizeCookie as normalizeBvCookie,
+} from '../lib/bourseview_market.js'
 
 const TGJU_AJAX = 'https://call2.tgju.org/ajax.json'
 const TGJU_TODAY = 'https://api.tgju.org/v1/market/indicator/today-table-data/bourse?lang=fa'
@@ -555,10 +561,7 @@ async function scrapeRahavardImpacts() {
   }
 }
 
-/** Farabourse movers from Rahavard «شاخص قیمت فرابورس» (index id 109) — ستون تغییر. */
-const RAHAVARD_IFB_PRICE_INDEX_ID = 109
-
-/** Core market indices on Rahavard (replaces Shakhesban for overview KPIs). */
+/** Core market indices on Rahavard (TEDPIX / IFB; equal-weight preferably from BourseView). */
 const RAHAVARD_INDEX = {
   tedpix: { id: 1, name: 'شاخص کل بورس' },
   equalWeight: { id: 57, name: 'شاخص کل (هم وزن)' },
@@ -605,43 +608,6 @@ async function scrapeRahavardMarketIndices() {
     ok: Boolean(out.tedpix || out.equalWeight || out.ifb),
     ...out,
     errors,
-  }
-}
-
-async function scrapeRahavardIfbMovers() {
-  const hdrs = {
-    Accept: 'application/json, text/plain, */*',
-    'User-Agent': UA,
-    Referer: `https://rahavard365.com/index/${RAHAVARD_IFB_PRICE_INDEX_ID}/assets`,
-    Origin: 'https://rahavard365.com',
-  }
-  try {
-    const res = await fetch(`${RAHAVARD_API}/index/${RAHAVARD_IFB_PRICE_INDEX_ID}/assets`, {
-      headers: hdrs,
-      signal: AbortSignal.timeout(UPSTREAM_MS),
-    })
-    if (!res.ok) throw new Error(`rahavard ifb ${res.status}`)
-    const payload = await res.json()
-    const rows = Array.isArray(payload?.data) ? payload.data : []
-    const scored = []
-    for (const row of rows) {
-      const symbol = String(row?.slug || row?.asset_name || '').trim()
-      // ستون «تغییر» روی جدول دارایی‌های شاخص — نه درصد تغییر
-      const change = parseNum(row?.real_close_price_change)
-      if (!symbol || change == null) continue
-      scored.push({ symbol, impact: Math.round(change * 10) / 10 })
-    }
-    const pos = scored.filter((r) => r.impact > 0).sort((a, b) => b.impact - a.impact).slice(0, 5)
-    const neg = scored.filter((r) => r.impact < 0).sort((a, b) => a.impact - b.impact).slice(0, 5)
-    return {
-      ok: Boolean(pos.length || neg.length),
-      source: 'rahavard365-ifb-index',
-      ifbPos: pos,
-      ifbNeg: neg,
-      universe: scored.length,
-    }
-  } catch (e) {
-    return { ok: false, source: 'rahavard365-ifb-index', error: String(e), ifbPos: [], ifbNeg: [] }
   }
 }
 
@@ -882,7 +848,7 @@ function resolveMarketStats({
   }
 }
 
-function mergeImpacts(rahavard, board, arena, rahavardIfb) {
+function mergeImpacts(rahavard, board, arena, ifbMovers) {
   const out = { boursePos: [], bourseNeg: [], ifbPos: [], ifbNeg: [] }
   const sources = []
   if (rahavard?.ok) {
@@ -890,10 +856,11 @@ function mergeImpacts(rahavard, board, arena, rahavardIfb) {
     out.bourseNeg = rahavard.bourseNeg || []
     sources.push('rahavard365')
   }
-  if (rahavardIfb?.ok) {
-    out.ifbPos = rahavardIfb.ifbPos || []
-    out.ifbNeg = rahavardIfb.ifbNeg || []
-    sources.push('rahavard365-ifb-index')
+  // Prefer BourseView IFB movers — Rahavard IFB assets table often freezes mid-session.
+  if (ifbMovers?.ok) {
+    out.ifbPos = ifbMovers.ifbPos || []
+    out.ifbNeg = ifbMovers.ifbNeg || []
+    sources.push(ifbMovers.source || 'bourseview-ifb')
   }
   if (arena?.impacts) {
     if (!out.boursePos.length) out.boursePos = arena.impacts.boursePos || []
@@ -911,6 +878,56 @@ function mergeImpacts(rahavard, board, arena, rahavardIfb) {
   }
   const has = Object.values(out).some((arr) => arr.length > 0)
   return { impacts: has ? out : null, source: sources.join('+') || null }
+}
+
+/** Build a money-flow day row from a TradersArena pulse snapshot / history point. */
+function moneyFlowDayFromPulse(pulseOrPoint, dateJalali) {
+  const dj = String(dateJalali || pulseOrPoint?.dateJalali || '').replace(/-/g, '/')
+  if (!/^\d{4}\/\d{2}\/\d{2}$/.test(dj)) return null
+  const flowRaw =
+    pulseOrPoint?.retailMoneyFlowBillionToman ??
+    pulseOrPoint?.retailFlow ??
+    null
+  if (flowRaw == null || !Number.isFinite(Number(flowRaw))) return null
+  const buy = pulseOrPoint?.retailBuyBillionToman
+  const sell = pulseOrPoint?.retailSellBillionToman
+  let retailTrade = null
+  if (buy != null && sell != null) retailTrade = Math.round((Number(buy) + Number(sell)) / 2)
+  else if (buy != null) retailTrade = Math.round(Number(buy))
+  return {
+    ok: true,
+    source: 'tradersarena',
+    dateJalali: dj,
+    date: dj.slice(5),
+    retailMoneyFlowDailyBillionToman: Math.round(Number(flowRaw)),
+    retailTradeValueBillionToman: retailTrade,
+    totalTradeValueBillionToman:
+      pulseOrPoint?.totalTradeValueBillionToman != null
+        ? Math.round(Number(pulseOrPoint.totalTradeValueBillionToman))
+        : null,
+  }
+}
+
+/** Extract end-of-day retail flow points from pulse history archive. */
+function moneyFlowDaysFromPulseStore(store) {
+  const days = []
+  if (!store || typeof store !== 'object') return days
+  const bag = { ...(store.days || {}) }
+  if (store.dateJalali && Array.isArray(store.history) && store.history.length) {
+    bag[store.dateJalali] = store.history
+  }
+  for (const [dj, hist] of Object.entries(bag)) {
+    if (!Array.isArray(hist) || !hist.length) continue
+    const withFlow = hist.filter((p) => p && p.retailFlow != null)
+    const last = withFlow.length ? withFlow[withFlow.length - 1] : hist[hist.length - 1]
+    const row = moneyFlowDayFromPulse(last, dj)
+    if (row) days.push(row)
+  }
+  if (store.current) {
+    const row = moneyFlowDayFromPulse(store.current, store.current.dateJalali || store.dateJalali)
+    if (row) days.push(row)
+  }
+  return days
 }
 
 const JALALI_MONTHS = {
@@ -1058,7 +1075,7 @@ function recomputeMoneyFlowYtd(store) {
     asOfJalali: asOf,
     asOfLabel: asLabel,
     updatedAt: new Date().toISOString(),
-    source: 'parsistahlil.ir',
+    source: store.source || 'tradersarena+parsistahlil',
   }
 }
 
@@ -1138,6 +1155,9 @@ export async function onRequestGet(context) {
   const token =
     context?.env?.SOURCEARENA_TOKEN ||
     'bba6d330a87bac533f18cc245d3baeaa'
+  const bvCookie = normalizeBvCookie(
+    context?.env?.BOURSEVIEW_COOKIE || context?.env?.BOURSEVIEW_TOKEN || '',
+  )
 
   const origin = new URL(context.request.url).origin
 
@@ -1145,7 +1165,8 @@ export async function onRequestGet(context) {
     fetchJson(TGJU_AJAX),
     fetchJson(TGJU_TODAY),
     scrapeRahavardMarketIndices(),
-    scrapeParsistahlil(),
+    // Parsistahlil site has been stale for days — keep as soft fallback only.
+    scrapeParsistahlil().catch((e) => ({ ok: false, error: String(e), days: [] })),
     scrapeSourceArena(token),
     fetchJson(`${origin}/data/money_flow_ytd.json`).catch(() => null),
     scrapeRahavardImpacts(),
@@ -1155,7 +1176,12 @@ export async function onRequestGet(context) {
     fetchTradersArenaPulse(),
     fetchJson(`${origin}/data/market.json`).catch(() => null),
     fetchEquityFundSymbolSet(),
-    scrapeRahavardIfbMovers(),
+    bvCookie
+      ? scrapeBourseViewIfbMovers(bvCookie, { indexValue: 41000, topN: 36, concurrency: 3 })
+      : Promise.resolve({ ok: false, error: 'BOURSEVIEW_COOKIE missing', ifbPos: [], ifbNeg: [] }),
+    bvCookie
+      ? scrapeBourseViewIndex(bvCookie, BV_EQUAL_WEIGHT)
+      : Promise.resolve({ ok: false, error: 'no cookie' }),
   ])
 
   if (tasks[0].status === 'fulfilled') {
@@ -1180,6 +1206,24 @@ export async function onRequestGet(context) {
     if (rh.errors?.length) errors.push(...rh.errors.map((e) => `rahavard-index: ${e}`))
   } else {
     errors.push(`rahavard-index: ${tasks[2].reason || 'empty'}`)
+  }
+
+  // Prefer BourseView equal-weight when available (avoids Rahavard/Shakhesban flicker).
+  if (tasks[14]?.status === 'fulfilled' && tasks[14].value?.ok) {
+    indices = {
+      ...indices,
+      equalWeight: {
+        name: tasks[14].value.name,
+        value: tasks[14].value.value,
+        change: tasks[14].value.change,
+        changePct: tasks[14].value.changePct,
+        source: 'bourseview',
+      },
+    }
+  } else if (tasks[14]?.status === 'rejected') {
+    errors.push(`bourseview-equalWeight: ${tasks[14].reason}`)
+  } else if (tasks[14]?.value && !tasks[14].value.ok) {
+    errors.push(`bourseview-equalWeight: ${tasks[14].value.error || 'empty'}`)
   }
 
   if (tasks[3].status === 'fulfilled') {
@@ -1211,14 +1255,6 @@ export async function onRequestGet(context) {
     errors.push(`rahavard: ${tasks[6].reason}`)
   }
 
-  let rahavardIfb = { ok: false }
-  if (tasks[13].status === 'fulfilled') {
-    rahavardIfb = tasks[13].value
-    if (!rahavardIfb.ok) errors.push(`rahavard-ifb: ${rahavardIfb.error || 'empty'}`)
-  } else if (tasks[13].status === 'rejected') {
-    errors.push(`rahavard-ifb: ${tasks[13].reason}`)
-  }
-
   let boardRows = []
   if (tasks[7].status === 'fulfilled') {
     boardRows = tasks[7].value || []
@@ -1246,6 +1282,28 @@ export async function onRequestGet(context) {
     errors.push(`equity-funds: ${tasks[12].reason}`)
   }
 
+  let bvIfb = { ok: false }
+  if (tasks[13].status === 'fulfilled') {
+    bvIfb = tasks[13].value || { ok: false }
+    // Rescale impacts if we now have a live IFB index (task used a placeholder).
+    const liveIfb = Number(indices?.ifb?.value)
+    const used = Number(bvIfb.indexValue)
+    if (bvIfb.ok && liveIfb > 0 && used > 0 && Math.abs(liveIfb - used) / used > 0.01) {
+      const scale = liveIfb / used
+      const rescale = (rows) =>
+        (rows || []).map((r) => ({ ...r, impact: Math.round(r.impact * scale * 10) / 10 }))
+      bvIfb = {
+        ...bvIfb,
+        ifbPos: rescale(bvIfb.ifbPos),
+        ifbNeg: rescale(bvIfb.ifbNeg),
+        indexValue: liveIfb,
+      }
+    }
+    if (!bvIfb.ok) errors.push(`bourseview-ifb: ${bvIfb.error || 'empty'}`)
+  } else {
+    errors.push(`bourseview-ifb: ${tasks[13].reason}`)
+  }
+
   let topTrades = []
   let topTradesSource = null
   try {
@@ -1261,7 +1319,7 @@ export async function onRequestGet(context) {
   }
 
   const boardImpacts = boardRows.length ? computeBoardImpacts(boardRows, indices) : null
-  const mergedImpacts = mergeImpacts(rahavard, boardImpacts, sourcearena, rahavardIfb)
+  const mergedImpacts = mergeImpacts(rahavard, boardImpacts, sourcearena, bvIfb)
   // fill gaps from deployed cache
   if (mergedImpacts.impacts && impactsCache) {
     for (const k of ['boursePos', 'bourseNeg', 'ifbPos', 'ifbNeg']) {
@@ -1289,10 +1347,25 @@ export async function onRequestGet(context) {
   }
   const marketPulseHistory = Array.isArray(pulseStore?.history) ? pulseStore.history : []
 
-  // topTrades already resolved above via TradersArena market-values + Rahavard equity funds
+  // Money-flow: keep historical parsistahlil series, append/update from TradersArena
+  // (live pulse + archived pulse days). Site/Telegram of پارسیس is often stale.
+  const taFlowDays = [
+    ...moneyFlowDaysFromPulseStore(pulseStore),
+    ...(tradersPulse ? [moneyFlowDayFromPulse(tradersPulse, tradersPulse.dateJalali)].filter(Boolean) : []),
+  ]
+  const parsisDays = Array.isArray(parsistahlil?.days) ? parsistahlil.days : []
+  const mergedParsis = mergeMoneyFlowStore(moneyFlowStore, parsisDays)
+  moneyFlowStore = { ...mergedParsis.store, source: 'parsistahlil+tradersarena' }
+  const merged = mergeMoneyFlowStore(moneyFlowStore, taFlowDays)
+  moneyFlowStore = { ...merged.store, source: 'tradersarena+parsistahlil' }
 
-  const merged = mergeMoneyFlowStore(moneyFlowStore, parsistahlil.days || [])
-  moneyFlowStore = merged.store
+  const taToday = moneyFlowDayFromPulse(tradersPulse, tradersPulse?.dateJalali || today.dateJalali)
+  const retailLive = taToday || (parsistahlil?.ok ? {
+    retailTradeValueBillionToman: parsistahlil.retailTradeValueBillionToman,
+    retailMoneyFlowDailyBillionToman: parsistahlil.retailMoneyFlowDailyBillionToman,
+    dateJalali: parsistahlil.dateJalali,
+    source: 'parsistahlil.ir',
+  } : null)
 
   const usd = quotes.price_dollar_rl?.value ?? null
   const tedpix = indices.tedpix || (quotes.bourse
@@ -1320,8 +1393,9 @@ export async function onRequestGet(context) {
 
   const blocked = [
     ...(sourcearena.ok ? [] : ['sourcearena']),
-    ...(parsistahlil.ok ? [] : ['parsistahlil']),
+    ...(tradersPulse ? [] : ['tradersarena']),
     ...(rahavard.ok ? [] : ['rahavard365']),
+    ...(bvIfb.ok ? [] : ['bourseview-ifb']),
   ]
 
   const body = {
@@ -1342,6 +1416,7 @@ export async function onRequestGet(context) {
     },
     sourcearena,
     rahavard,
+    bourseviewIfb: bvIfb,
     bourseMarketValueHmt: marketStats.bourseMarketValueHmt,
     ifbMarketValueHmt: marketStats.ifbMarketValueHmt,
     totalMarketValueHmt: marketStats.totalMarketValueHmt,
@@ -1352,24 +1427,40 @@ export async function onRequestGet(context) {
     impacts: mergedImpacts.impacts,
     impactsFromSourceArena: Boolean(mergedImpacts.source?.includes('sourcearena')),
     impactsFromRahavard: Boolean(mergedImpacts.source?.includes('rahavard')),
+    impactsFromBourseView: Boolean(mergedImpacts.source?.includes('bourseview')),
     impactsSource: mergedImpacts.source,
     topTrades,
     topTradesSource,
     marketPulse,
     marketPulseHistory,
     parsistahlil,
+    tradersArenaMoneyFlow: retailLive,
     retailMoneyFlowYtd: moneyFlowStore.ytdBillionToman,
-    retailMoneyFlowYtdSource: 'parsistahlil-cumulative',
+    retailMoneyFlowYtdSource: moneyFlowStore.source || 'tradersarena+parsistahlil',
     moneyFlowAsOfJalali: moneyFlowStore.asOfJalali,
     moneyFlowSeries: (moneyFlowStore.series || []).map((r) => ({
       date: r.date,
       dateJalali: r.dateJalali,
       value: r.value,
     })),
-    moneyFlowAdded: merged.added,
+    moneyFlowAdded: [...(mergedParsis.added || []), ...(merged.added || [])],
     usdRate: usd,
     errors,
     blocked,
+  }
+
+  // Surface live retail KPIs in a shape the client already understands (parsistahlil slot).
+  if (retailLive && tradersPulse) {
+    body.parsistahlil = {
+      ok: true,
+      source: 'tradersarena',
+      dateJalali: retailLive.dateJalali,
+      retailTradeValueBillionToman: retailLive.retailTradeValueBillionToman,
+      totalTradeValueBillionToman: retailLive.totalTradeValueBillionToman,
+      retailMoneyFlowDailyBillionToman: retailLive.retailMoneyFlowDailyBillionToman,
+      days: taFlowDays,
+      note: 'جایگزین پارسیس‌تحلیل (سایت قطع/منسوخ) — داده زنده TradersArena',
+    }
   }
 
   const headers = {

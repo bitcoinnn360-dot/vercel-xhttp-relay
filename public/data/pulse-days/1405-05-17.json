@@ -68,31 +68,48 @@
       "flowGoldFunds": 0.0,
       "perCapitaBuy": 112.63,
       "perCapitaSell": 60.64
+    },
+    {
+      "time": "12:37",
+      "positive": 812,
+      "negative": 18,
+      "flat": 74,
+      "orderBuy": 23757.7,
+      "orderSell": 179.7,
+      "retailFlow": 4806.3,
+      "flowStocks": 7237.1,
+      "flowEquityFunds": 1740.1,
+      "flowFixedIncome": -4170.9,
+      "flowBasicMetals": 1545.1,
+      "flowMetalOres": 634.0,
+      "flowGoldFunds": -342.9,
+      "perCapitaBuy": 120.38,
+      "perCapitaSell": 63.67
     }
   ],
   "current": {
-    "asOf": "2026-08-08T08:19:01.726423+00:00",
-    "time": "11:49",
+    "asOf": "2026-08-08T09:07:23.197741+00:00",
+    "time": "12:37",
     "dateJalali": "1405/05/17",
     "source": "tradersarena",
     "breadth": {
-      "positive": 811,
-      "negative": 16,
-      "flat": 79,
-      "total": 906
+      "positive": 812,
+      "negative": 18,
+      "flat": 74,
+      "total": 904
     },
-    "orderBuyBillionToman": 34078.6,
-    "orderSellBillionToman": 180.2,
-    "retailMoneyFlowBillionToman": 2407.2,
-    "flowStocksBillionToman": 4806.7,
-    "flowEquityFundsBillionToman": 1449.1,
-    "flowFixedIncomeBillionToman": -3848.6,
-    "flowBasicMetalsBillionToman": 130.6,
-    "flowMetalOresBillionToman": 567.8,
-    "flowGoldFundsBillionToman": 0.0,
-    "perCapitaBuyMillionToman": 112.63,
-    "perCapitaSellMillionToman": 60.64,
+    "orderBuyBillionToman": 23757.7,
+    "orderSellBillionToman": 179.7,
+    "retailMoneyFlowBillionToman": 4806.3,
+    "flowStocksBillionToman": 7237.1,
+    "flowEquityFundsBillionToman": 1740.1,
+    "flowFixedIncomeBillionToman": -4170.9,
+    "flowBasicMetalsBillionToman": 1545.1,
+    "flowMetalOresBillionToman": 634.0,
+    "flowGoldFundsBillionToman": -342.9,
+    "perCapitaBuyMillionToman": 120.38,
+    "perCapitaSellMillionToman": 63.67,
     "note": "داده زنده TradersArena · ورود پول بازار + صنایع"
   },
-  "updatedAt": "2026-08-08T08:19:01.726959+00:00"
+  "updatedAt": "2026-08-08T09:07:23.198425+00:00"
 }

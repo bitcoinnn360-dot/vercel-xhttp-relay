@@ -68,31 +68,48 @@
       "flowGoldFunds": 0.0,
       "perCapitaBuy": 105.94,
       "perCapitaSell": 125.98
+    },
+    {
+      "time": "12:43",
+      "positive": 381,
+      "negative": 454,
+      "flat": 80,
+      "orderBuy": 5682.3,
+      "orderSell": 2127.1,
+      "retailFlow": -9779.4,
+      "flowStocks": -4429.7,
+      "flowEquityFunds": -2480.5,
+      "flowFixedIncome": -2869.1,
+      "flowBasicMetals": 938.7,
+      "flowMetalOres": -190.1,
+      "flowGoldFunds": -7.8,
+      "perCapitaBuy": 107.72,
+      "perCapitaSell": 124.72
     }
   ],
   "current": {
-    "asOf": "2026-08-09T08:24:57.534271+00:00",
-    "time": "11:54",
+    "asOf": "2026-08-09T09:13:06.487330+00:00",
+    "time": "12:43",
     "dateJalali": "1405/05/18",
     "source": "tradersarena",
     "breadth": {
-      "positive": 359,
-      "negative": 474,
-      "flat": 84,
-      "total": 917
+      "positive": 381,
+      "negative": 454,
+      "flat": 80,
+      "total": 915
     },
-    "orderBuyBillionToman": 8126.7,
-    "orderSellBillionToman": 3210.5,
-    "retailMoneyFlowBillionToman": -9334.1,
-    "flowStocksBillionToman": -4336.7,
-    "flowEquityFundsBillionToman": -2404.7,
-    "flowFixedIncomeBillionToman": -2592.7,
-    "flowBasicMetalsBillionToman": 726.2,
-    "flowMetalOresBillionToman": -213.6,
-    "flowGoldFundsBillionToman": 0.0,
-    "perCapitaBuyMillionToman": 105.94,
-    "perCapitaSellMillionToman": 125.98,
+    "orderBuyBillionToman": 5682.3,
+    "orderSellBillionToman": 2127.1,
+    "retailMoneyFlowBillionToman": -9779.4,
+    "flowStocksBillionToman": -4429.7,
+    "flowEquityFundsBillionToman": -2480.5,
+    "flowFixedIncomeBillionToman": -2869.1,
+    "flowBasicMetalsBillionToman": 938.7,
+    "flowMetalOresBillionToman": -190.1,
+    "flowGoldFundsBillionToman": -7.8,
+    "perCapitaBuyMillionToman": 107.72,
+    "perCapitaSellMillionToman": 124.72,
     "note": "داده زنده TradersArena · ورود پول بازار + صنایع"
   },
-  "updatedAt": "2026-08-09T08:24:57.534803+00:00"
+  "updatedAt": "2026-08-09T09:13:06.488027+00:00"
 }

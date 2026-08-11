@@ -223,13 +223,15 @@ export function MarketOverview({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="panel p-3.5">
-          <div className="kpi-label">خالص ورود/خروج پول حقیقی (امروز)</div>
+          <div className="kpi-label">خالص ورود/خروج پول حقیقی امروز</div>
           <div className={`kpi-value num ${changeClass(retailDaily ?? 0)}`}>
             {retailDaily != null ? fmtInt(retailDaily) : '—'}
             <span className="mr-1 text-xs font-medium text-[var(--color-muted)]">میلیارد تومان</span>
           </div>
           <div className="mt-1 text-[10px] text-[var(--color-muted)]">
-            {src.retailMoneyFlowDaily === 'parsistahlil' ? 'آخرین گزارش پارسیس‌تحلیل' : 'در انتظار پارسیس'}
+            {src.retailMoneyFlowDaily === 'tradersarena-equity'
+              ? 'TradersArena · سهام، حق‌تقدم و صندوق سهامی'
+              : 'در انتظار دادهٔ TradersArena'}
           </div>
         </motion.div>
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="panel p-3.5">
@@ -488,3 +490,4 @@ function ImpactPanel({
     </motion.div>
   )
 }
+

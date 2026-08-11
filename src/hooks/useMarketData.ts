@@ -3,6 +3,7 @@ import {
   applyPulseToDashboard,
   fetchPulseApi,
   loadDashboardBundle,
+  loadOverviewPreview,
   PULSE_REFRESH_MS,
   REFRESH_MS,
   type FredBundle,
@@ -31,6 +32,23 @@ export function useMarketData() {
   const [error, setError] = useState<string | null>(null)
   const mounted = useRef(true)
   const hasLiveBourseViewStocks = useRef(false)
+
+
+  const refreshOverviewFirst = useCallback(async () => {
+    try {
+      const quick = await loadOverviewPreview()
+      if (!mounted.current) return
+      setData((previous) => ({
+        ...previous,
+        overview: quick.overview,
+        impacts: quick.impacts,
+        topTrades: quick.topTrades,
+        updatedAt: quick.updatedAt,
+      }))
+    } catch {
+      /* The full refresh below still has independent fallbacks. */
+    }
+  }, [])
 
   const refresh = useCallback(async (silent = false) => {
     if (!silent) setRefreshing(true)
@@ -101,6 +119,7 @@ export function useMarketData() {
 
   useEffect(() => {
     mounted.current = true
+    void refreshOverviewFirst()
     void refresh()
     const id = window.setInterval(() => void refresh(true), REFRESH_MS)
     const pulseId = window.setInterval(() => void refreshPulse(), PULSE_REFRESH_MS)
@@ -112,7 +131,7 @@ export function useMarketData() {
       window.clearInterval(pulseId)
       window.clearTimeout(firstPulse)
     }
-  }, [refresh, refreshPulse])
+  }, [refresh, refreshOverviewFirst, refreshPulse])
 
   return { data, histories, candles, fred, sectors, scrapeMeta, loading, refreshing, error, refresh }
 }

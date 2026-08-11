@@ -52,7 +52,7 @@ const MINERAL_STOCKS = [
 ]
 
 const CACHE_TTL_MS = 20 * 60 * 1000
-const CACHE_KEY = 'https://cache.local/mineral-stocks-bv-v10'
+const CACHE_KEY = 'https://cache.local/mineral-stocks-bv-v11'
 
 /** Manual share-count overrides when quote history lags capital-increase filings. */
 const OUTSTANDING_SHARES = {
@@ -301,19 +301,24 @@ function returnsFromBvItems(items, currentPayani) {
   }
 }
 
-async function bvFetchQuotes(cookie, exchange, isin, attempts = 3) {
+function bvHeaders(cookie, idToken) {
+  return {
+    Cookie: cookie,
+    ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+    Accept: 'application/json',
+    'User-Agent': UA,
+    Referer: 'https://www.bourseview.com/',
+    Origin: 'https://www.bourseview.com',
+  }
+}
+
+async function bvFetchQuotes(cookie, idToken, exchange, isin, attempts = 3) {
   const url = `${BV_BASE}/api/v2/exchanges/${exchange}/stocks/${isin}/quotes?timeFrame=daily&lastN=${BV_HISTORY_N}&expand=shamsiDate,individual-detail`
   let lastErr
   for (let i = 0; i < attempts; i++) {
     try {
       const res = await fetch(url, {
-        headers: {
-          Cookie: cookie,
-          Accept: 'application/json',
-          'User-Agent': UA,
-          Referer: 'https://www.bourseview.com/',
-          Origin: 'https://www.bourseview.com',
-        },
+        headers: bvHeaders(cookie, idToken),
         redirect: 'follow',
       })
       if (!res.ok) throw new Error(`bourseview ${res.status}`)
@@ -329,16 +334,10 @@ async function bvFetchQuotes(cookie, exchange, isin, attempts = 3) {
   throw lastErr || new Error('bourseview failed')
 }
 
-async function bvFetchStockMeta(cookie, exchange, isin) {
+async function bvFetchStockMeta(cookie, idToken, exchange, isin) {
   const url = `${BV_BASE}/api/v2/exchanges/${exchange}/stocks/${isin}`
   const res = await fetch(url, {
-    headers: {
-      Cookie: cookie,
-      Accept: 'application/json',
-      'User-Agent': UA,
-      Referer: 'https://www.bourseview.com/',
-      Origin: 'https://www.bourseview.com',
-    },
+    headers: bvHeaders(cookie, idToken),
     redirect: 'follow',
   })
   if (!res.ok) throw new Error(`bourseview meta ${res.status}`)
@@ -544,6 +543,7 @@ export async function onRequestGet(context) {
   const forceRefresh = url.searchParams.has('refresh') || url.searchParams.has('fresh')
   const token = (env?.SOURCEARENA_TOKEN || DEMO_TOKEN).trim()
   const bvCookie = normalizeCookie(env?.BOURSEVIEW_COOKIE || env?.BOURSEVIEW_TOKEN || '')
+  const bvIdToken = String(env?.BOURSEVIEW_ID_TOKEN || '').trim()
   const cache = typeof caches !== 'undefined' ? caches.default : null
   const headers = {
     'content-type': 'application/json; charset=utf-8',
@@ -566,7 +566,7 @@ export async function onRequestGet(context) {
   // The bundled snapshot is only a no-credential fallback. When BourseView is
   // configured, continue to the live cache/scrape instead of freezing the SPA
   // on the original PDF-era table.
-  if (!forceRefresh && !bvCookie && staticBundle?.stocks?.length && staticFlowOk) {
+  if (false && !forceRefresh && !bvCookie && staticBundle?.stocks?.length && staticFlowOk) {
     return new Response(
       JSON.stringify({
         ...staticBundle,
@@ -604,9 +604,9 @@ export async function onRequestGet(context) {
     const results = await mapInBatches(MINERAL_STOCKS, 5, async (meta) => {
       const needMeta = Boolean(OUTSTANDING_SHARES[meta.symbol] || PRICE_ADJUST_SHARES[meta.symbol])
       const [items, stockMeta] = await Promise.all([
-        bvFetchQuotes(bvCookie, meta.exchange, meta.isin),
+        bvFetchQuotes(bvCookie, bvIdToken, meta.exchange, meta.isin),
         needMeta
-          ? bvFetchStockMeta(bvCookie, meta.exchange, meta.isin).catch(() => null)
+          ? bvFetchStockMeta(bvCookie, bvIdToken, meta.exchange, meta.isin).catch(() => null)
           : Promise.resolve(null),
       ])
       return snapFromBv(meta, items, stockMeta)
@@ -632,7 +632,7 @@ export async function onRequestGet(context) {
   }
 
   // Fill gaps / no cookie → SourceArena
-  const needSa = !bvCookie || stocks.some((s) => s.returnsSource === 'error' || !(s.historyCount > 0))
+  const needSa = false
   if (needSa) {
     const adjustedEnabled = await probeAdjustedEnabled(token)
     const missing = MINERAL_STOCKS.filter((meta) => {
@@ -694,7 +694,7 @@ export async function onRequestGet(context) {
   const badCount = ordered.filter(
     (s) => s.returnsSource === 'error' || !(s.ytdPct != null || s.closePrice != null || s.historyCount > 0),
   ).length
-  if (badCount > 0) {
+  if (false && badCount > 0) {
     const fallback = await loadStaticFallback(origin)
     if (fallback?.stocks?.length) {
       const fbBy = new Map(fallback.stocks.map((s) => [s.symbol, s]))
@@ -721,19 +721,23 @@ export async function onRequestGet(context) {
     }
   }
 
+  const bourseviewRows = ordered.filter(
+    (s) => s.returnsSource === 'bourseview-adjusted' && (s.historyCount > 0 || s.closePrice != null),
+  )
   const payload = {
-    ok: ordered.some((s) => s.historyCount > 0 || s.closePrice != null || s.ytdPct != null),
+    ok: bvOk > 0,
     updatedAt: new Date().toISOString(),
-    source,
-    note,
+    source: 'bourseview-adjusted',
+    note: 'داده زنده و بازدهی تعدیل‌شده، فقط از بورس‌ویو',
     bourseviewReady: Boolean(bvCookie),
     bourseviewOk: bvOk,
-    stocks: ordered,
+    stocks: bourseviewRows,
     errors: errors.slice(0, 12),
   }
 
   const body = JSON.stringify(payload)
   const response = new Response(body, {
+    status: payload.ok ? 200 : 502,
     headers: {
       ...headers,
       'x-cached-at': String(Date.now()),

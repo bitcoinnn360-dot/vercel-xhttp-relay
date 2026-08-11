@@ -164,10 +164,11 @@ function productNameFa(name, productKey) {
   return `سایر (${productKey})`
 }
 
-async function bvJson(cookie, path) {
+async function bvJson(cookie, idToken, path) {
   const res = await fetch(`${BV_BASE}${path}`, {
     headers: {
       Cookie: cookie,
+      ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
       Accept: 'application/json',
       'User-Agent': UA,
       Referer: 'https://www.bourseview.com/',
@@ -315,14 +316,14 @@ function transformCompany(h, incomeStmt, prodStmt, balanceStmt, cashflowStmt) {
   }
 }
 
-async function fetchCompany(cookie, h) {
+async function fetchCompany(cookie, idToken, h) {
   const base = `/api/v2/exchanges/${h.exchange}/stocks/${h.isin}`
   const q = 'timeFrame=yearly&lastN=3&asReported=false&scenario=actual&view=origin'
   const [income, productions, balance, cashflow] = await Promise.all([
-    bvJson(cookie, `${base}/incomeStatements?${q}`),
-    bvJson(cookie, `${base}/productions?timeFrame=yearly&lastN=6`).catch(() => ({ items: [] })),
-    bvJson(cookie, `${base}/balanceSheets?${q}`).catch(() => ({ items: [] })),
-    bvJson(cookie, `${base}/cashFlows?${q}`).catch(() => ({ items: [] })),
+    bvJson(cookie, idToken, `${base}/incomeStatements?${q}`),
+    bvJson(cookie, idToken, `${base}/productions?timeFrame=yearly&lastN=6`).catch(() => ({ items: [] })),
+    bvJson(cookie, idToken, `${base}/balanceSheets?${q}`).catch(() => ({ items: [] })),
+    bvJson(cookie, idToken, `${base}/cashFlows?${q}`).catch(() => ({ items: [] })),
   ])
   const incomeStmt = pickLatestStmt(income)
   if (!incomeStmt) return null
@@ -332,12 +333,12 @@ async function fetchCompany(cookie, h) {
   return transformCompany(h, incomeStmt, prodStmt, balanceStmt, cashflowStmt)
 }
 
-export async function buildFinancialsBundle(cookie) {
+export async function buildFinancialsBundle(cookie, idToken = '') {
   const companies = []
   const errors = []
   for (let i = 0; i < HOLDINGS.length; i += 3) {
     const chunk = HOLDINGS.slice(i, i + 3)
-    const part = await Promise.allSettled(chunk.map((h) => fetchCompany(cookie, h)))
+    const part = await Promise.allSettled(chunk.map((h) => fetchCompany(cookie, idToken, h)))
     part.forEach((r, idx) => {
       const h = chunk[idx]
       if (r.status === 'fulfilled' && r.value) companies.push(r.value)

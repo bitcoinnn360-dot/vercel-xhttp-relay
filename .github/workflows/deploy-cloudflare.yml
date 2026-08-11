@@ -31,11 +31,14 @@ jobs:
             --outdir=dist/.functions-worker \
             --output-routes-path=dist/_routes.json
           cp dist/.functions-worker/index.js dist/_worker.js
-      - name: Sync BourseView credential
-        run: printf '%s' "$BOURSEVIEW_COOKIE" | npx wrangler pages secret put BOURSEVIEW_COOKIE --project-name=arz-digital-dashboard
+      - name: Sync BourseView credentials
+        run: |
+          printf '%s' "$BOURSEVIEW_COOKIE" | npx wrangler pages secret put BOURSEVIEW_COOKIE --project-name=arz-digital-dashboard
+          printf '%s' "$BOURSEVIEW_ID_TOKEN" | npx wrangler pages secret put BOURSEVIEW_ID_TOKEN --project-name=arz-digital-dashboard
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          BOURSEVIEW_COOKIE: ${{ secrets.BOURSEVIEW_COOKIE }}
+          BOURSEVIEW_COOKIE: ${{ secrets.BOURSEVIEW_COOKIE_V2 }}
+          BOURSEVIEW_ID_TOKEN: ${{ secrets.BOURSEVIEW_ID_TOKEN_V2 }}
       - name: Deploy production
         run: npx wrangler pages deploy dist --project-name=arz-digital-dashboard --branch=main --commit-dirty=true
         env:
@@ -51,9 +54,19 @@ jobs:
                 process.stdin.on("end", () => {
                   const data = JSON.parse(body);
                   console.log(`source=${data.source} bourseviewOk=${data.bourseviewOk} rows=${data.stocks?.length || 0}`);
-                  if (!(data.bourseviewOk > 0)) {
-                    console.warn(`BourseView unavailable; live fallback remains active: ${(data.errors || []).slice(0, 3).join(" | ")}`);
-                  }
+                  if (!(data.bourseviewOk > 0) || data.source !== "bourseview-adjusted") process.exit(1);
                 });
               '
-
+      - name: Verify BourseView NAV
+        run: |
+          curl --fail --silent --show-error --max-time 180 \
+            "https://www.arz-digital.xyz/api/nav?deploy=${GITHUB_SHA}" \
+            | node -e '
+                let body = "";
+                process.stdin.on("data", chunk => body += chunk);
+                process.stdin.on("end", () => {
+                  const data = JSON.parse(body);
+                  console.log(`source=${data.source} liveCount=${data.liveCount || 0}`);
+                  if (!data.ok || !(data.liveCount > 0) || !String(data.source).startsWith("bourseview")) process.exit(1);
+                });
+              '

@@ -30,6 +30,7 @@ export function useMarketData() {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const mounted = useRef(true)
+  const hasLiveBourseViewStocks = useRef(false)
 
   const refresh = useCallback(async (silent = false) => {
     if (!silent) setRefreshing(true)
@@ -48,12 +49,13 @@ export function useMarketData() {
         bundle.data.impacts = seedDashboard.impacts
         if (bundle.data.overview) bundle.data.overview.impactsLive = false
       }
+      const receivedLiveStocks = Boolean(bundle.scrapeMeta.stocksLive)
       setData((previous) => {
         const sameSession = previous.overview.dateJalali === bundle.data.overview.dateJalali
         // A transient stock API failure used to replace the live table with the
         // bundled seed on every minute refresh. Keep the last good table for the
         // same market day until a newer live snapshot arrives.
-        if (sameSession && !bundle.scrapeMeta.stocksLive) {
+        if (sameSession && !receivedLiveStocks && hasLiveBourseViewStocks.current) {
           bundle.data.stocks = previous.stocks
         }
         if (sameSession && !bundle.data.overview.marketPulse && previous.overview.marketPulse) {
@@ -68,6 +70,7 @@ export function useMarketData() {
         }
         return bundle.data
       })
+      if (receivedLiveStocks) hasLiveBourseViewStocks.current = true
       setHistories((previous) => ({ ...previous, ...bundle.histories }))
       setCandles((previous) => ({ ...previous, ...(bundle.candles || {}) }))
       setFred(bundle.fred)

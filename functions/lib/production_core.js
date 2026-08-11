@@ -181,10 +181,11 @@ function classifyEnergy(row) {
   return null
 }
 
-async function bvJson(cookie, path) {
+async function bvJson(cookie, idToken, path) {
   const res = await fetch(`${BV_BASE}${path}`, {
     headers: {
       Cookie: cookie,
+      ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
       Accept: 'application/json',
       'User-Agent': UA,
       Referer: 'https://www.bourseview.com/',
@@ -502,11 +503,11 @@ function buildIndustryEnergyRates(companies) {
   })
 }
 
-async function fetchCompany(cookie, h) {
+async function fetchCompany(cookie, idToken, h) {
   const base = `/api/v2/exchanges/${h.exchange}/stocks/${h.isin}`
   const [prod, energy] = await Promise.all([
-    bvJson(cookie, `${base}/productions?timeFrame=monthly&lastN=${LAST_N}`).catch(() => ({ items: [] })),
-    bvJson(cookie, `${base}/energy?timeFrame=monthly&lastN=${LAST_N}`).catch(() => ({ items: [] })),
+    bvJson(cookie, idToken, `${base}/productions?timeFrame=monthly&lastN=${LAST_N}`).catch(() => ({ items: [] })),
+    bvJson(cookie, idToken, `${base}/energy?timeFrame=monthly&lastN=${LAST_N}`).catch(() => ({ items: [] })),
   ])
   const products = extractProducts(prod.items || [])
   const energySeries = extractEnergy(energy.items || [])
@@ -544,12 +545,12 @@ async function fetchCompany(cookie, h) {
   }
 }
 
-export async function buildProductionBundle(cookie) {
+export async function buildProductionBundle(cookie, idToken = '') {
   const companies = []
   const errors = []
   for (let i = 0; i < HOLDINGS.length; i += 3) {
     const chunk = HOLDINGS.slice(i, i + 3)
-    const part = await Promise.allSettled(chunk.map((h) => fetchCompany(cookie, h)))
+    const part = await Promise.allSettled(chunk.map((h) => fetchCompany(cookie, idToken, h)))
     part.forEach((r, idx) => {
       const h = chunk[idx]
       if (r.status === 'fulfilled') {
@@ -571,4 +572,3 @@ export async function buildProductionBundle(cookie) {
     errors: errors.slice(0, 12),
   }
 }
-

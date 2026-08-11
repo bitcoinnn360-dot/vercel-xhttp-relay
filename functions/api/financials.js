@@ -6,7 +6,7 @@
 import { buildFinancialsBundle, normalizeCookie } from '../lib/financials_core.js'
 
 const CACHE_TTL_MS = 12 * 60 * 60 * 1000
-const CACHE_KEY = 'https://cache.local/midco-financials-v1'
+const CACHE_KEY = 'https://cache.local/midco-financials-bv-v2'
 
 async function loadStatic(origin) {
   try {
@@ -25,6 +25,7 @@ export async function onRequestGet(context) {
   const url = new URL(request.url)
   const forceRefresh = url.searchParams.has('refresh') || url.searchParams.has('fresh')
   const cookie = normalizeCookie(env?.BOURSEVIEW_COOKIE || env?.BOURSEVIEW_TOKEN || '')
+  const idToken = String(env?.BOURSEVIEW_ID_TOKEN || '').trim()
   const cache = typeof caches !== 'undefined' ? caches.default : null
   const headers = {
     'content-type': 'application/json; charset=utf-8',
@@ -39,7 +40,7 @@ export async function onRequestGet(context) {
     /* ignore */
   }
 
-  if (!forceRefresh && staticBundle?.ok) {
+  if (false && !forceRefresh && staticBundle?.ok) {
     return new Response(JSON.stringify({ ...staticBundle, served: 'static-fast' }), { headers })
   }
 
@@ -56,7 +57,7 @@ export async function onRequestGet(context) {
   }
 
   if (!cookie) {
-    if (staticBundle) {
+    if (false && staticBundle) {
       return new Response(JSON.stringify({ ...staticBundle, served: 'static-no-cookie' }), { headers })
     }
     return new Response(
@@ -66,7 +67,7 @@ export async function onRequestGet(context) {
   }
 
   try {
-    const payload = await buildFinancialsBundle(cookie)
+    const payload = await buildFinancialsBundle(cookie, idToken)
     payload.served = 'live'
     const body = JSON.stringify(payload)
     const response = new Response(body, {
@@ -81,7 +82,7 @@ export async function onRequestGet(context) {
     }
     return response
   } catch (e) {
-    if (staticBundle) {
+    if (false && staticBundle) {
       return new Response(
         JSON.stringify({ ...staticBundle, served: 'static-fallback', note: String(e?.message || e) }),
         { headers },

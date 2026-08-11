@@ -56,6 +56,16 @@ function PieCalloutLabel({ cx = 0, cy = 0, midAngle = 0, outerRadius = 0, name =
 
 export function NavSection({ data }: { data: DashboardData }) {
   const { nav, holdings } = data
+  if (!holdings.length || !holdings.some((h) => h.live)) {
+    return (
+      <section id="nav" className="scroll-mt-28 space-y-4">
+        <div>
+          <h2 className="section-title">ارزش روز خالص دارایی‌های بورسی (NAV)</h2>
+          <p className="section-sub">داده بورس‌ویو در دسترس نیست؛ داده جایگزین نمایش داده نمی‌شود.</p>
+        </div>
+      </section>
+    )
+  }
   const pie = holdings
     .filter((h) => h.portfolioPct > 0.05)
     .map((h) => ({

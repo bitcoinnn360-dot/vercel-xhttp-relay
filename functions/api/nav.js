@@ -66,7 +66,7 @@ const NAV_STATIC = {
 }
 
 const CACHE_TTL_MS = 5 * 60 * 1000
-const CACHE_KEY = 'https://cache.local/midco-nav-bv-v4'
+const CACHE_KEY = 'https://cache.local/midco-nav-bv-v5'
 
 function normalizeCookie(raw) {
   let c = String(raw || '').trim()
@@ -85,10 +85,11 @@ function round0(n) {
   return Math.round(Number(n))
 }
 
-async function bvJson(cookie, path) {
+async function bvJson(cookie, idToken, path) {
   const res = await fetch(`${BV_BASE}${path}`, {
     headers: {
       Cookie: cookie,
+      ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
       Accept: 'application/json',
       'User-Agent': UA,
       Referer: 'https://www.bourseview.com/',
@@ -100,11 +101,12 @@ async function bvJson(cookie, path) {
   return res.json()
 }
 
-async function fetchStockMeta(cookie, exchange, isin, symbol = '') {
+async function fetchStockMeta(cookie, idToken, exchange, isin, symbol = '') {
   const [meta, quotes] = await Promise.all([
-    bvJson(cookie, `/api/v2/exchanges/${exchange}/stocks/${isin}`),
+    bvJson(cookie, idToken, `/api/v2/exchanges/${exchange}/stocks/${isin}`),
     bvJson(
       cookie,
+      idToken,
       `/api/v2/exchanges/${exchange}/stocks/${isin}/quotes?timeFrame=daily&lastN=3&expand=shamsiDate`,
     ),
   ])
@@ -127,9 +129,9 @@ async function fetchStockMeta(cookie, exchange, isin, symbol = '') {
 }
 
 /** Best-effort ownership from BV (currently broken — returns null). */
-async function tryFetchOwnershipPct(cookie, exchange, isin, holderNeedles) {
+async function tryFetchOwnershipPct(cookie, idToken, exchange, isin, holderNeedles) {
   try {
-    const data = await bvJson(cookie, `/api/v2/exchanges/${exchange}/stocks/${isin}/shareholders`)
+    const data = await bvJson(cookie, idToken, `/api/v2/exchanges/${exchange}/stocks/${isin}/shareholders`)
     const rows = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
     for (const row of rows) {
       const name = String(row?.name || row?.shareholderName || row?.nameFa || '')
@@ -179,6 +181,7 @@ function buildHoldings(liveRows) {
 export async function onRequestGet(context) {
   const { env } = context
   const cookie = normalizeCookie(env?.BOURSEVIEW_COOKIE || env?.BOURSEVIEW_TOKEN || '')
+  const idToken = String(env?.BOURSEVIEW_ID_TOKEN || '').trim()
 
   const cache = typeof caches !== 'undefined' ? caches.default : null
   if (cache) {
@@ -198,8 +201,8 @@ export async function onRequestGet(context) {
 
   const liveRows = await mapPool(HOLDINGS, 4, async (h) => {
     try {
-      const meta = await fetchStockMeta(cookie, h.exchange, h.isin, h.symbol)
-      const liveOwn = await tryFetchOwnershipPct(cookie, h.exchange, h.isin, holderNeedles)
+      const meta = await fetchStockMeta(cookie, idToken, h.exchange, h.isin, h.symbol)
+      const liveOwn = await tryFetchOwnershipPct(cookie, idToken, h.exchange, h.isin, holderNeedles)
       const outstanding = meta.outstanding
       if (!outstanding || !meta.price) throw new Error('missing outstanding/price')
       // Prefer explicit post-capital-increase share count (e.g. فملی 52.17B → 71.55B).
@@ -248,7 +251,7 @@ export async function onRequestGet(context) {
   let midcoPrice = null
   let midcoOutstanding = null
   try {
-    const m = await fetchStockMeta(cookie, MIDCO.exchange, MIDCO.isin)
+    const m = await fetchStockMeta(cookie, idToken, MIDCO.exchange, MIDCO.isin)
     midcoPrice = m.price
     midcoOutstanding = m.outstanding
   } catch (e) {

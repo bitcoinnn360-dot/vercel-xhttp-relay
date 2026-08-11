@@ -139,6 +139,13 @@ def parse_pulse(market: dict, industries) -> dict:
     positive = int(pp or 0)
     negative = int(pm or 0)
     raw_t = now.strftime("%H:%M")
+    flow_stocks = seg_flow(st)
+    flow_equity_funds = seg_flow(sf)
+    equity_retail_flow = (
+        round(flow_stocks + flow_equity_funds, 1)
+        if flow_stocks is not None and flow_equity_funds is not None
+        else None
+    )
     return {
         "asOf": datetime.now(timezone.utc).isoformat(),
         "time": clamp_time(raw_t) or (PULSE_END if raw_t > PULSE_END else raw_t),
@@ -153,8 +160,9 @@ def parse_pulse(market: dict, industries) -> dict:
         "orderBuyBillionToman": bt(o[1] if len(o) > 1 else None),
         "orderSellBillionToman": bt(o[0] if len(o) > 0 else None),
         "retailMoneyFlowBillionToman": bt(m[5] if len(m) > 5 else None),
-        "flowStocksBillionToman": seg_flow(st),
-        "flowEquityFundsBillionToman": seg_flow(sf),
+        "equityRetailMoneyFlowBillionToman": equity_retail_flow,
+        "flowStocksBillionToman": flow_stocks,
+        "flowEquityFundsBillionToman": flow_equity_funds,
         "flowFixedIncomeBillionToman": seg_flow(nsf),
         "flowBasicMetalsBillionToman": ind["flowBasicMetalsBillionToman"],
         "flowMetalOresBillionToman": ind["flowMetalOresBillionToman"],
@@ -293,3 +301,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

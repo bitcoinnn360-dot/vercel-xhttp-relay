@@ -66,7 +66,7 @@ const NAV_STATIC = {
 }
 
 const CACHE_TTL_MS = 5 * 60 * 1000
-const CACHE_KEY = 'https://cache.local/midco-nav-bv-v5'
+const CACHE_KEY = 'https://cache.local/midco-nav-bv-v6'
 
 function normalizeCookie(raw) {
   let c = String(raw || '').trim()

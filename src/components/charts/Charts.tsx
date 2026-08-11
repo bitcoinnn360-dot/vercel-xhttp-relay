@@ -3,6 +3,7 @@ import {
   AreaChart,
   Bar,
   BarChart,
+  Brush,
   CartesianGrid,
   Cell,
   LabelList,
@@ -121,6 +122,16 @@ export function FlowBarChart({
           <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
           <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} width={48} />
           <Tooltip {...tipProps} formatter={(v) => [fmtInt(Number(v)), 'میلیارد تومان']} />
+          {data.length > 70 ? (
+            <Brush
+              dataKey="label"
+              height={22}
+              startIndex={Math.max(0, data.length - 60)}
+              travellerWidth={8}
+              stroke="#94a3b8"
+              tickFormatter={() => ''}
+            />
+          ) : null}
           <Bar dataKey="value" radius={[3, 3, 0, 0]}>
             {data.map((d) => (
               <Cell key={d.label} fill={d.value >= 0 ? '#15803d' : '#b91c1c'} />

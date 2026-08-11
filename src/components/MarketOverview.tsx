@@ -241,7 +241,9 @@ export function MarketOverview({
             <span className="mr-1 text-xs font-medium text-[var(--color-muted)]">میلیارد تومان</span>
           </div>
           <div className="mt-1 text-[10px] text-[var(--color-muted)]">
-            {src.retailMoneyFlowYtd?.includes('parsistahlil')
+            {src.retailMoneyFlowYtd?.startsWith('user-excel')
+              ? 'تجمعی تاریخچه اکسل کاربر · روز جاری از TradersArena'
+              : src.retailMoneyFlowYtd?.includes('parsistahlil')
               ? 'تجمعی از ابتدای ۱۴۰۴ · پایه PDF + روزهای پارسیس'
               : 'در انتظار به‌روزرسانی پارسیس'}
           </div>
@@ -287,7 +289,7 @@ export function MarketOverview({
         <div className="panel p-4">
           <h3 className="mb-2 text-sm font-bold">خالص ورود/خروج پول حقیقی (روزانه)</h3>
           <p className="mb-2 text-[10px] text-[var(--color-muted)]">
-            سری روزانه پارسیس‌تحلیل · آخرین نقاط از گزارش وضعیت بازار
+            تاریخچه اکسل کاربر · روز جاری از ردیف «سهام، حق تقدم و ص.سهامی» در TradersArena
           </p>
           <FlowBarChart data={money} />
         </div>

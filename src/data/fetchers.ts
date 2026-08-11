@@ -74,6 +74,61 @@ export interface HistoryPoint {
   value: number
 }
 
+interface RetailMoneyFlowHistory {
+  source?: string
+  sourceFile?: string
+  unit?: string
+  firstDateJalali?: string | null
+  throughDateJalali?: string | null
+  rowCount?: number
+  series?: { date: string; value: number }[]
+}
+
+async function fetchRetailMoneyFlowHistory(): Promise<RetailMoneyFlowHistory | null> {
+  try {
+    const res = await fetchWithTimeout('/data/retail_money_flow_daily.json', 5000, { cache: 'no-store' })
+    if (!res.ok) return null
+    const json = (await res.json()) as RetailMoneyFlowHistory
+    if (!Array.isArray(json.series) || !json.series.length) return null
+    return json
+  } catch {
+    return null
+  }
+}
+
+function applyRetailMoneyFlowHistory(base: DashboardData, history: RetailMoneyFlowHistory | null) {
+  if (!history?.series?.length) return false
+
+  const rows = new Map<string, number>()
+  for (const row of history.series) {
+    const date = String(row.date || '').trim()
+    const value = Number(row.value)
+    if (/^14\d{2}\/\d{2}\/\d{2}$/.test(date) && Number.isFinite(value)) rows.set(date, value)
+  }
+  if (!rows.size) return false
+
+  const overview = base.overview
+  const sources = { ...(overview.fieldSources || {}) }
+  const currentDate = overview.marketPulse?.dateJalali || overview.dateJalali
+  const hasExactToday = Boolean(
+    sources.retailMoneyFlowDaily === 'tradersarena-equity' &&
+    currentDate &&
+    overview.retailMoneyFlowDaily != null &&
+    Number.isFinite(overview.retailMoneyFlowDaily),
+  )
+
+  if (hasExactToday && currentDate) rows.set(currentDate, Number(overview.retailMoneyFlowDaily))
+
+  overview.moneyFlowSeries = [...rows.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([date, value]) => ({ date, value }))
+  overview.retailMoneyFlowYtd = overview.moneyFlowSeries.reduce((sum, row) => sum + row.value, 0)
+  sources.moneyFlowSeries = hasExactToday ? 'user-excel+tradersarena-equity' : 'user-excel'
+  sources.retailMoneyFlowYtd = sources.moneyFlowSeries
+  overview.fieldSources = sources
+  return true
+}
+
 export interface FredBundle {
   id: string
   label: string
@@ -1632,7 +1687,7 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   const base: DashboardData = structuredClone(seedDashboard)
   const now = new Date().toISOString()
 
-  const [current, histEntries, candleEntries, fredEntries, scraped, overviewApi, intradayFallback, stocksApi, steelApi, navApi, globalApi, productionApi, financialsApi] =
+  const [current, histEntries, candleEntries, fredEntries, scraped, overviewApi, intradayFallback, stocksApi, steelApi, navApi, globalApi, productionApi, financialsApi, retailMoneyFlowHistory] =
     await Promise.all([
       fetchTgjuAjax(),
       Promise.all(HIST_KEYS.map(async (k) => [k, await fetchTgjuHistory(k)] as const)),
@@ -1649,6 +1704,7 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
       fetchGlobalMarketsApi(),
       fetchProductionOpsApi(),
       fetchFinancialsApi(),
+      fetchRetailMoneyFlowHistory(),
     ])
 
   const liveCount = applyLiveQuotes(base, current)
@@ -1694,6 +1750,7 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   if (!base.overview.marketPulseHistory?.length && scrapedPulse?.history?.length) {
     base.overview.marketPulseHistory = scrapedPulse.history
   }
+  applyRetailMoneyFlowHistory(base, retailMoneyFlowHistory)
   // densify with sessionStorage (client builds 09:00→now series while page is open)
   {
     const session = readSessionPulse()

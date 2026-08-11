@@ -1,18 +1,13 @@
 name: Collect market pulse
 
-# Samples TradersArena every 5 minutes during Tehran trading.
-# TradersArena /data/market is a live snapshot only (no intraday history API),
-# so this cron + client polling are the only way to rebuild 09:00→now series.
-# Cash board ~08:45–12:30; gold commodity ETFs continue until ~17:00.
-# Writes public/data/market_pulse.json to the pulse-data branch so /api/pulse
-# can load a full-day series even if nobody opened the dashboard.
+# GitHub's repeated cron events were arriving only about once per hour. Start
+# one runner before market open and keep it alive through the cash session so
+# TradersArena is sampled even when nobody has the dashboard open.
 
 on:
   schedule:
-    # GitHub cron is UTC. Tehran = UTC+3:30
-    # 08:45–17:00 Tehran ≈ 05:15–13:30 UTC
-    # Note: GitHub may coalesce schedules; */5 is the practical minimum.
-    - cron: '*/5 5-13 * * 0-3,6'
+    # Tehran is UTC+3:30. Start at 08:50 and sample 09:00–13:00 Tehran.
+    - cron: '20 5 * * 0-3,6'
   workflow_dispatch:
 
 permissions:
@@ -25,6 +20,7 @@ concurrency:
 jobs:
   collect:
     runs-on: ubuntu-latest
+    timeout-minutes: 280
     steps:
       - name: Checkout pulse-data branch
         uses: actions/checkout@v4
@@ -32,32 +28,39 @@ jobs:
           ref: pulse-data
           fetch-depth: 1
 
-      - name: Ensure collector script present
+      - name: Refresh collector
         run: |
-          if [ ! -f scripts/collect_pulse.py ]; then
-            git fetch origin cursor/daily-market-dashboard-db3c --depth=1 || git fetch origin main --depth=1
-            git checkout origin/cursor/daily-market-dashboard-db3c -- scripts/collect_pulse.py 2>/dev/null \
-              || git checkout origin/main -- scripts/collect_pulse.py
-          fi
+          git fetch origin cursor/fix-index-history-ta-retail-db3c --depth=1
+          git checkout origin/cursor/fix-index-history-ta-retail-db3c -- scripts/collect_pulse.py
           mkdir -p public/data/pulse-days
 
-      - name: Collect pulse sample
-        id: collect
+      - name: Sample the full market session
+        shell: bash
         run: |
-          set -e
-          python3 scripts/collect_pulse.py | tee /tmp/pulse-out.json
-          echo "result<<EOF" >> "$GITHUB_OUTPUT"
-          cat /tmp/pulse-out.json >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-
-      - name: Commit & push if changed
-        run: |
-          if git diff --quiet -- public/data/market_pulse.json public/data/pulse-days; then
-            echo "No pulse file changes"
-            exit 0
-          fi
+          set -euo pipefail
           git config user.name "pulse-bot"
           git config user.email "pulse-bot@users.noreply.github.com"
-          git add public/data/market_pulse.json public/data/pulse-days
-          git commit -m "pulse: update $(date -u +%Y-%m-%dT%H:%MZ)"
-          git push origin HEAD:pulse-data
+
+          while true; do
+            tehran_hhmm="$(TZ=Asia/Tehran date +%H%M)"
+            tehran_min=$((10#${tehran_hhmm:0:2} * 60 + 10#${tehran_hhmm:2:2}))
+
+            if (( tehran_min < 540 )); then
+              sleep 30
+              continue
+            fi
+            if (( tehran_min > 780 )); then
+              break
+            fi
+
+            python3 scripts/collect_pulse.py
+            if ! git diff --quiet -- scripts/collect_pulse.py public/data/market_pulse.json public/data/pulse-days; then
+              git add scripts/collect_pulse.py public/data/market_pulse.json public/data/pulse-days
+              git commit -m "pulse: update $(TZ=Asia/Tehran date +%Y-%m-%dT%H:%M)"
+              git pull --rebase origin pulse-data
+              git push origin HEAD:pulse-data
+            fi
+
+            epoch="$(date +%s)"
+            sleep $((300 - epoch % 300))
+          done

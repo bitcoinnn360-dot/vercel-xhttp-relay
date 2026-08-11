@@ -54,8 +54,8 @@ jobs:
             fi
 
             python3 scripts/collect_pulse.py
-            if ! git diff --quiet -- scripts/collect_pulse.py public/data/market_pulse.json public/data/pulse-days; then
-              git add scripts/collect_pulse.py public/data/market_pulse.json public/data/pulse-days
+            if ! git diff --quiet -- scripts/collect_pulse.py market_pulse.json public/data/market_pulse.json public/data/pulse-days; then
+              git add scripts/collect_pulse.py market_pulse.json public/data/market_pulse.json public/data/pulse-days
               git commit -m "pulse: update $(TZ=Asia/Tehran date +%Y-%m-%dT%H:%M)"
               git pull --rebase origin pulse-data
               git push origin HEAD:pulse-data

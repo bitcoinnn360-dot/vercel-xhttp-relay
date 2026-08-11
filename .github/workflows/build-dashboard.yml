@@ -18,8 +18,6 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Probe TSETMC index history
-        run: node -e "fetch('https://cdn.tsetmc.com/api/Index/GetIndexB2/32097828799138957').then(async r=>{const t=await r.text(); console.log('status='+r.status); console.log(t.slice(0,5000))})"
       - run: npm ci
       - run: npm run build
       - run: npx wrangler pages functions build functions --outdir=dist/.functions-worker --output-routes-path=dist/_routes.json

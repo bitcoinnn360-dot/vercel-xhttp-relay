@@ -82,6 +82,8 @@ export interface MarketPulseSnapshot {
   orderBuyBillionToman?: number
   orderSellBillionToman?: number
   retailMoneyFlowBillionToman?: number
+  /** سهام و حق‌تقدم + صندوق‌های سهامی؛ میلیارد تومان، از TradersArena */
+  equityRetailMoneyFlowBillionToman?: number
   flowStocksBillionToman?: number
   flowEquityFundsBillionToman?: number
   flowFixedIncomeBillionToman?: number
@@ -508,3 +510,4 @@ export interface DashboardData {
   sources: SourceStatus[]
   updatedAt: string
 }
+

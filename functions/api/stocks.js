@@ -52,7 +52,7 @@ const MINERAL_STOCKS = [
 ]
 
 const CACHE_TTL_MS = 20 * 60 * 1000
-const CACHE_KEY = 'https://cache.local/mineral-stocks-bv-v9'
+const CACHE_KEY = 'https://cache.local/mineral-stocks-bv-v10'
 
 /** Manual share-count overrides when quote history lags capital-increase filings. */
 const OUTSTANDING_SHARES = {
@@ -563,7 +563,10 @@ export async function onRequestGet(context) {
       (s) => Array.isArray(s.netIndividualWeekBt) && s.netIndividualWeekBt.length >= 5,
     ),
   )
-  if (!forceRefresh && staticBundle?.stocks?.length && staticFlowOk) {
+  // The bundled snapshot is only a no-credential fallback. When BourseView is
+  // configured, continue to the live cache/scrape instead of freezing the SPA
+  // on the original PDF-era table.
+  if (!forceRefresh && !bvCookie && staticBundle?.stocks?.length && staticFlowOk) {
     return new Response(
       JSON.stringify({
         ...staticBundle,

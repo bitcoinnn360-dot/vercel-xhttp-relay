@@ -114,10 +114,15 @@ export function FlowBarChart({
   data: { label: string; value: number }[]
   height?: number
 }) {
+  const chartData = data.map((row) => ({
+    ...row,
+    inflow: row.value >= 0 ? row.value : null,
+    outflow: row.value < 0 ? row.value : null,
+  }))
   return (
     <div style={{ height }} className="w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data}>
+        <BarChart data={chartData}>
           <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
           <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
           <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} width={48} />
@@ -132,11 +137,8 @@ export function FlowBarChart({
               tickFormatter={() => ''}
             />
           ) : null}
-          <Bar dataKey="value" radius={[3, 3, 0, 0]}>
-            {data.map((d) => (
-              <Cell key={d.label} fill={d.value >= 0 ? '#15803d' : '#b91c1c'} />
-            ))}
-          </Bar>
+          <Bar dataKey="inflow" name="ورود پول" stackId="flow" fill="#15803d" radius={[3, 3, 0, 0]} />
+          <Bar dataKey="outflow" name="خروج پول" stackId="flow" fill="#b91c1c" radius={[0, 0, 3, 3]} />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -392,8 +394,8 @@ export function DualLineChart({
             {...tipProps}
             formatter={(v, name) => [fmtNum(Number(v), 2) + (unit ? ` ${unit}` : ''), String(name)]}
           />
-          <Line type="monotone" dataKey={aKey} name={aLabel} stroke={aColor} strokeWidth={2} dot={false} />
-          <Line type="monotone" dataKey={bKey} name={bLabel} stroke={bColor} strokeWidth={2} dot={false} />
+          <Line type="stepAfter" dataKey={aKey} name={aLabel} stroke={aColor} strokeWidth={2} dot={false} isAnimationActive={false} />
+          <Line type="stepAfter" dataKey={bKey} name={bLabel} stroke={bColor} strokeWidth={2} dot={false} isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>
@@ -438,7 +440,7 @@ export function TripleLineChart({
           {series.map((s) => (
             <Line
               key={s.key}
-              type="monotone"
+              type="stepAfter"
               dataKey={s.key}
               name={s.label}
               stroke={s.color}

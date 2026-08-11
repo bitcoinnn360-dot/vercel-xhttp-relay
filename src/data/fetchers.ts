@@ -1523,10 +1523,11 @@ async function fetchMineralStocksApi(): Promise<MineralStockSnap[] | null> {
     /* ignore */
   }
 
-  // Prefer live only when it clearly has richer money-flow / returns; keep timeout short.
+  // Prefer the API when it is at least as complete as the bundled snapshot.
+  // Equal scores are expected after a successful refresh, but the API values are newer.
   try {
     const live = await read('/api/stocks', 5000)
-    if (live && score(live) > score(staticStocks || [])) return live
+    if (live && score(live) >= score(staticStocks || [])) return live
   } catch {
     /* fall through */
   }

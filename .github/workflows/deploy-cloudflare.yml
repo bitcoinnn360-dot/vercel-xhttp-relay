@@ -31,7 +31,26 @@ jobs:
             --outdir=dist/.functions-worker \
             --output-routes-path=dist/_routes.json
           cp dist/.functions-worker/index.js dist/_worker.js
+      - name: Sync BourseView credential
+        run: printf '%s' "$BOURSEVIEW_COOKIE" | npx wrangler pages secret put BOURSEVIEW_COOKIE --project-name=arz-digital-dashboard
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          BOURSEVIEW_COOKIE: ${{ secrets.BOURSEVIEW_COOKIE }}
       - name: Deploy production
         run: npx wrangler pages deploy dist --project-name=arz-digital-dashboard --branch=main --commit-dirty=true
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: Warm live mineral-stock cache
+        run: |
+          sleep 5
+          curl --fail --silent --show-error --max-time 180 \
+            "https://www.arz-digital.xyz/api/stocks?refresh=1&deploy=${GITHUB_SHA}" \
+            | node -e '
+                let body = "";
+                process.stdin.on("data", chunk => body += chunk);
+                process.stdin.on("end", () => {
+                  const data = JSON.parse(body);
+                  console.log(`source=${data.source} bourseviewOk=${data.bourseviewOk} rows=${data.stocks?.length || 0}`);
+                  if (!(data.bourseviewOk > 0)) process.exit(2);
+                });
+              '

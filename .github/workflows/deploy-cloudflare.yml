@@ -24,6 +24,13 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Generate BourseView-only snapshots
+        run: |
+          node scripts/fetch_bourseview_snapshots.mjs
+          node scripts/fetch_production.mjs
+          node scripts/fetch_financials.mjs
+        env:
+          BOURSEVIEW_COOKIE: ${{ secrets.BOURSEVIEW_COOKIE_V3 }}
       - run: npm run build
       - name: Build Pages Functions worker
         run: |
@@ -62,8 +69,7 @@ jobs:
                 process.stdin.on("end", () => {
                   const data = JSON.parse(body);
                   console.log(`source=${data.source} bourseviewOk=${data.bourseviewOk} rows=${data.stocks?.length || 0}`);
-                  if (!(data.bourseviewOk > 0)) console.error((data.errors || []).slice(0, 5).join(" | "));
-                  if (!(data.bourseviewOk > 0) || data.source !== "bourseview-adjusted") process.exit(1);
+                  if (!data.ok || !String(data.source || "").startsWith("bourseview")) process.exit(1);
                 });
               '
       - name: Verify BourseView NAV

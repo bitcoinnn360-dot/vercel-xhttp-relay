@@ -1339,15 +1339,20 @@ type NavApiBundle = {
 }
 
 async function fetchNavApi(): Promise<NavApiBundle | null> {
-  try {
-    const res = await fetchWithTimeout('/api/nav', 6000, { cache: 'no-store' })
+  const read = async (url: string): Promise<NavApiBundle | null> => {
+    const res = await fetchWithTimeout(url, 6000, { cache: 'no-store' })
     if (!res.ok) return null
     const json = (await res.json()) as NavApiBundle
-    if (!json?.ok || !json.holdings?.length || !json.nav) return null
+    if (!json?.ok || !json.holdings?.length || !json.nav || !String(json.source || '').startsWith('bourseview')) return null
     return json
-  } catch {
-    return null
   }
+  try {
+    const live = await read('/api/nav')
+    if (live) return live
+  } catch {
+    /* use only the build-time BourseView snapshot */
+  }
+  try { return await read('/data/nav.json') } catch { return null }
 }
 
 function applyNavLive(base: DashboardData, bundle: NavApiBundle | null | undefined) {
@@ -1434,6 +1439,12 @@ async function fetchProductionOpsApi(): Promise<ProductionOpsBundle | null> {
   } catch {
     /* BourseView unavailable */
   }
+  try {
+    const snapshot = await read('/data/production.json', 4000)
+    if (snapshot && String(snapshot.source || '').startsWith('bourseview')) return snapshot
+  } catch {
+    /* no verified BourseView snapshot */
+  }
   return null
 }
 
@@ -1465,6 +1476,12 @@ async function fetchFinancialsApi(): Promise<FinancialsBundle | null> {
     if (live) return live
   } catch {
     /* BourseView unavailable */
+  }
+  try {
+    const snapshot = await read('/data/financials.json', 4000)
+    if (snapshot && String(snapshot.source || '').startsWith('bourseview')) return snapshot
+  } catch {
+    /* no verified BourseView snapshot */
   }
   return null
 }

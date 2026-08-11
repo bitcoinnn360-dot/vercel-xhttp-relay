@@ -720,16 +720,26 @@ export async function onRequestGet(context) {
     }
   }
 
-  const bourseviewRows = ordered.filter(
+  let bourseviewRows = ordered.filter(
     (s) => s.returnsSource === 'bourseview-adjusted' && (s.historyCount > 0 || s.closePrice != null),
   )
+  const strictSnapshot = Boolean(
+    staticBundle?.stocks?.length &&
+      String(staticBundle.source || '').startsWith('bourseview') &&
+      staticBundle.stocks.every((s) => s.returnsSource === 'bourseview-adjusted'),
+  )
+  const servedFromSnapshot = bourseviewRows.length === 0 && strictSnapshot
+  if (servedFromSnapshot) bourseviewRows = staticBundle.stocks
   const payload = {
-    ok: bvOk > 0,
+    ok: bourseviewRows.length > 0,
     updatedAt: new Date().toISOString(),
-    source: 'bourseview-adjusted',
-    note: 'داده زنده و بازدهی تعدیل‌شده، فقط از بورس‌ویو',
+    source: servedFromSnapshot ? 'bourseview-snapshot' : 'bourseview-adjusted',
+    note: servedFromSnapshot
+      ? 'آخرین snapshot معتبر بورس‌ویو؛ هیچ منبع جایگزینی استفاده نشده است'
+      : 'داده زنده و بازدهی تعدیل‌شده، فقط از بورس‌ویو',
     bourseviewReady: Boolean(bvCookie),
     bourseviewOk: bvOk,
+    served: servedFromSnapshot ? 'bourseview-snapshot' : 'live',
     stocks: bourseviewRows,
     errors: errors.slice(0, 12),
   }

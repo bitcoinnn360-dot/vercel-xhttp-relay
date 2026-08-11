@@ -89,7 +89,6 @@ async function bvJson(cookie, idToken, path) {
   const res = await fetch(`${BV_BASE}${path}`, {
     headers: {
       Cookie: cookie,
-      ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
       Accept: 'application/json',
       'User-Agent': UA,
       Referer: 'https://www.bourseview.com/',

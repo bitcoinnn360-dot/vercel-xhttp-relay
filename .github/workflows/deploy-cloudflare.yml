@@ -32,13 +32,10 @@ jobs:
             --output-routes-path=dist/_routes.json
           cp dist/.functions-worker/index.js dist/_worker.js
       - name: Sync BourseView credentials
-        run: |
-          printf '%s' "$BOURSEVIEW_COOKIE" | npx wrangler pages secret put BOURSEVIEW_COOKIE --project-name=arz-digital-dashboard
-          printf '%s' "$BOURSEVIEW_ID_TOKEN" | npx wrangler pages secret put BOURSEVIEW_ID_TOKEN --project-name=arz-digital-dashboard
+        run: printf '%s' "$BOURSEVIEW_COOKIE" | npx wrangler pages secret put BOURSEVIEW_COOKIE --project-name=arz-digital-dashboard
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           BOURSEVIEW_COOKIE: ${{ secrets.BOURSEVIEW_COOKIE_V2 }}
-          BOURSEVIEW_ID_TOKEN: ${{ secrets.BOURSEVIEW_ID_TOKEN_V2 }}
       - name: Deploy production
         run: npx wrangler pages deploy dist --project-name=arz-digital-dashboard --branch=main --commit-dirty=true
         env:

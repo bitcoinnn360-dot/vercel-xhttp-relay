@@ -301,10 +301,9 @@ function returnsFromBvItems(items, currentPayani) {
   }
 }
 
-function bvHeaders(cookie, idToken) {
+function bvHeaders(cookie) {
   return {
     Cookie: cookie,
-    ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
     Accept: 'application/json',
     'User-Agent': UA,
     Referer: 'https://www.bourseview.com/',
@@ -318,7 +317,7 @@ async function bvFetchQuotes(cookie, idToken, exchange, isin, attempts = 3) {
   for (let i = 0; i < attempts; i++) {
     try {
       const res = await fetch(url, {
-        headers: bvHeaders(cookie, idToken),
+        headers: bvHeaders(cookie),
         redirect: 'follow',
       })
       if (!res.ok) throw new Error(`bourseview ${res.status}`)
@@ -337,7 +336,7 @@ async function bvFetchQuotes(cookie, idToken, exchange, isin, attempts = 3) {
 async function bvFetchStockMeta(cookie, idToken, exchange, isin) {
   const url = `${BV_BASE}/api/v2/exchanges/${exchange}/stocks/${isin}`
   const res = await fetch(url, {
-    headers: bvHeaders(cookie, idToken),
+    headers: bvHeaders(cookie),
     redirect: 'follow',
   })
   if (!res.ok) throw new Error(`bourseview meta ${res.status}`)

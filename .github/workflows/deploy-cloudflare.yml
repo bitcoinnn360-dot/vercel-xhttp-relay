@@ -27,7 +27,7 @@ jobs:
       - name: Generate BourseView-only snapshots
         run: node scripts/fetch_bourseview_snapshots.mjs
         env:
-          BOURSEVIEW_COOKIE: ${{ secrets.BOURSEVIEW_COOKIE_V3 }}
+          BOURSEVIEW_COOKIE: ${{ secrets.BOURSEVIEW_COOKIE_V4 }}
       - run: npm run build
       - name: Build Pages Functions worker
         run: |
@@ -39,7 +39,7 @@ jobs:
         run: printf '%s' "$BOURSEVIEW_COOKIE" | npx wrangler pages secret put BOURSEVIEW_COOKIE --project-name=arz-digital-dashboard
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          BOURSEVIEW_COOKIE: ${{ secrets.BOURSEVIEW_COOKIE_V3 }}
+          BOURSEVIEW_COOKIE: ${{ secrets.BOURSEVIEW_COOKIE_V4 }}
       - name: Verify BourseView credential from runner
         run: |
           BV_COOKIE="$BOURSEVIEW_COOKIE"
@@ -50,7 +50,7 @@ jobs:
           echo "BourseView runner status=$status"
           test "$status" = "200"
         env:
-          BOURSEVIEW_COOKIE: ${{ secrets.BOURSEVIEW_COOKIE_V3 }}
+          BOURSEVIEW_COOKIE: ${{ secrets.BOURSEVIEW_COOKIE_V4 }}
       - name: Deploy production
         run: npx wrangler pages deploy dist --project-name=arz-digital-dashboard --branch=main --commit-dirty=true
         env:

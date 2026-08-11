@@ -19,6 +19,7 @@ import {
 
 const TGJU_AJAX = 'https://call2.tgju.org/ajax.json'
 const TGJU_TODAY = 'https://api.tgju.org/v1/market/indicator/today-table-data/bourse?lang=fa'
+const TSETMC_OVERVIEW = 'https://cdn.tsetmc.com/api/MarketData/GetMarketOverview/'
 const SHAKH_INDEX = 'https://www.shakhesban.com/markets/index'
 const SHAKH_LIST = 'https://www.shakhesban.com/stocks/list-data'
 const TA_HEATMAP_STOCK_FUNDS = 'https://tradersarena.ir/data/heatmap/stock-funds'
@@ -78,6 +79,38 @@ async function fetchJson(url, ms = UPSTREAM_MS) {
   })
   if (!res.ok) throw new Error(`${url} ${res.status}`)
   return res.json()
+}
+
+/** Official TSETMC market overview: flow 1 = TSE, flow 2 = IFB. */
+async function fetchTsetmcMarketSummary() {
+  const read = async (flow) => {
+    const payload = await fetchJson(`${TSETMC_OVERVIEW}${flow}`, 4000)
+    const row = payload?.marketOverview || payload?.data || payload || {}
+    const num = (...keys) => {
+      for (const key of keys) {
+        const value = parseNum(row?.[key])
+        if (value != null) return value
+      }
+      return null
+    }
+    return {
+      index: num('indexLastValue', 'indexValue', 'lastValue'),
+      indexChange: num('indexChange', 'change'),
+      equalIndex: num('indexEqualWeightedLastValue', 'equalWeightedLastValue'),
+      equalIndexChange: num('indexEqualWeightedChange', 'equalWeightedChange'),
+      marketValue: num('marketValue', 'marketCap', 'marketCapitalization'),
+    }
+  }
+  const [bourse, ifb] = await Promise.all([read(1), read(2)])
+  const bMv = bourse.marketValue
+  const fMv = ifb.marketValue
+  return {
+    ok: bourse.index != null || ifb.index != null || bMv != null || fMv != null,
+    bourse,
+    ifb,
+    bourseMarketValueHmt: bMv != null ? Math.round((bMv / RIAL_PER_HEMAT) * 10) / 10 : null,
+    ifbMarketValueHmt: fMv != null ? Math.round((fMv / RIAL_PER_HEMAT) * 10) / 10 : null,
+  }
 }
 
 async function fetchJsonRetry(url, attempts = 2) {
@@ -1103,6 +1136,7 @@ export async function onRequestGet(context) {
     fetchJson(`${origin}/data/market.json`).catch(() => null),
     fetchEquityFundSymbolSet(),
     scrapeRahavardIfbMovers(),
+    fetchTsetmcMarketSummary(),
   ])
 
   if (tasks[0].status === 'fulfilled') {
@@ -1156,6 +1190,13 @@ export async function onRequestGet(context) {
     if (!rahavardIfb.ok) errors.push(`rahavard-ifb: ${rahavardIfb.error || 'empty'}`)
   } else if (tasks[13].status === 'rejected') {
     errors.push(`rahavard-ifb: ${tasks[13].reason}`)
+  }
+
+  let tsetmcSummary = { ok: false }
+  if (tasks[14].status === 'fulfilled') {
+    tsetmcSummary = tasks[14].value
+  } else if (tasks[14].status === 'rejected') {
+    errors.push(`tsetmc-overview: ${tasks[14].reason}`)
   }
 
   let boardRows = []
@@ -1245,7 +1286,7 @@ export async function onRequestGet(context) {
       }
     : null)
 
-  const marketStats = resolveMarketStats({
+  let marketStats = resolveMarketStats({
     sourcearena,
     boardStats,
     tradersPulse: marketPulse,
@@ -1257,6 +1298,22 @@ export async function onRequestGet(context) {
     tedpixChangePct: tedpix?.changePct,
     ifbChangePct: indices?.ifb?.changePct,
   })
+  // Official TSETMC values take priority for market capitalization.
+  if (tsetmcSummary?.ok) {
+    const bMv = tsetmcSummary.bourseMarketValueHmt
+    const fMv = tsetmcSummary.ifbMarketValueHmt
+    const totalMv = bMv != null && fMv != null ? Math.round((bMv + fMv) * 10) / 10 : bMv ?? fMv
+    if (totalMv != null) {
+      marketStats = {
+        ...marketStats,
+        bourseMarketValueHmt: bMv,
+        ifbMarketValueHmt: fMv,
+        totalMarketValueHmt: totalMv,
+        totalMarketValueUsdM: usd > 0 ? Math.round((totalMv * RIAL_PER_HEMAT) / usd / 1e6) : null,
+        marketValueSource: 'tsetmc-official-bourse+ifb',
+      }
+    }
+  }
 
   const blocked = [
     ...(sourcearena.ok ? [] : ['sourcearena']),
@@ -1273,7 +1330,19 @@ export async function onRequestGet(context) {
     indices: {
       tedpix,
       equalWeight: taIndices.equalWeight || indices.equalWeight || null,
-      ifb: indices.ifb || null,
+      ifb:
+        tsetmcSummary?.ifb?.index != null
+          ? {
+              name: 'شاخص کل فرابورس',
+              value: tsetmcSummary.ifb.index,
+              change: tsetmcSummary.ifb.indexChange || 0,
+              changePct:
+                tsetmcSummary.ifb.indexChange != null && tsetmcSummary.ifb.index
+                  ? Math.round((tsetmcSummary.ifb.indexChange / (tsetmcSummary.ifb.index - tsetmcSummary.ifb.indexChange)) * 10000) / 100
+                  : 0,
+              source: 'tsetmc-official',
+            }
+          : indices.ifb || null,
     },
     intraday: {
       source: 'tgju-today-table',

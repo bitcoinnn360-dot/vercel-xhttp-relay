@@ -230,7 +230,7 @@ export function MarketOverview({
           </div>
           <div className="mt-1 text-[10px] text-[var(--color-muted)]">
             {src.retailMoneyFlowDaily === 'tradersarena-equity'
-              ? 'TradersArena · سهام، حق‌تقدم و صندوق سهامی'
+              ? '(سهام، حق تقدم و ص.سهامی)'
               : 'در انتظار دادهٔ TradersArena'}
           </div>
         </motion.div>
@@ -490,4 +490,3 @@ function ImpactPanel({
     </motion.div>
   )
 }
-

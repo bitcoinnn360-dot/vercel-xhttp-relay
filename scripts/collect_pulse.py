@@ -22,10 +22,10 @@ TA_MARKET = "https://tradersarena.ir/data/market"
 TA_INDUSTRIES = "https://tradersarena.ir/data/industries"
 UA = "Mozilla/5.0 (compatible; midco-pulse-collector/1.0)"
 RIAL_PER_BT = 1e10
-PULSE_START = "08:45"
+PULSE_START = "09:00"
 PULSE_CASH_END = "12:30"
-# Gold commodity ETFs (صندوق طلا) trade into the afternoon (~18:00).
-PULSE_END = "18:00"
+# Gold commodity ETFs (صندوق طلا) continue until ~17:00.
+PULSE_END = "17:00"
 MAX_DAYS = 45
 MAX_POINTS = 720
 TEHRAN = ZoneInfo("Asia/Tehran")
@@ -138,9 +138,17 @@ def parse_pulse(market: dict, industries) -> dict:
     ind = parse_industries(industries)
     positive = int(pp or 0)
     negative = int(pm or 0)
+    raw_t = now.strftime("%H:%M")
+    flow_stocks = seg_flow(st)
+    flow_equity_funds = seg_flow(sf)
+    equity_retail_flow = (
+        round(flow_stocks + flow_equity_funds, 1)
+        if flow_stocks is not None and flow_equity_funds is not None
+        else None
+    )
     return {
         "asOf": datetime.now(timezone.utc).isoformat(),
-        "time": now.strftime("%H:%M"),
+        "time": clamp_time(raw_t) or (PULSE_END if raw_t > PULSE_END else raw_t),
         "dateJalali": market.get("j") or jalali_today(now),
         "source": "tradersarena",
         "breadth": {
@@ -152,8 +160,9 @@ def parse_pulse(market: dict, industries) -> dict:
         "orderBuyBillionToman": bt(o[1] if len(o) > 1 else None),
         "orderSellBillionToman": bt(o[0] if len(o) > 0 else None),
         "retailMoneyFlowBillionToman": bt(m[5] if len(m) > 5 else None),
-        "flowStocksBillionToman": seg_flow(st),
-        "flowEquityFundsBillionToman": seg_flow(sf),
+        "equityRetailMoneyFlowBillionToman": equity_retail_flow,
+        "flowStocksBillionToman": flow_stocks,
+        "flowEquityFundsBillionToman": flow_equity_funds,
         "flowFixedIncomeBillionToman": seg_flow(nsf),
         "flowBasicMetalsBillionToman": ind["flowBasicMetalsBillionToman"],
         "flowMetalOresBillionToman": ind["flowMetalOresBillionToman"],
@@ -237,8 +246,8 @@ def in_session(now: datetime) -> bool:
     if now.weekday() not in MARKET_WEEKDAYS:
         return False
     t = now.time()
-    # Cash board ~08:45–12:30; gold ETFs continue until ~18:00
-    return time(8, 40) <= t <= time(18, 10)
+    # Cash board ~08:45–12:30; gold ETFs continue until ~17:00
+    return time(8, 40) <= t <= time(17, 0)
 
 
 def main() -> int:
@@ -292,3 +301,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

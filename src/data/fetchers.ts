@@ -438,4 +438,1486 @@ function markSources(base: DashboardData, liveCount: number, fredOk: number, now
         ...s,
         status: liveCount > 0 ? 'live' : 'seed',
         note: 'ŸÑÿß⁄Ø€åŸÜ ÿßÿ¥ÿ™ÿ±ÿß⁄© ‚Äî ŸÇ€åŸÖÿ™ ÿ≤ŸÜÿ¨€åÿ±Ÿá ⁄Ü€åŸÜ (ÿßÿ≥⁄©ÿ±Ÿæÿ± /api/steel)',
-        lastOk: liveCount > 0 ? no◊}∑ﬁ⁄$z{-ÆÈ‹j◊ùfñ«FW"Çá2í”‚2Êw&˜W””“rê¢Á6˜'BÇÜ¬"í”‚Ü"Ê÷&∂WEf«VT'"«¬í“ÜÊ÷&∂WEf«VT'"«¬íê¢ñbÇ÷V÷&W'2Ê∆VÊwFÇí6ˆÁFñÁVP¢&V'Vñ«BÁW6ÇÇ‚‚Ê÷V÷&W'2ê†¢6ˆÁ7B◊b“÷V÷&W'2Á&VGV6RÇÜ¬2í”‚≤á2Ê÷&∂WEf«VT'"«¬í¬ê¢6ˆÁ7BW6B“÷V÷&W'2Á&VGV6RÇÜ¬2í”‚≤á2Ê÷&∂WEf«VUW6D“«¬í¬ê¢6ˆÁ7Bfˆ¬“÷V÷&W'2Á&VGV6RÇÜ¬2í”‚≤á2Áfˆ«V÷R«¬í¬ê¢6ˆÁ7BGb“÷V÷&W'2Á&VGV6RÇÜ¬2í”‚≤á2ÁG&FUf«VT◊"«¬í¬ê¢6ˆÁ7BÊWB“÷V÷&W'2Á&VGV6RÇÜ¬2í”‚≤á2ÊÊWDñÊFófñGVƒ'B«¬í¬ê¢6ˆÁ7BvVV¥f∆˜r“vw&VvFUvVV¥f∆˜w2Ü÷V÷&W'2ê†¢&V'Vñ«BÁW6Çá∞¢w&˜W¢r¿¢Ê÷S¢ã]òmãùä¢G∂w÷¿¢ó4ñÊGW7G'ì¢G'VR¿¢÷&∂WEf«VT'#¢◊b¿¢÷&∂WEf«VUW6D”¢W6B¿¢fˆ«V÷S¢fˆ¬¿¢G&FUf«VT◊#¢Gb¿¢6∆˜6U&ñ6S¢¿¢Fñ«ï7C¢vVñváFVE7BÜ÷V÷&W'2¬vFñ«ï7Brí¿¢vVVµ7C¢vVñváFVE7BÜ÷V÷&W'2¬wvVVµ7Brí¿¢÷ˆÁFÖ7C¢vVñváFVE7BÜ÷V÷&W'2¬v÷ˆÁFÖ7Brí¿¢óFE7C¢vVñváFVE7BÜ÷V÷&W'2¬wóFE7Brí¿¢ñV#7C¢vVñváFVE7BÜ÷V÷&W'2¬wñV#7Brí¿¢ñV#57C¢vVñváFVE7BÜ÷V÷&W'2¬wñV#57Brí¿¢ÊWDñÊFófñGVƒ'C¢÷FÇÁ&˜VÊBÜÊWB¢íÚ¿¢ÊWDñÊFófñGV≈vVV¥'C¢vVV¥f∆˜r¿¢&WGW&Á4FßW7FVC¢÷V÷&W'2Á6ˆ÷RÇá2í”‚2Á&WGW&Á4FßW7FVBí¿¢&WGW&Á56˜W&6S¢vñÊGW7G'í◊vVñváFVBr¿¢“ê¢–†¢f˜"Ü6ˆÁ7B2ˆbWVóFñW2í∞¢ñbÇ4T5Dı%Ùı$DU"ÊñÊ6«VFW2á2Êw&˜W2áGóVˆb4T5Dı%Ùı$DU"ï∂ÁV÷&W%“íí&V'Vñ«BÁW6Çá2ê¢–¢&6RÁ7Fˆ6∑2“&V'Vñ«@ß–†¶gVÊ7Fñˆ‚«î÷ñÊW&≈7Fˆ6µ&WGW&Á2Ü&6S¢F6Ü&ˆ&DFF¬6Ê3¢÷ñÊW&≈7Fˆ6µ6Êµ“¬ÁV∆¬¬VÊFVfñÊVBí∞¢ñbÇ6Ê3ÚÊ∆VÊwFÇí∞¢f˜"Ü6ˆÁ7B2ˆb&6RÁ7Fˆ6∑2í∞¢ñbá2Êó4ñÊGW7G'íí6ˆÁFñÁVP¢6ˆÁ7B7ñ““‘î‰U$≈ı5î‘$Ù≈Ù%ïÙ‰‘U∑2ÊÊ÷U–¢ñbá7ñ“í2Á7ñ÷&ˆ¬“7ñ–¢–¢&V'Vñ∆DñÊGW7G'ï&˜w2Ü&6Rê¢&WGW&‡¢–¢6ˆÁ7B'ï7ñ““ÊWr÷á6Ê2Ê÷Çá"í”‚∑"Á7ñ÷&ˆ¬¬%“íê†¢6ˆÁ7BW6B“&6RÊ˜fW'fñWrÁW6E&FR«¬6VVDF6Ü&ˆ&BÊ˜fW'fñWrÁW6E&FR«¬¢f˜"Ü6ˆÁ7B2ˆb&6RÁ7Fˆ6∑2í∞¢ñbá2Êó4ñÊGW7G'íí6ˆÁFñÁVP¢6ˆÁ7B7ñ““‘î‰U$≈ı5î‘$Ù≈Ù%ïÙ‰‘U∑2ÊÊ÷U–¢ñbá7ñ“í2Á7ñ÷&ˆ¬“7ñ–¢6ˆÁ7B6Ê“7ñ“Ú'ï7ñ“ÊvWBá7ñ“í¢VÊFVfñÊV@¢ñbÇ6Êí6ˆÁFñÁVP¢ÚÚ6∂óFVBí7GV'2ÜWáó&VB&˜W'6UfñWr6ˆˆ∂ñRWF2‚í6Ú6VVB˜7FFñ27Fífó6ñ&∆R‡¢ñbá6ÊÁ&WGW&Á56˜W&6R””“vW'&˜"rbb6ÊÊ6∆˜6U&ñ6R”“ÁV∆¬bb6ÊÁóFE7B”“ÁV∆¬í6ˆÁFñÁVP†¢ñbá6ÊÊ6∆˜6U&ñ6R“ÁV∆¬bb6ÊÊ6∆˜6U&ñ6R‚í2Ê6∆˜6U&ñ6R“6ÊÊ6∆˜6U&ñ6P¢V«6Rñbá6ÊÊ∆7E&ñ6R“ÁV∆¬bb6ÊÊ∆7E&ñ6R‚í2Ê6∆˜6U&ñ6R“6ÊÊ∆7E&ñ6P¢ñbá6ÊÊFñ«ï7B“ÁV∆¬bbÁV÷&W"Êó4fñÊóFRá6ÊÊFñ«ï7Bíí2ÊFñ«ï7B“6ÊÊFñ«ï7@¢ñbá6ÊÁvVVµ7B“ÁV∆¬bbÁV÷&W"Êó4fñÊóFRá6ÊÁvVVµ7Bíí2ÁvVVµ7B“6ÊÁvVVµ7@¢ñbá6ÊÊ÷ˆÁFÖ7B“ÁV∆¬bbÁV÷&W"Êó4fñÊóFRá6ÊÊ÷ˆÁFÖ7Bíí2Ê÷ˆÁFÖ7B“6ÊÊ÷ˆÁFÖ7@¢ñbá6ÊÁóFE7B“ÁV∆¬bbÁV÷&W"Êó4fñÊóFRá6ÊÁóFE7Bíí2ÁóFE7B“6ÊÁóFE7@¢ñbá6ÊÁñV#7B“ÁV∆¬bbÁV÷&W"Êó4fñÊóFRá6ÊÁñV#7Bíí2ÁñV#7B“6ÊÁñV#7@¢ñbá6ÊÁñV#57B“ÁV∆¬bbÁV÷&W"Êó4fñÊóFRá6ÊÁñV#57Bíí2ÁñV#57B“6ÊÁñV#57@¢ñbá6ÊÁ&WGW&Á56˜W&6Rí∞¢2Á&WGW&Á4FßW7FVB“&ˆˆ∆V‚á6ÊÁ&WGW&Á4FßW7FVBê¢2Á&WGW&Á56˜W&6R“6ÊÁ&WGW&Á56˜W&6P¢–¢ñbá6ÊÊÜ«FVB“ÁV∆¬í2ÊÜ«FVB“6ÊÊÜ«FV@¢ñbá6ÊÁfˆ«V÷R“ÁV∆¬í2Áfˆ«V÷R“6ÊÁfˆ«V÷P¢ñbá6ÊÁG&FUf«VT◊"“ÁV∆¬í2ÁG&FUf«VT◊"“6ÊÁG&FUf«VT◊ ¢ñbá6ÊÊÊWDñÊFófñGVƒ'B“ÁV∆¬bbÁV÷&W"Êó4fñÊóFRá6ÊÊÊWDñÊFófñGVƒ'Bíí∞¢2ÊÊWDñÊFófñGVƒ'B“6ÊÊÊWDñÊFófñGVƒ'@¢–¢ñbÑ'&íÊó4'&íá6ÊÊÊWDñÊFófñGV≈vVV¥'Bíbb6ÊÊÊWDñÊFófñGV≈vVV¥'BÊ∆VÊwFÇí∞¢2ÊÊWDñÊFófñGV≈vVV¥'B“6ÊÊÊWDñÊFófñGV≈vVV¥'@¢–¢ñbá6ÊÊg&VTf∆ˆE7B“ÁV∆¬bbÁV÷&W"Êó4fñÊóFRá6ÊÊg&VTf∆ˆE7Bíí2Êg&VTf∆ˆE7B“6ÊÊg&VTf∆ˆE7@¢ñbá6ÊÊ˜WG7FÊFñÊu6Ü&W2“ÁV∆¬í2Ê˜WG7FÊFñÊu6Ü&W2“6ÊÊ˜WG7FÊFñÊu6Ü&W0¢ñbá6ÊÁfˆ«V÷UFÙf∆ˆE7B“ÁV∆¬bbÁV÷&W"Êó4fñÊóFRá6ÊÁfˆ«V÷UFÙf∆ˆE7Bíí∞¢2Áfˆ«V÷UFÙf∆ˆE7B“6ÊÁfˆ«V÷UFÙf∆ˆE7@¢–¢ñbá6ÊÊ÷&∂WEf«VT'"“ÁV∆¬bb6ÊÊ÷&∂WEf«VT'"‚í∞¢2Ê÷&∂WEf«VT'"“6ÊÊ÷&∂WEf«VT' ¢2Ê÷&∂WEf«VUW6D““÷FÇÁ&˜VÊBÇá6ÊÊ÷&∂WEf«VT'"¢ÛÛÛíÚW6BÚÛÛê¢–¢–¢&V'Vñ∆DñÊGW7G'ï&˜w2Ü&6Rêß–†¶Wá˜'B7ñÊ2gVÊ7Fñˆ‚∆ˆDF6Ü&ˆ&D'VÊF∆RÇì¢&ˆ÷ó6Sƒ∆ófT'VÊF∆S‚∞¢6ˆÁ7B&6S¢F6Ü&ˆ&DFF“7G'V7GW&VD6∆ˆÊRá6VVDF6Ü&ˆ&Bê¢6ˆÁ7BÊ˜r“ÊWrFFRÇíÁFÙï4ı7G&ñÊrÇê†¢6ˆÁ7B∂7W'&VÁB¬Üó7DVÁG&ñW2¬6ÊF∆TVÁG&ñW2¬g&VDVÁG&ñW2¬67&VB¬˜fW'fñWtí¬ñÁG&Fîf∆∆&6≤¬7Fˆ6∑4í¬7FVVƒí¬Êdí¬v∆ˆ&ƒí¬&ˆGV7Fñˆ‰í¬fñÊÊ6ñ«4í¬&WFñƒ÷ˆÊWîf∆˜tÜó7F˜'ï“–¢vóB&ˆ÷ó6RÊ∆¬Ö∞¢fWF6ÖFvßT¶ÇÇí¿¢&ˆ÷ó6RÊ∆¬ÑÑï5EÙ¥Uï2Ê÷Ü7ñÊ2Ü≤í”‚∂≤¬vóBfWF6ÖFvßTÜó7F˜'íÜ≤ï“26ˆÁ7Bíí¿¢&ˆ÷ó6RÊ∆¬Ä¢Ñï5EÙ¥Uï2Ê÷Ü7ñÊ2Ü≤í”‚∂≤¬≤””“v&˜W'6RrÚvóBfWF6Ñ&˜W'6TˆÜ∆2Çí¢vóBfWF6ÖFvßTˆÜ∆2Ü≤¬s##"ÛÛrï“26ˆÁ7Bí¿¢í¿¢&ˆ÷ó6RÊ∆¬Ñe$TEı4U$îU2Ê÷Ü7ñÊ2á2í”‚∑2Ê÷FÚ«¬2ÊñB¬vóBfWF6Ñg&VBá2ÊñB¬2Ê∆&V¬ï“26ˆÁ7Bíí¿¢fWF6Ö67&VD÷&∂WBÇí¿¢fWF6Ñ˜fW'fñWtíÇí¿¢fWF6ÖFvßTñÁG&FíÇí¿¢fWF6Ñ÷ñÊW&≈7Fˆ6∑4íÇí¿¢fWF6Ö7FVVƒ6Üñ‰íÇí¿¢fWF6ÑÊdíÇí¿¢fWF6Ñv∆ˆ&ƒ÷&∂WG4íÇí¿¢fWF6Ö&ˆGV7Fñˆ‰˜4íÇí¿¢fWF6ÑfñÊÊ6ñ«4íÇí¿¢fWF6Ö&WFñƒ÷ˆÊWîf∆˜tÜó7F˜'íÇí¿¢“ê†¢6ˆÁ7B∆ófT6˜VÁB“«î∆ófUV˜FW2Ü&6R¬7W'&VÁBê¢6ˆÁ7B˜fW'fñWt∆ófTˆ≤“«î˜fW'fñWt∆ófRÜ&6R¬67&VCÚÊ˜fW'fñWt∆ófR¬67&VCÚÊ6ÊF∆W3Cê¢6ˆÁ7Bg&W6Ñˆ≤“«îg&W6Ñ˜fW'fñWrÜ&6R¬˜fW'fñWtí¬ñÁG&Fîf∆∆&6≤ê¢6ˆÁ7B÷ñÊW&≈7Fˆ6µ&˜w2“7Fˆ6∑4ìÚÊ∆VÊwFÇÚ7Fˆ6∑4í¢ÁV∆¿¢ñbÜ÷ñÊW&≈7Fˆ6µ&˜w2í«î÷ñÊW&≈7Fˆ6µ&WGW&Á2Ü&6R¬÷ñÊW&≈7Fˆ6µ&˜w2ê¢V«6R&6RÁ7Fˆ6∑2“µ–¢6ˆÁ7B7FVV≈7FGW2“«ï7FVVƒ6Üñ‚Ü&6R¬7FVVƒíê¢6ˆÁ7BÊdˆ≤“«îÊd∆ófRÜ&6R¬Êdíê¢ñbÇÊdˆ≤í∞¢&6RÊÜˆ∆FñÊw2“µ–¢&6RÊ˜fW'fñWrÊfñV∆E6˜W&6W2“≤‚‚‚Ü&6RÊ˜fW'fñWrÊfñV∆E6˜W&6W2«¬∑“í¬Êc¢v&˜W'6WfñWr◊VÊfñ∆&∆Rr–¢–¢6ˆÁ7Bv∆ˆ&ƒˆ≤“«îv∆ˆ&ƒ÷&∂WG2Ü&6R¬v∆ˆ&ƒíê¢6ˆÁ7B&ˆGV7Fñˆ‰ˆ≤“«ï&ˆGV7Fñˆ‰˜2Ü&6R¬&ˆGV7Fñˆ‰íê¢ñbÇ&ˆGV7Fñˆ‰ˆ≤í&6RÁ&ˆGV7Fñˆ‰˜2“≤ˆ≥¢f«6R¬6ˆ◊ÊñW3¢µ“¬6˜W&6S¢v&˜W'6WfñWrr–¢6ˆÁ7BfñÊÊ6ñ«4ˆ≤“«îfñÊÊ6ñ«2Ü&6R¬fñÊÊ6ñ«4íê¢ñbÇfñÊÊ6ñ«4ˆ≤í&6RÊfñÊÊ6ñ«2“≤ˆ≥¢f«6R¬6ˆ◊ÊñW3¢µ“¬6˜W&6S¢v&˜W'6WfñWrr–¢6ˆÁ7Bîñ◊7G2“Ê˜&÷∆ó¶Tñ◊7G2Ü˜fW'fñWtìÚÊñ◊7G2ê¢ñbÜîñ◊7G2bbÜ˜fW'fñWtìÚÊñ◊7G4g&ˆ’6˜W&6T&VÊ«¬˜fW'fñWtìÚÊñ◊7G4g&ˆ’&Üf&B«¬˜fW'fñWtìÚÊñ◊7G56˜W&6Ríí∞¢&6RÊñ◊7G2“îñ◊7G0¢&6RÊ˜fW'fñWrÊñ◊7G4∆ófR“G'VP¢&6RÊ˜fW'fñWrÊfñV∆E6˜W&6W2“∞¢‚‚‚Ü&6RÊ˜fW'fñWrÊfñV∆E6˜W&6W2«¬∑“í¿¢ñ◊7G3¢˜fW'fñWtìÚÊñ◊7G56˜W&6R«¬Ü˜fW'fñWtìÚÊñ◊7G4g&ˆ’&Üf&BÚw&Üf&C3cRr¢w6˜W&6V&VÊ÷∆ófRrí¿¢–¢–¢ñbÜ˜fW'fñWtìÚÁF˜G&FW3ÚÊ∆VÊwFÇí∞¢&6RÁF˜G&FW2“˜fW'fñWtíÁF˜G&FW0¢&6RÊ˜fW'fñWrÊfñV∆E6˜W&6W2“∞¢‚‚‚Ü&6RÊ˜fW'fñWrÊfñV∆E6˜W&6W2«¬∑“í¿¢F˜G&FW3¢˜fW'fñWtíÁF˜G&FW56˜W&6R«¬w6˜W&6V&VÊ÷∆¬r¿¢–¢–¢ñbÜ˜fW'fñWtìÚÊFFT¶∆∆íí∞¢&6RÊ˜fW'fñWrÊFFT¶∆∆í“˜fW'fñWtíÊFFT¶∆∆ê¢–¢ñbÜ˜fW'fñWtìÚÊ÷&∂WEV«6Rí∞¢&6RÊ˜fW'fñWrÊ÷&∂WEV«6R“˜fW'fñWtíÊ÷&∂WEV«6P¢–¢ñbÜ˜fW'fñWtìÚÊ÷&∂WEV«6TÜó7F˜'ìÚÊ∆VÊwFÇí∞¢&6RÊ˜fW'fñWrÊ÷&∂WEV«6TÜó7F˜'í“˜fW'fñWtíÊ÷&∂WEV«6TÜó7F˜'ê¢–¢ÚÚ«6Úg&ˆ“67&VB÷&∂WBÊß6ˆ‚vÜV‚íFÜñ‡¢6ˆÁ7B67&VEV«6R“67&VCÚÊ÷&∂WEV«6P¢ñbÇ&6RÊ˜fW'fñWrÊ÷&∂WEV«6Rbb67&VEV«6SÚÊ7W'&VÁBí∞¢&6RÊ˜fW'fñWrÊ÷&∂WEV«6R“67&VEV«6RÊ7W'&VÁ@¢–¢ñbÇ&6RÊ˜fW'fñWrÊ÷&∂WEV«6TÜó7F˜'ìÚÊ∆VÊwFÇbb67&VEV«6SÚÊÜó7F˜'ìÚÊ∆VÊwFÇí∞¢&6RÊ˜fW'fñWrÊ÷&∂WEV«6TÜó7F˜'í“67&VEV«6RÊÜó7F˜'ê¢–¢«ï&WFñƒ÷ˆÊWîf∆˜tÜó7F˜'íÜ&6R¬&WFñƒ÷ˆÊWîf∆˜tÜó7F˜'íê¢ÚÚFVÁ6ñgívóFÇ6W76ñˆÂ7F˜&vRÜ6∆ñVÁB'Vñ∆G2ì£(i&Ê˜r6W&ñW2vÜñ∆RvRó2˜V‚ê¢∞¢6ˆÁ7B6W76ñˆ‚“&VE6W76ñˆÂV«6RÇê¢6ˆÁ7BFFT¶∆∆í–¢&6RÊ˜fW'fñWrÊ÷&∂WEV«6SÚÊFFT¶∆∆í«¬˜fW'fñWtìÚÊFFT¶∆∆í«¬6W76ñˆ‚ÊFFT¶∆∆ê¢ñbá6W76ñˆ‚ÊFFT¶∆∆íbbFFT¶∆∆íbb6W76ñˆ‚ÊFFT¶∆∆í”“FFT¶∆∆íí∞¢6W76ñˆ‚ÊÜó7F˜'í“µ–¢–¢6ˆÁ7BÜó7B“÷W&vUV«6UˆñÁG2á6W76ñˆ‚ÊÜó7F˜'í¬&6RÊ˜fW'fñWrÊ÷&∂WEV«6TÜó7F˜'íê¢w&óFU6W76ñˆÂV«6RÜFFT¶∆∆í¬Üó7Bê¢ñbÜÜó7BÊ∆VÊwFÇí&6RÊ˜fW'fñWrÊ÷&∂WEV«6TÜó7F˜'í“Üó7@¢–†¢6ˆÁ7BÜó7F˜&ñW3¢&V6˜&C«7G&ñÊr¬Üó7F˜'ïˆñÁEµ”‚“≤‚‚‚á67&VCÚÊÜó7F˜&ñW2«¬∑“í–¢f˜"Ü6ˆÁ7B∂≤¬G5“ˆbÜó7DVÁG&ñW2í∞¢ñbÜ≤””“v&˜W'6RrbbÜÜó7F˜&ñW2Ê&˜W'6SÚÊ∆VÊwFÇ«¬í‚G2Ê∆VÊwFÇí6ˆÁFñÁVP¢ñbáG2Ê∆VÊwFÇíÜó7F˜&ñW5∂µ““G0¢–¢ÚÚ÷W&vR7W7FVV¬7FVV¬Üó7F˜&ñW2f˜"6Ü'G4áV"Ú7FVV≈6V7Fñˆ‡¢ñbá7FVVƒìÚÊÜó7F˜&ñW2í∞¢f˜"Ü6ˆÁ7B∂ñB¬G5“ˆbˆ&¶V7BÊVÁG&ñW2á7FVVƒíÊÜó7F˜&ñW2íí∞¢ñbÇG3ÚÊ∆VÊwFÇí6ˆÁFñÁVP¢Üó7F˜&ñW5∂7FVV√¢G∂ñG÷““G2Ê÷Çáí”‚á≤FFS¢ÊFFR¬f«VS¢Áf«VR“íê¢–¢–†¢6ˆÁ7B6ÊF∆W3¢&V6˜&C«7G&ñÊr¬6ÊF∆UˆñÁEµ”‚“≤‚‚‚á67&VCÚÊ6ÊF∆TÜó7F˜&ñW2«¬∑“í–¢f˜"Ü6ˆÁ7B∂≤¬G5“ˆb6ÊF∆TVÁG&ñW2í∞¢ñbáG2Ê∆VÊwFÇí6ÊF∆W5∂µ““G0¢V«6RñbÇ6ÊF∆W5∂µ”ÚÊ∆VÊwFÇbbÜó7F˜&ñW5∂µ”ÚÊ∆VÊwFÇí∞¢ÚÚFVw&FS¢7ñÁFÜW6ó¶Rf∆B6ÊF∆W2g&ˆ“6∆˜6R÷ˆÊ«íÜó7F˜'ê¢6ÊF∆W5∂µ““Üó7F˜&ñW5∂µ“Ê÷Çáí”‚á∞¢FFS¢ÊFFR¿¢FFT¶∆∆ì¢ÊFFT¶∆∆í¿¢˜V„¢Áf«VR¿¢ÜñvÉ¢Áf«VR¿¢∆˜s¢Áf«VR¿¢6∆˜6S¢Áf«VR¿¢“íê¢–¢–¢6ÊF∆W2Ê&˜W'6R“vóFÑ7W'&VÁEFVGóÑ6ÊF∆RÜ6ÊF∆W2Ê&˜W'6R«¬µ“¬&6RÊ˜fW'fñWr¬7W'&VÁBÊ&˜W'6Rê¢ÚÚ÷&∂WD˜fW'fñWròmò]òçä˝ä}ãä≠ä}ã∏ÕäÌ∏¬ãärä}ã"˜fW'fñWrÊ6ÊF∆W3Cò]∏Œ(ÕäÌòçä}òmä˝â∞¢ÚÚäçä˝òçòbä}∏Õòbä}ä≠ã]ä}òMà¬ä˝ä}ä˝ò}ôBã-òmä˝ò}ôBDt•Ròmä}ä˝∏Õä˝òr™˝ãòä≠òròÇòä}∏ÕòBä}∏Õã=ä≠äròmò]ä}∏ÕãBä˝ä}ä˝òrò]∏Œ(ÕãMäÚ‡¢ñbÜ6ÊF∆W2Ê&˜W'6SÚÊ∆VÊwFÇí&6RÊ˜fW'fñWrÊ6ÊF∆W3C“6ÊF∆W2Ê&˜W'6P†¢f˜"Ü6ˆÁ7B2ˆb&6RÊ6ˆ÷÷ˆFóFñW2í∞¢6ˆÁ7BÜó7D∂Wí“2ÊñB””“v&6R◊W2÷ó&ˆ‚÷˜&RrÚv&6R◊W2÷ó&ˆ‚÷˜&Rr¢2Êñ@¢6ˆÁ7BG2“Üó7F˜&ñW5∂Üó7D∂Wï–¢ñbáG3ÚÊ∆VÊwFÇí∞¢2ÊÜó7F˜'í“G2Á6∆ñ6RÇ”CíÊ÷Çáí”‚á≤C¢ÊFFT¶∆∆í«¬ÊFFR¬c¢Áf«VR“íê¢–¢–†¢ñbÜÜó7F˜&ñW2Ê&˜W'6SÚÊ∆VÊwFÇí∞¢&6RÊ˜fW'fñWrÊñÊFWÑÜó7F˜'í“Üó7F˜&ñW2Ê&˜W'6RÁ6∆ñ6RÇ”3bíÊ÷Çáí”‚á∞¢FFS¢ÊFFT¶∆∆í«¬ÊFFR¿¢f«VS¢Áf«VR¿¢“íê¢ñbÇ&6RÊ˜fW'fñWrÊñÁG&FîñÊFWÉÚÊ∆VÊwFÇ«¬&6RÊ˜fW'fñWrÊñÁG&FîñÊFWÇÊ∆VÊwFÇ¬Rí∞¢&6RÊ˜fW'fñWrÊñÁG&FîñÊFWÇ“Üó7F˜&ñW2Ê&˜W'6RÁ6∆ñ6RÇ”"íÊ÷Çá¬íí”‚á∞¢Fñ÷S¢ÊFFT¶∆∆í«¬G∂ó÷¿¢f«VS¢Áf«VR¿¢“íê¢–¢–†¢6ˆÁ7Bg&VC¢&V6˜&C«7G&ñÊr¬g&VD'VÊF∆S‚“∑–¢∆WBg&VDˆ≤“ ¢f˜"Ü6ˆÁ7B∂÷FÚ¬'VÊF∆U“ˆbg&VDVÁG&ñW2í∞¢ñbÜ'VÊF∆Rí∞¢g&VE∂÷Fı““'VÊF∆P¢g&VDˆ≤≥“¢–¢–†¢ñbÜg&VBÊg&VEˆGáìÚÊ∆7B“ÁV∆¬í∞¢6ˆÁ7B&˜r“&6RÁW&ñˆFñ2ÊfñÊBÇáí”‚ÊÊ÷R””“}ãMä}äÌãRä˝òMä}ãrê¢ñbá&˜rí∞¢&˜rÁ&ñ6R“g&VBÊg&VEˆGáíÊ∆7@¢&˜rÊFñ«ï7B“g&VBÊg&VEˆGáíÊ6ÜÊvU7@¢–¢–¢ñbÜg&VBÊg&VEˆFw3ÚÊ∆7B“ÁV∆¬í∞¢6ˆÁ7B&˜r“&6RÁW&ñˆFñ2ÊfñÊBÇáí”‚ÊÊ÷R””“}ä}òçãä}ò"ò-ããmòrä-ò]ã∏Õ™ùärrê¢ñbá&˜rí∞¢&˜rÁ&ñ6R“g&VBÊg&VEˆFw3Ê∆7@¢&˜rÊFñ«ï7B“g&VBÊg&VEˆFw3Ê6ÜÊvU7@¢–¢–†¢&6RÁ6˜W&6W2“÷&µ6˜W&6W2Ü&6R¬∆ófT6˜VÁB¬g&VDˆ≤¬Ê˜rê¢6ˆÁ7BÜ5'2“&ˆˆ∆V‚Ä¢&6RÊ˜fW'fñWrÁ&WFñƒ÷ˆÊWîf∆˜tFñ«í“ÁV∆¬«¬&6RÊ˜fW'fñWrÁ&WFñ≈G&FUf«VT&ñ∆∆ñˆÂFˆ÷‚“ÁV∆¬¿¢ê¢6ˆÁ7BÜ4&VÊ◊b“&ˆˆ∆V‚Ä¢˜fW'fñWtìÚÁF˜Fƒ÷&∂WEf«VTÜ◊B“ÁV∆¬«¿¢á67&VCÚÊ˜fW'fñWt∆ófSÚÊ÷&∂WEf«VU6˜W&6R«¬rríÊñÊ6«VFW2Çw6˜W&6V&VÊrí¿¢ê¢ñbÜ˜fW'fñWt∆ófTˆ≤«¬g&W6Ñˆ≤í∞¢&6RÁ6˜W&6W2“∞¢‚‚Ê&6RÁ6˜W&6W2Êfñ«FW"Ä¢á2í”‚2ÊñB”“w6Ü∂ÜW6&‚rbb2ÊñB”“w'6ó7FÜ∆ñ¬rbb2ÊñB”“wG6WF÷2rbb2ÊñB”“w6˜W&6V&VÊr¿¢í¿¢∞¢ñC¢w6˜W&6V&VÊr¿¢Ê÷S¢u6˜W&6T&VÊÚG&FW'4&VÊr¿¢7FGW3¢Ü4&VÊ◊bÚv∆ófRr¢v&∆ˆ6∂VBr¿¢Ê˜FS¢Ü4&VÊ◊`¢Úä}ãã-ãBäçä}ã-ä}ãäçòçãã2Ωòãä}äçòçãã2G∞¢˜fW'fñWtìÚÁF˜Fƒ÷&∂WEf«VTÜ◊B“ÁV∆¬Ú+rG∂˜fW'fñWtíÁF˜Fƒ÷&∂WEf«VTÜ◊G“ò}ò]ä¶¢rp¢÷ ¢¢}ä˝ã∏Õ™íòm™˝ä}òräÌòçä}òmä˝òròmãMäÚr¿¢∆7Dˆ≥¢Ü4&VÊ◊bÚ˜fW'fñWtìÚÁWFFVDB«¬67&VCÚÊ˜fW'fñWt∆ófSÚÊ4ˆb«¬Ê˜r¢VÊFVfñÊVB¿¢“¿¢∞¢ñC¢w6Ü∂ÜW6&‚r¿¢Ê÷S¢}ãMä}äÌã^(Õäçä}òbr¿¢7FGW3¢v∆ófRr¿¢Ê˜FS¢}ò}ò^(Õòçã-òb≤òãä}äçòçãã2Ñíã-òmä˝òrÚä}ã=™ùãõÌãír¿¢∆7Dˆ≥¢˜fW'fñWtìÚÁWFFVDB«¬67&VCÚÊ˜fW'fñWt∆ófSÚÊ4ˆb«¬Ê˜r¿¢“¿¢∞¢ñC¢w'6ó7FÜ∆ñ¬r¿¢Ê÷S¢}õÌä}ãã=∏Õã>(Õä≠ä›òM∏ÕòBr¿¢7FGW3¢Ü5'2Úv∆ófRr¢v&∆ˆ6∂VBr¿¢Ê˜FS¢Ü5'0¢Úò]ãùä}ò]òMä}ä¢äÌãäÚ≤õÌòçòBä›ò-∏Õò-∏¬G∂˜fW'fñWtìÚÁ'6ó7FÜ∆ñ√ÚÊFFT¶∆∆íÚ+rG∂˜fW'fñWtíÁ'6ó7FÜ∆ñ¬ÊFFT¶∆∆ó÷¢rw÷ ¢¢˜fW'fñWtìÚÁ'6ó7FÜ∆ñ√ÚÊW'&˜"«¬}™˝ã-ä}ããBòçãmãù∏Õä¢äçä}ã-ä}ãäÌòçä}òmä˝òròmãMäÚr¿¢∆7Dˆ≥¢Ü5'2Ú˜fW'fñWtìÚÁWFFVDB«¬Ê˜r¢VÊFVfñÊVB¿¢“¿¢–¢–¢&6RÁ6˜W&6W2“&6RÁ6˜W&6W2Ê÷Çá2í”‚∞¢ñbá2ÊñB””“vñ÷Rrí∞¢6ˆÁ7B∆ófTñ÷R“7FVV≈7FGW2Êñ÷Tˆ≤«¬67&VCÚÊ÷WFÚÊñ÷Tˆ∞¢&WGW&‚∞¢‚‚Á2¿¢7FGW3¢∆ófTñ÷RÚv∆ófRr¢v&∆ˆ6∂VBr¿¢Ê˜FS¢∆ófTñ÷P¢Ú}ä-ò]ä}ãò∏Õã-∏Õ™ù∏¬ˆffW"◊7FBp¢¢tî‘Rä}ã"ä}∏Õòbò]ä›∏Õãrä˝ãä˝ã=ä≠ãã2òm∏Õã=ä¢(	Bä}ã=™ùãõÌãäçärïä}∏Õãä}òbr¿¢–¢–¢ñbá2ÊñB””“wñÜˆÚrí∞¢6ˆÁ7B‚“&6RÊv∆ˆ&ƒ÷&∂WG2Á7Fˆ6∑2Ê∆VÊwFÄ¢&WGW&‚∞¢‚‚Á2¿¢7FGW3¢v∆ˆ&ƒˆ≤Úv∆ófRr¢w6VVBr¿¢Ê˜FS¢v∆ˆ&ƒˆ∞¢ÚG∂Á“òmò]ä}äÚ+rG∂&6RÊv∆ˆ&ƒ÷&∂WG2Á6V7F˜%W&f˜&÷Ê6SÚÊ∆VÊwFÇ«¬“ã=™ùä≠òçã+rG∂&6RÊv∆ˆ&ƒ÷&∂WG2Ê÷FW&ñ«4'î6˜VÁG'ìÚÊ∆VÊwFÇ«¬“ò]òçä}äÚ˝™ùãMòçã ¢¢uñÜˆÚfñÊÊ6Rò}òmòçã"òMòçäÚòmãMä˝òrr¿¢∆7Dˆ≥¢v∆ˆ&ƒˆ≤Ú&6RÊv∆ˆ&ƒ÷&∂WG2ÁWFFVDB«¬Ê˜r¢2Ê∆7Dˆ≤¿¢–¢–¢&WGW&‚0¢“ê¢ñbá&ˆGV7Fñˆ‰ˆ≤í∞¢6ˆÁ7B‚“&6RÁ&ˆGV7Fñˆ‰˜2Ê6ˆ◊ÊñW2Ê∆VÊwFÄ¢6ˆÁ7BÜ2“&6RÁ6˜W&6W2Á6ˆ÷RÇá2í”‚2ÊñB””“v&˜W'6WfñWr÷˜2rê¢6ˆÁ7B&˜s¢6˜W&6U7FGW2“∞¢ñC¢v&˜W'6WfñWr÷˜2r¿¢Ê÷S¢}äçòçãã>(Õòç∏ÕòÇ+rä≠òçòM∏ÕäÚ˝ä}òmã©ç∏¬r¿¢7FGW3¢v∆ófRr¿¢Ê˜FS¢G∂Á“ãMã™ùä¢õÌãä≠òòÇ+rä≠òçòM∏ÕäÚò]ä}ò}ä}òmòr≤ä-äÇ˝äçãò"˝™˝ä}ã&¿¢∆7Dˆ≥¢&6RÁ&ˆGV7Fñˆ‰˜2ÁWFFVDB«¬Ê˜r¿¢–¢&6RÁ6˜W&6W2“Ü0¢Ú&6RÁ6˜W&6W2Ê÷Çá2í”‚á2ÊñB””“v&˜W'6WfñWr÷˜2rÚ&˜r¢2íê¢¢≤‚‚Ê&6RÁ6˜W&6W2¬&˜u–¢–¢&6RÁWFFVDB“˜fW'fñWtìÚÁWFFVDB«¬7FVVƒìÚÁWFFVDB«¬&6RÊv∆ˆ&ƒ÷&∂WG2ÁWFFVDB«¬Ê˜p†¢&WGW&‚∞¢FF¢&6R¿¢Üó7F˜&ñW2¿¢6ÊF∆W2¿¢g&VB¿¢6V7F˜'3¢67&VCÚÁ6V7F˜'2«¬µ“¿¢67&T÷WF¢∞¢‚‚‚á67&VCÚÊ÷WF«¬∑“í¿¢7Fˆ6∑4∆ófS¢&ˆˆ∆V‚Ä¢÷ñÊW&≈7Fˆ6µ&˜w3ÚÁ6ˆ÷RÄ¢á&˜rí”‡¢&˜rÁ&WGW&Á56˜W&6R”“vW'&˜"rb`¢Çá&˜rÊ6∆˜6U&ñ6R“ÁV∆¬bb&˜rÊ6∆˜6U&ñ6R‚í«¿¢á&˜rÊ∆7E&ñ6R“ÁV∆¬bb&˜rÊ∆7E&ñ6R‚í«¿¢&˜rÊFñ«ï7B“ÁV∆¬í¿¢í¿¢í¿¢˜fW'fñWtîC¢˜fW'fñWtìÚÁWFFVDB¿¢7W7FVVƒˆ≥¢7FVV≈7FGW2Ê7W7FVVƒˆ≤¿¢ñ÷Tˆ≥¢7FVV≈7FGW2Êñ÷Tˆ≤«¬67&VCÚÊ÷WFÚÊñ÷Tˆ≤¿¢“¿¢–ß–†¶Wá˜'B6ˆÁ7B$Te$U4ÖÙ’2“c¢ 
+        lastOk: liveCount > 0 ? now : s.lastOk,
+      }
+    }
+    return s
+  })
+  return sources
+}
+
+async function fetchScrapedMarket(): Promise<{
+  histories: Record<string, HistoryPoint[]>
+  candleHistories?: Record<string, CandlePoint[]>
+  mineralStocks?: MineralStockSnap[]
+  sectors: LiveBundle['sectors']
+  meta: LiveBundle['scrapeMeta']
+  overviewLive?: {
+    ok?: boolean
+    totalMarketValueHmt?: number
+    totalMarketValueUsdM?: number
+    usdRate?: number
+    totalTradeValueHmt?: number
+    totalTradeValueSource?: string
+    marketValueSource?: string
+    retailMoneyFlowDailyBillionToman?: number
+    retailTradeValueBillionToman?: number
+    retailTradeValueHmt?: number
+    retailMoneyFlowYtd?: number
+    retailMoneyFlowYtdSource?: string
+    moneyFlowSeries?: { date: string; dateJalali?: string; value: number }[]
+    moneyFlowAsOfJalali?: string
+    impacts?: DashboardData['impacts'] | null
+    impactsFromTsetmc?: boolean
+    impactsFromSourceArena?: boolean
+    impactsFromRahavard?: boolean
+    impactsSource?: string
+    dateJalali?: string
+    marketPulse?: DashboardData['overview']['marketPulse']
+    marketPulseHistory?: DashboardData['overview']['marketPulseHistory']
+    topTrades?: DashboardData['topTrades']
+    topTradesSource?: string
+    indices?: {
+      tedpix?: { name?: string; value?: number; change?: number; changePct?: number; source?: string }
+      equalWeight?: { name?: string; value?: number; change?: number; changePct?: number; source?: string }
+      ifb?: { name?: string; value?: number; change?: number; changePct?: number; source?: string }
+    }
+    notes?: string[]
+    blocked?: string[]
+    asOf?: string
+  }
+  marketPulse?: {
+    current?: DashboardData['overview']['marketPulse']
+    history?: DashboardData['overview']['marketPulseHistory']
+  }
+  candles1401?: import('./types').CandlePoint[]
+} | null> {
+  try {
+    const res = await fetchWithTimeout('/data/market.json', 5000, { cache: 'no-store' })
+    if (!res.ok) return null
+    const json = (await res.json()) as {
+      updatedAt?: string
+      histories?: Record<string, HistoryPoint[]>
+      candleHistories?: Record<string, CandlePoint[]>
+      mineralStocks?: MineralStockSnap[]
+      sectors?: LiveBundle['sectors']
+      tsetmc?: { ok?: boolean }
+      ime?: { ok?: boolean }
+      infra?: Record<string, string>
+      moneyFlowYtd?: {
+        ytdBillionToman?: number
+        asOfJalali?: string
+        series?: { date: string; dateJalali?: string; value: number }[]
+      }
+      overviewLive?: {
+        ok?: boolean
+        totalMarketValueHmt?: number
+        totalMarketValueUsdM?: number
+        usdRate?: number
+        totalTradeValueHmt?: number
+        totalTradeValueSource?: string
+        marketValueSource?: string
+        retailMoneyFlowDailyBillionToman?: number
+        retailTradeValueBillionToman?: number
+        retailTradeValueHmt?: number
+        retailMoneyFlowYtd?: number
+        retailMoneyFlowYtdSource?: string
+        moneyFlowSeries?: { date: string; dateJalali?: string; value: number }[]
+        moneyFlowAsOfJalali?: string
+        impacts?: DashboardData['impacts'] | null
+        impactsFromTsetmc?: boolean
+        impactsFromSourceArena?: boolean
+        topTrades?: DashboardData['topTrades']
+        topTradesSource?: string
+        indices?: {
+          tedpix?: { name?: string; value?: number; change?: number; changePct?: number; source?: string }
+          equalWeight?: { name?: string; value?: number; change?: number; changePct?: number; source?: string }
+          ifb?: { name?: string; value?: number; change?: number; changePct?: number; source?: string }
+        }
+        notes?: string[]
+        blocked?: string[]
+        asOf?: string
+      }
+      candles1401?: import('./types').CandlePoint[]
+      marketPulse?: {
+        current?: DashboardData['overview']['marketPulse']
+        history?: DashboardData['overview']['marketPulseHistory']
+      }
+    }
+    const overviewLive = json.overviewLive
+      ? {
+          ...json.overviewLive,
+          retailMoneyFlowYtd:
+            json.overviewLive.retailMoneyFlowYtd ?? json.moneyFlowYtd?.ytdBillionToman,
+          moneyFlowSeries: json.overviewLive.moneyFlowSeries?.length
+            ? json.overviewLive.moneyFlowSeries
+            : json.moneyFlowYtd?.series,
+          moneyFlowAsOfJalali:
+            json.overviewLive.moneyFlowAsOfJalali ?? json.moneyFlowYtd?.asOfJalali,
+        }
+      : json.overviewLive
+    return {
+      histories: json.histories || {},
+      candleHistories: json.candleHistories,
+      mineralStocks: json.mineralStocks,
+      sectors: json.sectors || [],
+      meta: {
+        updatedAt: json.updatedAt,
+        tsetmcOk: Boolean(json.tsetmc?.ok),
+        imeOk: Boolean(json.ime?.ok),
+        infra: json.infra,
+      },
+      overviewLive,
+      marketPulse: json.marketPulse,
+      candles1401: json.candles1401,
+    }
+  } catch {
+    return null
+  }
+}
+
+async function fetchTgjuIntraday(): Promise<IntradayPoint[]> {
+  try {
+    const res = await fetchWithTimeout(
+      'https://api.tgju.org/v1/market/indicator/today-table-data/bourse?lang=fa',
+      5000,
+      { headers: { Accept: 'application/json' } },
+    )
+    if (!res.ok) return []
+    const json = (await res.json()) as { data?: string[][] }
+    const rows = json.data || []
+    const points = rows
+      .map((row) => ({
+        time: String(row[1] || '').trim(),
+        value: parseFaNumber(row[0]),
+        change: parseFaNumber(String(row[2] || '').replace(/<[^>]+>/g, '')),
+      }))
+      .filter((p) => p.time && Number.isFinite(p.value))
+    return points.reverse()
+  } catch {
+    return []
+  }
+}
+
+type OverviewApi = {
+  ok?: boolean
+  updatedAt?: string
+  dateJalali?: string
+  dateGregorian?: string
+  indices?: {
+    tedpix?: { name?: string; value?: number; change?: number; changePct?: number; source?: string }
+    equalWeight?: { name?: string; value?: number; change?: number; changePct?: number; source?: string }
+    ifb?: { name?: string; value?: number; change?: number; changePct?: number; source?: string }
+  }
+  usdRate?: number
+  bourseMarketValueHmt?: number
+  ifbMarketValueHmt?: number
+  totalMarketValueHmt?: number
+  totalMarketValueUsdM?: number
+  marketValueSource?: string
+  totalTradeValueHmt?: number
+  totalTradeValueSource?: string
+  impacts?: DashboardData['impacts'] | null
+  impactsFromSourceArena?: boolean
+  impactsFromRahavard?: boolean
+  impactsSource?: string
+  topTrades?: DashboardData['topTrades']
+  topTradesSource?: string
+  marketPulse?: DashboardData['overview']['marketPulse']
+  marketPulseHistory?: DashboardData['overview']['marketPulseHistory']
+  retailMoneyFlowYtd?: number
+  retailMoneyFlowYtdSource?: string
+  moneyFlowAsOfJalali?: string
+  moneyFlowSeries?: { date: string; dateJalali?: string; value: number }[]
+  intraday?: { points?: IntradayPoint[]; note?: string; source?: string }
+  parsistahlil?: {
+    ok?: boolean
+    retailTradeValueBillionToman?: number
+    retailMoneyFlowDailyBillionToman?: number
+    dateJalali?: string
+    error?: string
+  }
+  blocked?: string[]
+  errors?: string[]
+}
+
+async function fetchOverviewApi(): Promise<OverviewApi | null> {
+  try {
+    const res = await fetchWithTimeout('/api/overview', 6000, { cache: 'no-store' })
+    if (!res.ok) return null
+    return (await res.json()) as OverviewApi
+  } catch {
+    return null
+  }
+}
+
+const PULSE_SESSION_KEY = 'midco-pulse-history-v7'
+export const PULSE_REFRESH_MS = 30 * 1000
+/** Cash session chart starts at 09:00 Tehran (user-facing axis). */
+export const PULSE_HIST_START = '09:00'
+/** Cash equities / bond / equity-ETF board close. */
+export const PULSE_CASH_END = '12:30'
+/** Gold commodity ETFs keep trading into the afternoon (~17:00). */
+export const PULSE_HIST_END = '17:00'
+
+export function clampPulseHistoryTime(hhmm: string | undefined | null): string | null {
+  const t = String(hhmm || '')
+  if (!/^\d{2}:\d{2}$/.test(t)) return null
+  if (t < PULSE_HIST_START) return null
+  if (t > PULSE_HIST_END) return PULSE_HIST_END
+  return t
+}
+
+/** Current Tehran wall-clock HH:MM (no seconds). */
+export function tehranNowHhmm(now = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Tehran',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(now)
+  const hh = parts.find((p) => p.type === 'hour')?.value || '00'
+  const mm = parts.find((p) => p.type === 'minute')?.value || '00'
+  return `${hh}:${mm}`
+}
+
+/** Axis end for live pulse charts: now, never past 17:00, never before 09:00. */
+export function pulseChartEndLabel(now = new Date()): string {
+  const t = tehranNowHhmm(now)
+  if (t < PULSE_HIST_START) return PULSE_HIST_START
+  if (t > PULSE_HIST_END) return PULSE_HIST_END
+  return t
+}
+
+/** Cash-board breadth chart (ŸÖÿ´ÿ®ÿ™/ŸÖŸÜŸÅ€å): 09:00 ‚Üí now, capped at 13:00. */
+export const PULSE_BREADTH_END = '13:00'
+
+export function pulseBreadthChartEndLabel(now = new Date()): string {
+  const t = tehranNowHhmm(now)
+  if (t < PULSE_HIST_START) return PULSE_HIST_START
+  if (t > PULSE_BREADTH_END) return PULSE_BREADTH_END
+  return t
+}
+
+function hhmmToMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number)
+  return h * 60 + m
+}
+
+function minutesToHhmm(total: number): string {
+  const h = Math.floor(total / 60)
+  const m = total % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+type PulseApi = {
+  ok?: boolean
+  marketPulse?: DashboardData['overview']['marketPulse']
+  marketPulseHistory?: DashboardData['overview']['marketPulseHistory']
+  dateJalali?: string
+  availableDays?: string[]
+}
+
+function pulseStorage(): Storage | null {
+  try {
+    if (typeof localStorage !== 'undefined') return localStorage
+  } catch {
+    /* private mode */
+  }
+  try {
+    if (typeof sessionStorage !== 'undefined') return sessionStorage
+  } catch {
+    /* ignore */
+  }
+  return null
+}
+
+function readSessionPulse(): {
+  dateJalali?: string
+  history: NonNullable<DashboardData['overview']['marketPulseHistory']>
+} {
+  try {
+    const store = pulseStorage()
+    if (!store) return { history: [] }
+    const raw = store.getItem(PULSE_SESSION_KEY) || sessionStorage.getItem('midco-pulse-history-v4')
+    if (!raw) return { history: [] }
+    const parsed = JSON.parse(raw) as { dateJalali?: string; history?: DashboardData['overview']['marketPulseHistory'] }
+    return { dateJalali: parsed.dateJalali, history: Array.isArray(parsed.history) ? parsed.history : [] }
+  } catch {
+    return { history: [] }
+  }
+}
+
+function writeSessionPulse(
+  dateJalali: string | undefined,
+  history: NonNullable<DashboardData['overview']['marketPulseHistory']>,
+) {
+  try {
+    const store = pulseStorage()
+    store?.setItem(PULSE_SESSION_KEY, JSON.stringify({ dateJalali, history }))
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+function mergePulsePoints(
+  ...lists: Array<DashboardData['overview']['marketPulseHistory'] | undefined>
+): NonNullable<DashboardData['overview']['marketPulseHistory']> {
+  const byTime = new Map<string, NonNullable<DashboardData['overview']['marketPulseHistory']>[number]>()
+  for (const list of lists) {
+    for (const p of list || []) {
+      if (!p?.time) continue
+      const t = clampPulseHistoryTime(String(p.time))
+      if (!t) continue
+      byTime.set(t, { ...byTime.get(t), ...p, time: t })
+    }
+  }
+  return [...byTime.values()].sort((a, b) => String(a.time).localeCompare(String(b.time))).slice(-720)
+}
+
+/** Build a continuous HH:MM series from 09:00 ‚Üí end (usually ¬´now¬ª), forward-filling known samples. */
+export function densifyFlowSeries(
+  points: Record<string, string | number | null | undefined>[],
+  keys: string[],
+  endLabel?: string,
+): Record<string, string | number>[] {
+  const end = clampPulseHistoryTime(endLabel) || pulseChartEndLabel()
+  const start = PULSE_HIST_START
+  const byLabel = new Map<string, Record<string, string | number | null | undefined>>()
+  for (const p of points || []) {
+    const label = clampPulseHistoryTime(String(p.label || ''))
+    if (!label || label > end) continue
+    byLabel.set(label, { ...byLabel.get(label), ...p, label })
+  }
+
+  const startMin = hhmmToMinutes(start)
+  const endMin = hhmmToMinutes(end)
+  if (endMin < startMin) return []
+
+  const last: Record<string, number> = {}
+  const out: Record<string, string | number>[] = []
+  for (let mins = startMin; mins <= endMin; mins += 1) {
+    const label = minutesToHhmm(mins)
+    const sample = byLabel.get(label)
+    const next: Record<string, string | number> = { label }
+    for (const k of keys) {
+      const raw = sample?.[k]
+      if (raw != null && raw !== '' && Number.isFinite(Number(raw))) last[k] = Number(raw)
+      next[k] = last[k] ?? 0
+    }
+    out.push(next)
+  }
+  return out
+}
+
+export async function fetchPulseApi(): Promise<{
+  marketPulse?: DashboardData['overview']['marketPulse']
+  marketPulseHistory: NonNullable<DashboardData['overview']['marketPulseHistory']>
+} | null> {
+  try {
+    const res = await fetchWithTimeout('/api/pulse', 4000, { cache: 'no-store' })
+    if (!res.ok) return null
+    const json = (await res.json()) as PulseApi
+    const session = readSessionPulse()
+    const dateJalali = json.dateJalali || json.marketPulse?.dateJalali || session.dateJalali
+    if (session.dateJalali && dateJalali && session.dateJalali !== dateJalali) {
+      session.history = []
+    }
+    const history = mergePulsePoints(session.history, json.marketPulseHistory)
+    writeSessionPulse(dateJalali, history)
+    return { marketPulse: json.marketPulse, marketPulseHistory: history }
+  } catch {
+    return null
+  }
+}
+
+/** Merge a pulse tick into existing dashboard overview (client-side densify). */
+export function applyPulseToDashboard(
+  data: DashboardData,
+  pulse: {
+    marketPulse?: DashboardData['overview']['marketPulse']
+    marketPulseHistory?: DashboardData['overview']['marketPulseHistory']
+  } | null,
+): DashboardData {
+  if (!pulse) return data
+  const next = { ...data, overview: { ...data.overview } }
+  if (pulse.marketPulse) next.overview.marketPulse = pulse.marketPulse
+  const session = readSessionPulse()
+  const dateJalali = pulse.marketPulse?.dateJalali || session.dateJalali
+  const history = mergePulsePoints(session.history, next.overview.marketPulseHistory, pulse.marketPulseHistory)
+  writeSessionPulse(dateJalali, history)
+  next.overview.marketPulseHistory = history
+  return next
+}
+
+function patchIndex(
+  target: { name: string; value: number; change: number; changePct: number },
+  live?: { name?: string; value?: number; change?: number; changePct?: number },
+) {
+  if (!live || live.value == null || !Number.isFinite(live.value)) return false
+  if (live.name) target.name = live.name
+  target.value = live.value
+  if (live.change != null && Number.isFinite(live.change)) target.change = live.change
+  if (live.changePct != null && Number.isFinite(live.changePct)) target.changePct = live.changePct
+  return true
+}
+
+type ImpactRow = { symbol: string; impact: number }
+
+/** Normalize SourceArena / legacy shapes into UI `{ boursePos, bourseNeg, ifbPos, ifbNeg }`. */
+function normalizeImpacts(raw: unknown): DashboardData['impacts'] | null {
+  if (!raw || typeof raw !== 'object') return null
+  const obj = raw as Record<string, unknown>
+
+  const toRows = (v: unknown): ImpactRow[] => {
+    if (!Array.isArray(v)) return []
+    return v
+      .map((row) => {
+        if (!row || typeof row !== 'object') return null
+        const r = row as Record<string, unknown>
+        const symbol = String(r.symbol ?? r.name ?? '').trim()
+        const impact = Number(r.impact ?? r.effect)
+        if (!symbol || !Number.isFinite(impact)) return null
+        return { symbol, impact }
+      })
+      .filter((x): x is ImpactRow => Boolean(x))
+  }
+
+  // Legacy mistaken shape from earlier SourceArena wiring
+  if ('positive' in obj || 'negative' in obj) {
+    const pos = toRows(obj.positive)
+    const neg = toRows(obj.negative)
+    if (!pos.length && !neg.length) return null
+    return { boursePos: pos, bourseNeg: neg, ifbPos: [], ifbNeg: [] }
+  }
+
+  const out = {
+    boursePos: toRows(obj.boursePos),
+    bourseNeg: toRows(obj.bourseNeg),
+    ifbPos: toRows(obj.ifbPos),
+    ifbNeg: toRows(obj.ifbNeg),
+  }
+  if (!out.boursePos.length && !out.bourseNeg.length && !out.ifbPos.length && !out.ifbNeg.length) {
+    return null
+  }
+  return out
+}
+
+function applyFreshOverview(base: DashboardData, api: OverviewApi | null, intradayFallback: IntradayPoint[]) {
+  const o = base.overview
+  const sources = { ...(o.fieldSources || {}) }
+  const notes = [...(o.liveNotes || [])]
+
+  if (api?.indices) {
+    if (patchIndex(o.tedpix, api.indices.tedpix)) sources.tedpix = api.indices.tedpix?.source || 'live'
+    if (patchIndex(o.equalWeight, api.indices.equalWeight)) sources.equalWeight = 'shakhesban-live'
+    if (patchIndex(o.ifb, api.indices.ifb)) sources.ifb = 'shakhesban-live'
+  }
+
+  if (api?.totalMarketValueHmt != null && Number.isFinite(api.totalMarketValueHmt)) {
+    o.totalMarketValueHmt = api.totalMarketValueHmt
+    sources.marketValue = api.marketValueSource || 'sourcearena-bourse+ifb'
+    notes.unshift(
+      `ÿßÿ±ÿ≤ÿ¥ ÿ®ÿßÿ≤ÿßÿ±: ÿ®Ÿàÿ±ÿ≥ ${api.bourseMarketValueHmt ?? '‚Äî'} + ŸÅÿ±ÿßÿ®Ÿàÿ±ÿ≥ ${api.ifbMarketValueHmt ?? '‚Äî'} = ${api.totalMarketValueHmt} ŸáŸÖÿ™ (SourceArena)`,
+    )
+  }
+  if (api?.totalMarketValueUsdM != null && Number.isFinite(api.totalMarketValueUsdM)) {
+    o.totalMarketValueUsdM = api.totalMarketValueUsdM
+    sources.usdMarketValue = 'marketValue√∑tgjuUsd'
+  }
+  if (api?.totalTradeValueHmt != null && Number.isFinite(api.totalTradeValueHmt)) {
+    o.totalTradeValueHmt = api.totalTradeValueHmt
+    sources.totalTrade = api.totalTradeValueSource || 'sourcearena'
+  }
+
+  if (api?.usdRate != null && Number.isFinite(api.usdRate)) {
+    o.usdRate = api.usdRate
+    sources.usdRate = 'tgju'
+    if (o.totalMarketValueHmt > 0 && (api.totalMarketValueUsdM == null || !Number.isFinite(api.totalMarketValueUsdM))) {
+      o.totalMarketValueUsdM = Math.round((o.totalMarketValueHmt * 1e13) / api.usdRate / 1e6)
+      sources.usdMarketValue = 'marketValue√∑tgjuUsd'
+    }
+  }
+
+  if (api?.impactsFromSourceArena && api.impacts) {
+    // applied on base via caller ‚Äî store flag on overview
+    o.impactsLive = true
+    sources.impacts = api.impactsSource || 'sourcearena'
+  }
+  if (api?.impactsFromRahavard && api.impacts) {
+    o.impactsLive = true
+    sources.impacts = api.impactsSource || 'rahavard365'
+  }
+  if (api?.dateJalali) {
+    o.dateJalali = api.dateJalali
+    sources.dateJalali = 'tehran-live'
+  }
+  if (api?.dateGregorian) {
+    o.dateGregorian = api.dateGregorian
+  }
+  if (api?.marketPulse) {
+    o.marketPulse = api.marketPulse
+    sources.marketPulse = api.marketPulse.source || 'tradersarena'
+    const equityRetailFlow = api.marketPulse.equityRetailMoneyFlowBillionToman
+    if (equityRetailFlow != null && Number.isFinite(equityRetailFlow)) {
+      o.retailMoneyFlowDaily = equityRetailFlow
+      sources.retailMoneyFlowDaily = 'tradersarena-equity'
+    }
+  }
+  if (api?.marketPulseHistory?.length) {
+    o.marketPulseHistory = api.marketPulseHistory
+  }
+  if (api?.topTrades?.length) {
+    // applied on base via caller
+    sources.topTrades = api.topTradesSource || 'sourcearena-all'
+  }
+
+  const pars = api?.parsistahlil
+  if (pars?.ok) {
+    if (pars.retailTradeValueBillionToman != null) {
+      o.retailTradeValueBillionToman = pars.retailTradeValueBillionToman
+      o.retailTradeValueHmt = pars.retailTradeValueBillionToman / 1000
+      sources.retailTrade = 'parsistahlil-live'
+    }
+    notes.unshift(
+      `Ÿæÿßÿ±ÿ≥€åÿ≥ ÿ≤ŸÜÿØŸá: ŸÖÿπÿßŸÖŸÑÿßÿ™ ÿÆÿ±ÿØ=${pars.retailTradeValueBillionToman ?? '‚Äî'} ŸÖ€åŸÑ€åÿßÿ±ÿØ ÿ™ŸàŸÖÿßŸÜ` +
+        (pars.dateJalali ? ` (${pars.dateJalali})` : ''),
+    )
+  } else if (api) {
+    notes.unshift(`Ÿæÿßÿ±ÿ≥€åÿ≥ ÿØÿ± API ÿ≤ŸÜÿØŸá ÿÆŸàÿßŸÜÿØŸá ŸÜÿ¥ÿØ${pars?.error ? `: ${pars.error}` : ''}`)
+  }
+
+  if (api?.retailMoneyFlowYtd != null && Number.isFinite(api.retailMoneyFlowYtd)) {
+    o.retailMoneyFlowYtd = api.retailMoneyFlowYtd
+    sources.retailMoneyFlowYtd = api.retailMoneyFlowYtdSource || 'parsistahlil-cumulative'
+    notes.unshift(
+      `YTD ŸæŸàŸÑ ÿ≠ŸÇ€åŸÇ€å ÿßÿ≤ ÿßÿ®ÿ™ÿØÿß€å €±€¥€∞€¥: ${api.retailMoneyFlowYtd}` +
+        (api.moneyFlowAsOfJalali ? ` (ÿ™ÿß ${api.moneyFlowAsOfJalali})` : ''),
+    )
+  }
+  if (api?.moneyFlowSeries?.length) {
+    o.moneyFlowSeries = api.moneyFlowSeries.map((r) => ({
+      date: r.date,
+      value: r.value,
+    }))
+  }
+
+  const intraday = api?.intraday?.points?.length ? api.intraday.points : intradayFallback
+  if (intraday.length) {
+    o.intradayIndex = intraday.map((p) => ({ time: p.time.slice(0, 5), value: p.value }))
+    sources.intraday = api?.intraday?.source || 'tgju-today-table'
+    notes.unshift(api?.intraday?.note || 'ŸÜŸÖŸàÿØÿßÿ± ÿØÿ±ŸàŸÜ‚Äåÿ±Ÿàÿ≤€å ÿßÿ≤ today-table TGJU (ÿ±ÿ≤ŸàŸÑŸàÿ¥ŸÜ ⁄ÜŸÜÿØÿØŸÇ€åŸÇŸá‚Äåÿß€å).')
+  }
+
+  if (api?.blocked?.length) o.blockedSources = api.blocked
+  o.fieldSources = sources
+  o.liveNotes = notes.slice(0, 12)
+  o.dataSource = 'live'
+  return Boolean(api?.ok) || intraday.length > 0
+}
+
+function applyOverviewLive(
+  base: DashboardData,
+  live: NonNullable<Awaited<ReturnType<typeof fetchScrapedMarket>>>['overviewLive'],
+  candles?: import('./types').CandlePoint[],
+) {
+  if (!live?.ok) {
+    if (candles?.length) base.overview.candles1401 = candles
+    return false
+  }
+  const o = base.overview
+  const sources: Record<string, string> = {}
+
+  if (live.indices) {
+    if (patchIndex(o.tedpix, live.indices.tedpix)) sources.tedpix = live.indices.tedpix?.source || 'shakhesban'
+    if (patchIndex(o.equalWeight, live.indices.equalWeight)) sources.equalWeight = 'shakhesban'
+    if (patchIndex(o.ifb, live.indices.ifb)) sources.ifb = 'shakhesban'
+  }
+
+  if (live.totalMarketValueHmt != null) {
+    o.totalMarketValueHmt = live.totalMarketValueHmt
+    sources.marketValue = live.marketValueSource || 'interim'
+  }
+  if (live.totalMarketValueUsdM != null) {
+    o.totalMarketValueUsdM = live.totalMarketValueUsdM
+    sources.usdMarketValue = 'marketValue√∑tgjuUsd'
+  }
+  if (live.usdRate != null) {
+    o.usdRate = live.usdRate
+    sources.usdRate = 'tgju'
+  }
+  if (live.totalTradeValueHmt != null) {
+    o.totalTradeValueHmt = live.totalTradeValueHmt
+    sources.totalTrade = live.totalTradeValueSource || 'interim'
+  }
+  if (live.retailTradeValueBillionToman != null) {
+    o.retailTradeValueBillionToman = live.retailTradeValueBillionToman
+    o.retailTradeValueHmt = live.retailTradeValueHmt ?? live.retailTradeValueBillionToman / 1000
+    sources.retailTrade = 'parsistahlil'
+  }
+  if (live.retailMoneyFlowYtd != null) {
+    o.retailMoneyFlowYtd = live.retailMoneyFlowYtd
+    sources.retailMoneyFlowYtd = live.retailMoneyFlowYtdSource || 'parsistahlil-cumulative'
+  }
+  if (live.moneyFlowSeries?.length) {
+    o.moneyFlowSeries = live.moneyFlowSeries.map((r) => ({
+      date: r.date,
+      value: Number(r.value),
+    }))
+  }
+
+  const liveAny = live as {
+    impactsFromSourceArena?: boolean
+    impactsFromRahavard?: boolean
+    impactsFromTsetmc?: boolean
+    impactsSource?: string
+    impacts?: unknown
+    dateJalali?: string
+    marketPulse?: DashboardData['overview']['marketPulse']
+    marketPulseHistory?: DashboardData['overview']['marketPulseHistory']
+  }
+  const normalized = normalizeImpacts(liveAny.impacts)
+  if (
+    normalized &&
+    (liveAny.impactsFromSourceArena || liveAny.impactsFromRahavard || liveAny.impactsFromTsetmc || liveAny.impactsSource)
+  ) {
+    base.impacts = normalized
+    o.impactsLive = true
+    sources.impacts =
+      liveAny.impactsSource ||
+      (liveAny.impactsFromRahavard ? 'rahavard365' : liveAny.impactsFromSourceArena ? 'sourcearena' : 'tsetmc')
+  } else {
+    o.impactsLive = false
+    sources.impacts = 'pdf-seed'
+  }
+  if (liveAny.dateJalali) o.dateJalali = liveAny.dateJalali
+  if (liveAny.marketPulse) {
+    o.marketPulse = liveAny.marketPulse
+    const equityRetailFlow = liveAny.marketPulse.equityRetailMoneyFlowBillionToman
+    if (equityRetailFlow != null && Number.isFinite(equityRetailFlow)) {
+      o.retailMoneyFlowDaily = equityRetailFlow
+      sources.retailMoneyFlowDaily = 'tradersarena-equity'
+    }
+  }
+  if (liveAny.marketPulseHistory?.length) o.marketPulseHistory = liveAny.marketPulseHistory
+
+  if (live.topTrades?.length) {
+    base.topTrades = live.topTrades
+    sources.topTrades = live.topTradesSource || 'shakhesban'
+  }
+
+  if (candles?.length) o.candles1401 = candles
+  const intradayPts = (live as { intraday?: { points?: { time: string; value: number }[] } }).intraday?.points
+  if (intradayPts?.length) {
+    o.intradayIndex = intradayPts.map((p) => ({ time: p.time.slice(0, 5), value: p.value }))
+    sources.intraday = 'tgju-today-table'
+  }
+  o.liveNotes = live.notes
+  o.fieldSources = sources
+  o.blockedSources = live.blocked || []
+  o.dataSource = 'live'
+  return true
+}
+
+type SteelChainBundle = {
+  ok?: boolean
+  updatedAt?: string
+  custeelOk?: boolean
+  imeOk?: boolean
+  steel?: DashboardData['steel']
+  imeChain?: DashboardData['imeChain']
+  inventories?: DashboardData['inventories'] | null
+  bfRate?: DashboardData['bfRate'] | null
+  billetStocks?: NonNullable<DashboardData['billetStocks']> | null
+  histories?: Record<string, { date: string; value: number }[]>
+  source?: string
+}
+
+async function fetchSteelChainApi(): Promise<SteelChainBundle | null> {
+  // Static first (always fast). Live /api/steel can take 15‚Äì30s on Custeel ‚Äî never block the
+  // dashboard Promise.all on that; a short race is enough to pick up a warm edge cache.
+  let staticBundle: SteelChainBundle | null = null
+  try {
+    const res = await fetchWithTimeout('/data/steel_chain.json', 5000, { cache: 'no-store' })
+    if (res.ok) {
+      const json = (await res.json()) as SteelChainBundle
+      if (json?.ok || json?.steel?.length || json?.imeChain?.length) staticBundle = json
+    }
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    const res = await fetchWithTimeout('/api/steel', 2500, { cache: 'no-store' })
+    if (res.ok) {
+      const json = (await res.json()) as SteelChainBundle
+      if (json?.ok || json?.steel?.length || json?.imeChain?.length) {
+        // Prefer live only when it actually beat the short budget (warm CF cache / fast path).
+        if (json.custeelOk || !staticBundle) return json
+        // If live fell back to static itself, keep whichever has the newer asOf on FOB rows.
+        const liveAsOf = (json.steel || []).find((s) => s.asOf)?.asOf
+        const staticAsOf = (staticBundle.steel || []).find((s) => s.asOf)?.asOf
+        if (liveAsOf && (!staticAsOf || liveAsOf >= staticAsOf)) return json
+      }
+    }
+  } catch {
+    /* fall through to static */
+  }
+  return staticBundle
+}
+
+function applySteelChain(base: DashboardData, bundle: SteelChainBundle | null | undefined) {
+  if (!bundle) return { custeelOk: false, imeOk: false }
+  const byId = new Map(base.steel.map((s) => [s.id, s]))
+  for (const row of bundle.steel || []) {
+    if (!row?.id) continue
+    const prev = byId.get(row.id)
+    byId.set(row.id, {
+      ...(prev || row),
+      ...row,
+      nameFa: row.nameFa || prev?.nameFa || row.name,
+      unit: row.unit || prev?.unit || 'ÿØŸÑÿßÿ±/ÿ™ŸÜ',
+    })
+  }
+  // attach short history sparklines
+  if (bundle.histories) {
+    for (const [id, pts] of Object.entries(bundle.histories)) {
+      const row = byId.get(id)
+      if (!row || !pts?.length) continue
+      row.history = pts.slice(-60).map((p) => ({ t: p.date, v: p.value }))
+    }
+  }
+  const preferred = [
+    'seaborne62',
+    'portside62',
+    'pb61',
+    'brbf',
+    'chile_conc',
+    'iran_hem',
+    'iran_conc',
+    'br_pellet',
+    'ime_ore',
+    'ime_pellet',
+    'tangshan_billet',
+    'iran_export_billet',
+    'ime_billet',
+    'hr_shanghai',
+    'ime_hr',
+    'rebar_beijing',
+    'ime_rebar',
+    'ime_conc',
+    'ime_dri',
+  ]
+  const merged: DashboardData['steel'] = []
+  const seen = new Set<string>()
+  for (const id of preferred) {
+    const row = byId.get(id)
+    if (row) {
+      merged.push(row)
+      seen.add(id)
+    }
+  }
+  for (const [id, row] of byId) {
+    if (!seen.has(id)) merged.push(row)
+  }
+  base.steel = merged
+
+  if (bundle.imeChain?.length) base.imeChain = bundle.imeChain
+  if (bundle.inventories?.value != null) base.inventories = bundle.inventories
+  if (bundle.bfRate?.rate != null) base.bfRate = bundle.bfRate
+  if (bundle.billetStocks?.value != null) base.billetStocks = bundle.billetStocks
+
+  syncPeriodicFromSteel(base, bundle)
+
+  const custeelOk = Boolean(
+    bundle.custeelOk ||
+      bundle.source?.includes('custeel') ||
+      (bundle.steel || []).some((s) => String(s.source || '').includes('custeel')),
+  )
+  const imeOk = Boolean(
+    bundle.imeOk ||
+      (bundle.imeChain?.length && (bundle.source?.includes('ime') || (bundle.imeChain || []).some((r) => r.source?.includes('ime')))),
+  )
+  base.sources = base.sources.map((s) => {
+    if (s.id === 'custeel') {
+      return {
+        ...s,
+        status: custeelOk ? 'live' : s.status,
+        note: custeelOk ? `ÿ≤ŸÜÿØŸá ¬∑ ${bundle.source || 'custeel'}` : s.note,
+        lastOk: custeelOk ? bundle.updatedAt || s.lastOk : s.lastOk,
+      }
+    }
+    if (s.id === 'ime') {
+      return {
+        ...s,
+        status: imeOk ? 'live' : bundle.imeOk === false ? 'blocked' : s.status,
+        note: imeOk
+          ? `ÿ¢ŸÖÿßÿ± ŸÅ€åÿ≤€å⁄©€å offer-stat ¬∑ ${bundle.imeChain?.length || 0} ŸÇŸÑŸÖ`
+          : 'IME ÿßÿ≤ ÿß€åŸÜ ŸÖÿ≠€åÿ∑ ÿØÿ± ÿØÿ≥ÿ™ÿ±ÿ≥ ŸÜ€åÿ≥ÿ™ ‚Äî IP ÿß€åÿ±ÿßŸÜ / VPS',
+        lastOk: imeOk ? bundle.updatedAt || s.lastOk : s.lastOk,
+      }
+    }
+    return s
+  })
+  return { custeelOk, imeOk }
+}
+
+/** Map live Custeel / IME quotes onto the periodic-changes table. */
+const PERIODIC_STEEL_MAP: { name: string; id: string; imeProduct?: string }[] = [
+  { name: '⁄©ŸÜÿ≥ÿßŸÜÿ™ÿ±Ÿá ÿ¥€åŸÑ€å', id: 'chile_conc' },
+  { name: '⁄ØŸÜÿØŸÑŸá ÿ®ÿ±ÿ≤€åŸÑ', id: 'br_pellet' },
+  { name: 'ÿ®€åŸÑÿ™ ÿ™ÿßŸÜ⁄Øÿ¥ÿßŸÜ', id: 'tangshan_billet' },
+  { name: 'ŸÖ€åŸÑ⁄Øÿ±ÿØ Ÿáÿ®€å', id: 'rebar_beijing' },
+  { name: 'Ÿàÿ±ŸÇ ⁄Øÿ±ŸÖ ÿ¥ÿßŸÜ⁄ØŸáÿß€å', id: 'hr_shanghai' },
+  { name: 'ÿ®€åŸÑÿ™ ÿµÿßÿØÿ±ÿßÿ™€å ÿß€åÿ±ÿßŸÜ', id: 'iran_export_billet' },
+  { name: '⁄©ŸÜÿ≥ÿßŸÜÿ™ÿ±Ÿá IME', id: 'ime_conc', imeProduct: '⁄©ŸÜÿ≥ÿßŸÜÿ™ÿ±Ÿá' },
+  { name: '⁄ØŸÜÿØŸÑŸá IME', id: 'ime_pellet', imeProduct: '⁄ØŸÜÿØŸÑŸá' },
+  { name: 'ÿ¢ŸáŸÜ ÿßÿ≥ŸÅŸÜÿ¨€å IME', id: 'ime_dri', imeProduct: 'ÿßÿ≥ŸÅŸÜÿ¨' },
+  { name: 'ÿ®€åŸÑÿ™ ŸÅÿÆŸàÿ≤ IME', id: 'ime_billet', imeProduct: 'ÿ®€åŸÑÿ™' },
+  { name: 'ŸÖ€åŸÑ⁄Øÿ±ÿØ IME', id: 'ime_rebar', imeProduct: 'ŸÖ€åŸÑ⁄Øÿ±ÿØ' },
+  { name: 'Ÿàÿ±ŸÇ ⁄Øÿ±ŸÖ IME', id: 'ime_hr', imeProduct: 'Ÿàÿ±ŸÇ ⁄Øÿ±ŸÖ' },
+]
+
+function pctChange(from: number | null | undefined, to: number | null | undefined): number | null {
+  if (from == null || to == null || !(from > 0) || !Number.isFinite(to)) return null
+  return Math.round((to / from - 1) * 1000) / 10
+}
+
+function valueOnOrBefore(
+  pts: { date: string; value: number }[],
+  isoDay: string,
+): number | null {
+  let best: number | null = null
+  for (const p of pts) {
+    if (!p?.date || p.value == null) continue
+    if (p.date <= isoDay) best = p.value
+  }
+  return best
+}
+
+function daysAgoIso(days: number, now = new Date()): string {
+  const d = new Date(now.getTime() - days * 86400000)
+  return d.toISOString().slice(0, 10)
+}
+
+function syncPeriodicFromSteel(base: DashboardData, bundle: SteelChainBundle) {
+  const byId = new Map((bundle.steel || []).map((s) => [s.id, s]))
+  const hist = bundle.histories || {}
+  for (const map of PERIODIC_STEEL_MAP) {
+    const row = base.periodic.find((p) => p.name === map.name)
+    if (!row) continue
+    const steel = byId.get(map.id)
+    let price = steel?.value
+    if (price == null && map.imeProduct && bundle.imeChain?.length) {
+      const ime = bundle.imeChain.find((r) => String(r.product || '').includes(map.imeProduct!))
+      if (ime?.priceRialKg != null) price = ime.priceRialKg
+    }
+    if (price != null && Number.isFinite(price)) row.price = price
+
+    const pts = hist[map.id] || []
+    if (pts.length >= 2) {
+      const last = pts[pts.length - 1]?.value
+      const w = pctChange(valueOnOrBefore(pts, daysAgoIso(7)), last)
+      const m = pctChange(valueOnOrBefore(pts, daysAgoIso(30)), last)
+      const y = pctChange(valueOnOrBefore(pts, daysAgoIso(365)), last)
+      if (w != null) row.weeklyPct = w
+      if (m != null) row.monthlyPct = m
+      if (y != null) row.yoyPct = y
+    } else if (steel?.changePct != null && Number.isFinite(steel.changePct)) {
+      // at least refresh daily-ish move into weekly slot when history is thin
+      row.weeklyPct = Math.round(steel.changePct * 10) / 10
+    }
+  }
+}
+
+type NavApiBundle = {
+  ok?: boolean
+  holdings?: DashboardData['holdings']
+  nav?: DashboardData['nav']
+  source?: string
+  ownershipNote?: string
+}
+
+async function fetchNavApi(): Promise<NavApiBundle | null> {
+  try {
+    const res = await fetchWithTimeout('/api/nav', 6000, { cache: 'no-store' })
+    if (!res.ok) return null
+    const json = (await res.json()) as NavApiBundle
+    if (!json?.ok || !json.holdings?.length || !json.nav) return null
+    return json
+  } catch {
+    return null
+  }
+}
+
+function applyNavLive(base: DashboardData, bundle: NavApiBundle | null | undefined) {
+  if (!bundle?.ok || !bundle.holdings?.length || !bundle.nav) return false
+  base.holdings = bundle.holdings
+  base.nav = { ...base.nav, ...bundle.nav, prev: bundle.nav.prev || base.nav.prev }
+  base.overview.fieldSources = {
+    ...(base.overview.fieldSources || {}),
+    nav: bundle.source || 'bourseview',
+  }
+  return true
+}
+
+async function fetchGlobalMarketsApi(): Promise<GlobalMarketsBundle | null> {
+  const read = async (url: string, ms: number): Promise<GlobalMarketsBundle | null> => {
+    const res = await fetchWithTimeout(url, ms, { cache: 'no-store' })
+    if (!res.ok) return null
+    const json = (await res.json()) as GlobalMarketsBundle & { ok?: boolean }
+    if (!json?.stocks?.length) return null
+    return {
+      stocks: json.stocks,
+      industries: json.industries || [],
+      sectorPerformance: json.sectorPerformance || [],
+      materialsIndustries: json.materialsIndustries || [],
+      metalsMiningByCountry: json.metalsMiningByCountry || json.materialsByCountry || [],
+      materialsByCountry: json.metalsMiningByCountry || json.materialsByCountry || [],
+      countrySectors: [],
+      news: [],
+      updatedAt: json.updatedAt,
+      source: json.source,
+      note: json.note,
+      served: json.served,
+    }
+  }
+
+  // Static first ‚Äî never block SPA on Yahoo scrape.
+  let staticBundle: GlobalMarketsBundle | null = null
+  try {
+    staticBundle = await read('/data/global_markets.json', 4000)
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    const live = await read('/api/global', 4000)
+    if (live && live.stocks.length >= (staticBundle?.stocks.length || 0)) return live
+  } catch {
+    /* fall through */
+  }
+  return staticBundle
+}
+
+function applyGlobalMarkets(base: DashboardData, bundle: GlobalMarketsBundle | null | undefined) {
+  if (!bundle?.stocks?.length) return false
+  base.globalMarkets = {
+    stocks: bundle.stocks,
+    industries: bundle.industries || [],
+    sectorPerformance: bundle.sectorPerformance || [],
+    materialsIndustries: bundle.materialsIndustries || [],
+    metalsMiningByCountry: bundle.metalsMiningByCountry || bundle.materialsByCountry || [],
+    materialsByCountry: bundle.metalsMiningByCountry || bundle.materialsByCountry || [],
+    countrySectors: [],
+    news: [],
+    updatedAt: bundle.updatedAt,
+    source: bundle.source || 'yahoo-finance',
+    note: bundle.note,
+    served: bundle.served,
+  }
+  return true
+}
+
+async function fetchProductionOpsApi(): Promise<ProductionOpsBundle | null> {
+  const read = async (url: string, ms: number): Promise<ProductionOpsBundle | null> => {
+    const res = await fetchWithTimeout(url, ms, { cache: 'no-store' })
+    if (!res.ok) return null
+    const json = (await res.json()) as ProductionOpsBundle & { ok?: boolean }
+    if (!json?.companies?.length) return null
+    return json
+  }
+
+  try {
+    const live = await read('/api/production', 6000)
+    if (live) return live
+  } catch {
+    /* BourseView unavailable */
+  }
+  return null
+}
+
+function applyProductionOps(base: DashboardData, bundle: ProductionOpsBundle | null | undefined) {
+  if (!bundle?.companies?.length) return false
+  base.productionOps = {
+    ok: bundle.ok !== false,
+    companies: bundle.companies,
+    industryEnergyRates: bundle.industryEnergyRates || [],
+    updatedAt: bundle.updatedAt,
+    source: bundle.source || 'bourseview',
+    note: bundle.note,
+    served: bundle.served,
+    errors: bundle.errors,
+  }
+  return true
+}
+
+async function fetchFinancialsApi(): Promise<FinancialsBundle | null> {
+  const read = async (url: string, ms: number): Promise<FinancialsBundle | null> => {
+    const res = await fetchWithTimeout(url, ms, { cache: 'no-store' })
+    if (!res.ok) return null
+    const json = (await res.json()) as FinancialsBundle
+    if (!json?.companies?.length) return null
+    return json
+  }
+  try {
+    const live = await read('/api/financials', 6000)
+    if (live) return live
+  } catch {
+    /* BourseView unavailable */
+  }
+  return null
+}
+
+function applyFinancials(base: DashboardData, bundle: FinancialsBundle | null | undefined) {
+  if (!bundle?.companies?.length) return false
+  base.financials = {
+    ok: bundle.ok !== false,
+    companies: bundle.companies,
+    updatedAt: bundle.updatedAt,
+    source: bundle.source || 'bourseview',
+    note: bundle.note,
+    served: bundle.served,
+  }
+  return true
+}
+
+async function fetchMineralStocksApi(): Promise<MineralStockSnap[] | null> {
+  const read = async (url: string, ms: number) => {
+    const res = await fetchWithTimeout(url, ms, { cache: 'no-store' })
+    if (!res.ok) return null
+    const json = (await res.json()) as { ok?: boolean; stocks?: MineralStockSnap[] } | MineralStockSnap[]
+    if (!Array.isArray(json) && json.ok === false) return null
+    const stocks = Array.isArray(json) ? json : json.stocks
+    return stocks?.length ? stocks : null
+  }
+  try {
+    return await read('/api/stocks', 8000)
+  } catch {
+    return null
+  }
+}
+
+function weightedPct(
+  members: StockRow[],
+  key: 'dailyPct' | 'weekPct' | 'monthPct' | 'ytdPct' | 'year1Pct' | 'year3Pct',
+): number {
+  let num = 0
+  let den = 0
+  for (const s of members) {
+    const w = Number(s.marketValueBr) || 0
+    const v = Number(s[key])
+    if (w > 0 && Number.isFinite(v)) {
+      num += w * v
+      den += w
+    }
+  }
+  return den > 0 ? Math.round((num / den) * 100) / 100 : 0
+}
+
+/** Display sector: ŸÅŸàŸÑÿßÿØ€å+ŸÖÿ≥ ‚Üí ŸÅŸÑÿ≤ÿßÿ™ */
+export function displaySector(group: string): string {
+  if (group === 'ŸÅŸàŸÑÿßÿØ€å' || group === 'ŸÖÿ≥' || group === 'ŸÅŸÑÿ≤ÿßÿ™') return 'ŸÅŸÑÿ≤ÿßÿ™'
+  return group
+}
+
+function aggregateWeekFlows(members: StockRow[]): number[] | undefined {
+  const series = members
+    .map((s) => s.netIndividualWeekBt)
+    .filter((a): a is number[] => Array.isArray(a) && a.length > 0)
+  if (!series.length) return undefined
+  const n = 7
+  const out: number[] = []
+  for (let i = 0; i < n; i++) {
+    let sum = 0
+    let hit = false
+    for (const w of series) {
+      const v = w[w.length - n + i]
+      if (v != null && Number.isFinite(v)) {
+        sum += v
+        hit = true
+      }
+    }
+    out.push(hit ? Math.round(sum * 100) / 100 : 0)
+  }
+  return out
+}
+
+function rebuildIndustryRows(base: DashboardData) {
+  const SECTOR_ORDER = ['ÿ≥ÿ±ŸÖÿß€åŸá‚Äå⁄Øÿ∞ÿßÿ±€å', 'ÿ≥ŸÜ⁄Ø‚Äåÿ¢ŸáŸÜ', 'ŸÅŸÑÿ≤ÿßÿ™', '⁄©ÿßÿ®ŸÑ'] as const
+  const equities = base.stocks
+    .filter((s) => !s.isIndustry)
+    .map((s) => ({ ...s, group: displaySector(s.group) }))
+  const rebuilt: typeof base.stocks = []
+
+  for (const g of SECTOR_ORDER) {
+    const members = equities
+      .filter((s) => s.group === g)
+      .sort((a, b) => (b.marketValueBr || 0) - (a.marketValueBr || 0))
+    if (!members.length) continue
+    rebuilt.push(...members)
+
+    const mv = members.reduce((a, s) => a + (s.marketValueBr || 0), 0)
+    const usd = members.reduce((a, s) => a + (s.marketValueUsdM || 0), 0)
+    const vol = members.reduce((a, s) => a + (s.volume || 0), 0)
+    const tv = members.reduce((a, s) => a + (s.tradeValueMr || 0), 0)
+    const net = members.reduce((a, s) => a + (s.netIndividualBt || 0), 0)
+    const weekFlow = aggregateWeekFlows(members)
+
+    rebuilt.push({
+      group: g,
+      name: `ÿµŸÜÿπÿ™ ${g}`,
+      isIndustry: true,
+      marketValueBr: mv,
+      marketValueUsdM: usd,
+      volume: vol,
+      tradeValueMr: tv,
+      closePrice: 0,
+      dailyPct: weightedPct(members, 'dailyPct'),
+      weekPct: weightedPct(members, 'weekPct'),
+      monthPct: weightedPct(members, 'monthPct'),
+      ytdPct: weightedPct(members, 'ytdPct'),
+      year1Pct: weightedPct(members, 'year1Pct'),
+      year3Pct: weightedPct(members, 'year3Pct'),
+      netIndividualBt: Math.round(net * 100) / 100,
+      netIndividualWeekBt: weekFlow,
+      returnsAdjusted: members.some((s) => s.returnsAdjusted),
+      returnsSource: 'industry-weighted',
+    })
+  }
+
+  for (const s of equities) {
+    if (!SECTOR_ORDER.includes(s.group as (typeof SECTOR_ORDER)[number])) rebuilt.push(s)
+  }
+  base.stocks = rebuilt
+}
+
+function applyMineralStockReturns(base: DashboardData, snaps: MineralStockSnap[] | null | undefined) {
+  if (!snaps?.length) {
+    for (const s of base.stocks) {
+      if (s.isIndustry) continue
+      const sym = MINERAL_SYMBOL_BY_NAME[s.name]
+      if (sym) s.symbol = sym
+    }
+    rebuildIndustryRows(base)
+    return
+  }
+  const bySym = new Map(snaps.map((r) => [r.symbol, r]))
+
+  const usd = base.overview.usdRate || seedDashboard.overview.usdRate || 1
+  for (const s of base.stocks) {
+    if (s.isIndustry) continue
+    const sym = MINERAL_SYMBOL_BY_NAME[s.name]
+    if (sym) s.symbol = sym
+    const snap = sym ? bySym.get(sym) : undefined
+    if (!snap) continue
+    // Skip dead API stubs (expired BourseView cookie etc.) so seed/static stay visible.
+    if (snap.returnsSource === 'error' && snap.closePrice == null && snap.ytdPct == null) continue
+
+    if (snap.closePrice != null && snap.closePrice > 0) s.closePrice = snap.closePrice
+    else if (snap.lastPrice != null && snap.lastPrice > 0) s.closePrice = snap.lastPrice
+    if (snap.dailyPct != null && Number.isFinite(snap.dailyPct)) s.dailyPct = snap.dailyPct
+    if (snap.weekPct != null && Number.isFinite(snap.weekPct)) s.weekPct = snap.weekPct
+    if (snap.monthPct != null && Number.isFinite(snap.monthPct)) s.monthPct = snap.monthPct
+    if (snap.ytdPct != null && Number.isFinite(snap.ytdPct)) s.ytdPct = snap.ytdPct
+    if (snap.year1Pct != null && Number.isFinite(snap.year1Pct)) s.year1Pct = snap.year1Pct
+    if (snap.year3Pct != null && Number.isFinite(snap.year3Pct)) s.year3Pct = snap.year3Pct
+    if (snap.returnsSource) {
+      s.returnsAdjusted = Boolean(snap.returnsAdjusted)
+      s.returnsSource = snap.returnsSource
+    }
+    if (snap.halted != null) s.halted = snap.halted
+    if (snap.volume != null) s.volume = snap.volume
+    if (snap.tradeValueMr != null) s.tradeValueMr = snap.tradeValueMr
+    if (snap.netIndividualBt != null && Number.isFinite(snap.netIndividualBt)) {
+      s.netIndividualBt = snap.netIndividualBt
+    }
+    if (Array.isArray(snap.netIndividualWeekBt) && snap.netIndividualWeekBt.length) {
+      s.netIndividualWeekBt = snap.netIndividualWeekBt
+    }
+    if (snap.freeFloatPct != null && Number.isFinite(snap.freeFloatPct)) s.freeFloatPct = snap.freeFloatPct
+    if (snap.outstandingShares != null) s.outstandingShares = snap.outstandingShares
+    if (snap.volumeToFloatPct != null && Number.isFinite(snap.volumeToFloatPct)) {
+      s.volumeToFloatPct = snap.volumeToFloatPct
+    }
+    if (snap.marketValueBr != null && snap.marketValueBr > 0) {
+      s.marketValueBr = snap.marketValueBr
+      s.marketValueUsdM = Math.round((snap.marketValueBr * 1_000_000_000) / usd / 1_000_000)
+    }
+  }
+  rebuildIndustryRows(base)
+}
+
+export async function loadDashboardBundle(): Promise<LiveBundle> {
+  const base: DashboardData = structuredClone(seedDashboard)
+  const now = new Date().toISOString()
+
+  const [current, histEntries, candleEntries, fredEntries, scraped, overviewApi, intradayFallback, stocksApi, steelApi, navApi, globalApi, productionApi, financialsApi, retailMoneyFlowHistory] =
+    await Promise.all([
+      fetchTgjuAjax(),
+      Promise.all(HIST_KEYS.map(async (k) => [k, await fetchTgjuHistory(k)] as const)),
+      Promise.all(
+        HIST_KEYS.map(async (k) => [k, k === 'bourse' ? await fetchBourseOhlc() : await fetchTgjuOhlc(k, '2022/01/01')] as const),
+      ),
+      Promise.all(FRED_SERIES.map(async (s) => [s.mapTo || s.id, await fetchFred(s.id, s.label)] as const)),
+      fetchScrapedMarket(),
+      fetchOverviewApi(),
+      fetchTgjuIntraday(),
+      fetchMineralStocksApi(),
+      fetchSteelChainApi(),
+      fetchNavApi(),
+      fetchGlobalMarketsApi(),
+      fetchProductionOpsApi(),
+      fetchFinancialsApi(),
+      fetchRetailMoneyFlowHistory(),
+    ])
+
+  const liveCount = applyLiveQuotes(base, current)
+  const overviewLiveOk = applyOverviewLive(base, scraped?.overviewLive, scraped?.candles1401)
+  const freshOk = applyFreshOverview(base, overviewApi, intradayFallback)
+  const mineralStockRows = stocksApi?.length ? stocksApi : null
+  if (mineralStockRows) applyMineralStockReturns(base, mineralStockRows)
+  else base.stocks = []
+  const steelStatus = applySteelChain(base, steelApi)
+  const navOk = applyNavLive(base, navApi)
+  if (!navOk) {
+    base.holdings = []
+    base.overview.fieldSources = { ...(base.overview.fieldSources || {}), nav: 'bourseview-unavailable' }
+  }
+  const globalOk = applyGlobalMarkets(base, globalApi)
+  const productionOk = applyProductionOps(base, productionApi)
+  if (!productionOk) base.productionOps = { ok: false, companies: [], source: 'bourseview' }
+  const financialsOk = applyFinancials(base, financialsApi)
+  if (!financialsOk) base.financials = { ok: false, companies: [], source: 'bourseview' }
+  const apiImpacts = normalizeImpacts(overviewApi?.impacts)
+  if (apiImpacts && (overviewApi?.impactsFromSourceArena || overviewApi?.impactsFromRahavard || overviewApi?.impactsSource)) {
+    base.impacts = apiImpacts
+    base.overview.impactsLive = true
+    base.overview.fieldSources = {
+      ...(base.overview.fieldSources || {}),
+      impacts: overviewApi?.impactsSource || (overviewApi?.impactsFromRahavard ? 'rahavard365' : 'sourcearena-live'),
+    }
+  }
+  if (overviewApi?.topTrades?.length) {
+    base.topTrades = overviewApi.topTrades
+    base.overview.fieldSources = {
+      ...(base.overview.fieldSources || {}),
+      topTrades: overviewApi.topTradesSource || 'sourcearena-all',
+    }
+  }
+  if (overviewApi?.dateJalali) {
+    base.overview.dateJalali = overviewApi.dateJalali
+  }
+  if (overviewApi?.marketPulse) {
+    base.overview.marketPulse = overviewApi.marketPulse
+  }
+  if (overviewApi?.marketPulseHistory?.length) {
+    base.overview.marketPulseHistory = overviewApi.marketPulseHistory
+  }
+  // also from scraped market.json when API thin
+  const scrapedPulse = scraped?.marketPulse
+  if (!base.overview.marketPulse && scrapedPulse?.current) {
+    base.overview.marketPulse = scrapedPulse.current
+  }
+  if (!base.overview.marketPulseHistory?.length && scrapedPulse?.history?.length) {
+    base.overview.marketPulseHistory = scrapedPulse.history
+  }
+  applyRetailMoneyFlowHistory(base, retailMoneyFlowHistory)
+  // densify with sessionStorage (client builds 09:00‚Üínow series while page is open)
+  {
+    const session = readSessionPulse()
+    const dateJalali =
+      base.overview.marketPulse?.dateJalali || overviewApi?.dateJalali || session.dateJalali
+    if (session.dateJalali && dateJalali && session.dateJalali !== dateJalali) {
+      session.history = []
+    }
+    const hist = mergePulsePoints(session.history, base.overview.marketPulseHistory)
+    writeSessionPulse(dateJalali, hist)
+    if (hist.length) base.overview.marketPulseHistory = hist
+  }
+
+  const histories: Record<string, HistoryPoint[]> = { ...(scraped?.histories || {}) }
+  for (const [k, pts] of histEntries) {
+    if (k === 'bourse' && (histories.bourse?.length || 0) > pts.length) continue
+    if (pts.length) histories[k] = pts
+  }
+  // Merge Custeel steel histories for ChartsHub / SteelSection
+  if (steelApi?.histories) {
+    for (const [id, pts] of Object.entries(steelApi.histories)) {
+      if (!pts?.length) continue
+      histories[`steel:${id}`] = pts.map((p) => ({ date: p.date, value: p.value }))
+    }
+  }
+
+  const candles: Record<string, CandlePoint[]> = { ...(scraped?.candleHistories || {}) }
+  for (const [k, pts] of candleEntries) {
+    if (pts.length) candles[k] = pts
+    else if (!candles[k]?.length && histories[k]?.length) {
+      // degrade: synthesize flat candles from close-only history
+      candles[k] = histories[k].map((p) => ({
+        date: p.date,
+        dateJalali: p.dateJalali,
+        open: p.value,
+        high: p.value,
+        low: p.value,
+        close: p.value,
+      }))
+    }
+  }
+  candles.bourse = withCurrentTedpixCandle(candles.bourse || [], base.overview, current.bourse)
+  // MarketOverview ŸÜŸÖŸàÿØÿßÿ± ÿ™ÿßÿ±€åÿÆ€å ÿ±ÿß ÿßÿ≤ overview.candles1401 ŸÖ€å‚ÄåÿÆŸàÿßŸÜÿØÿõ
+  // ÿ®ÿØŸàŸÜ ÿß€åŸÜ ÿßÿ™ÿµÿßŸÑÿå ÿØÿßÿØŸáŸî ÿ≤ŸÜÿØŸáŸî TGJU ŸÜÿßÿØ€åÿØŸá ⁄Øÿ±ŸÅÿ™Ÿá Ÿà ŸÅÿß€åŸÑ ÿß€åÿ≥ÿ™ÿß ŸÜŸÖÿß€åÿ¥ ÿØÿßÿØŸá ŸÖ€å‚Äåÿ¥ÿØ.
+  if (candles.bourse?.length) base.overview.candles1401 = candles.bourse
+
+  for (const c of base.commodities) {
+    const histKey = c.id === 'base-us-iron-ore' ? 'base-us-iron-ore' : c.id
+    const pts = histories[histKey]
+    if (pts?.length) {
+      c.history = pts.slice(-40).map((p) => ({ t: p.dateJalali || p.date, v: p.value }))
+    }
+  }
+
+  if (histories.bourse?.length) {
+    base.overview.indexHistory = histories.bourse.slice(-36).map((p) => ({
+      date: p.dateJalali || p.date,
+      value: p.value,
+    }))
+    if (!base.overview.intradayIndex?.length || base.overview.intradayIndex.length < 5) {
+      base.overview.intradayIndex = histories.bourse.slice(-12).map((p, i) => ({
+        time: p.dateJalali || `${i}`,
+        value: p.value,
+      }))
+    }
+  }
+
+  const fred: Record<string, FredBundle> = {}
+  let fredOk = 0
+  for (const [mapTo, bundle] of fredEntries) {
+    if (bundle) {
+      fred[mapTo] = bundle
+      fredOk += 1
+    }
+  }
+
+  if (fred.fred_dxy?.last != null) {
+    const row = base.periodic.find((p) => p.name === 'ÿ¥ÿßÿÆÿµ ÿØŸÑÿßÿ±')
+    if (row) {
+      row.price = fred.fred_dxy.last
+      row.dailyPct = fred.fred_dxy.changePct
+    }
+  }
+  if (fred.fred_dgs10?.last != null) {
+    const row = base.periodic.find((p) => p.name === 'ÿßŸàÿ±ÿßŸÇ ŸÇÿ±ÿ∂Ÿá ÿ¢ŸÖÿ±€å⁄©ÿß')
+    if (row) {
+      row.price = fred.fred_dgs10.last
+      row.dailyPct = fred.fred_dgs10.changePct
+    }
+  }
+
+  base.sources = markSources(base, liveCount, fredOk, now)
+  const hasPars = Boolean(
+    base.overview.retailMoneyFlowDaily != null || base.overview.retailTradeValueBillionToman != null,
+  )
+  const hasArenaMv = Boolean(
+    overviewApi?.totalMarketValueHmt != null ||
+      (scraped?.overviewLive?.marketValueSource || '').includes('sourcearena'),
+  )
+  if (overviewLiveOk || freshOk) {
+    base.sources = [
+      ...base.sources.filter(
+        (s) => s.id !== 'shakhesban' && s.id !== 'parsistahlil' && s.id !== 'tsetmc' && s.id !== 'sourcearena',
+      ),
+      {
+        id: 'sourcearena',
+        name: 'SourceArena / TradersArena',
+        status: hasArenaMv ? 'live' : 'blocked',
+        note: hasArenaMv
+          ? `ÿßÿ±ÿ≤ÿ¥ ÿ®ÿßÿ≤ÿßÿ± ÿ®Ÿàÿ±ÿ≥+ŸÅÿ±ÿßÿ®Ÿàÿ±ÿ≥${
+              overviewApi?.totalMarketValueHmt != null ? ` ¬∑ ${overviewApi.totalMarketValueHmt} ŸáŸÖÿ™` : ''
+            }`
+          : 'ÿØÿ± €å⁄© ŸÜ⁄ØÿßŸá ÿÆŸàÿßŸÜÿØŸá ŸÜÿ¥ÿØ',
+        lastOk: hasArenaMv ? overviewApi?.updatedAt || scraped?.overviewLive?.asOf || now : undefined,
+      },
+      {
+        id: 'shakhesban',
+        name: 'ÿ¥ÿßÿÆÿµ‚Äåÿ®ÿßŸÜ',
+        status: 'live',
+        note: 'ŸáŸÖ‚ÄåŸàÿ≤ŸÜ + ŸÅÿ±ÿßÿ®Ÿàÿ±ÿ≥ (API ÿ≤ŸÜÿØŸá / ÿßÿ≥⁄©ÿ±Ÿæÿ±)',
+        lastOk: overviewApi?.updatedAt || scraped?.overviewLive?.asOf || now,
+      },
+      {
+        id: 'parsistahlil',
+        name: 'Ÿæÿßÿ±ÿ≥€åÿ≥‚Äåÿ™ÿ≠ŸÑ€åŸÑ',
+        status: hasPars ? 'live' : 'blocked',
+        note: hasPars
+          ? `ŸÖÿπÿßŸÖŸÑÿßÿ™ ÿÆÿ±ÿØ + ŸæŸàŸÑ ÿ≠ŸÇ€åŸÇ€å${overviewApi?.parsistahlil?.dateJalali ? ` ¬∑ ${overviewApi.parsistahlil.dateJalali}` : ''}`
+          : overviewApi?.parsistahlil?.error || '⁄Øÿ≤ÿßÿ±ÿ¥ Ÿàÿ∂ÿπ€åÿ™ ÿ®ÿßÿ≤ÿßÿ± ÿÆŸàÿßŸÜÿØŸá ŸÜÿ¥ÿØ',
+        lastOk: hasPars ? overviewApi?.updatedAt || now : undefined,
+      },
+    ]
+  }
+  base.sources = base.sources.map((s) => {
+    if (s.id === 'ime') {
+      const liveIme = steelStatus.imeOk || scraped?.meta?.imeOk
+      return {
+        ...s,
+        status: liveIme ? 'live' : 'blocked',
+        note: liveIme
+          ? 'ÿ¢ŸÖÿßÿ± ŸÅ€åÿ≤€å⁄©€å offer-stat'
+          : 'IME ÿßÿ≤ ÿß€åŸÜ ŸÖÿ≠€åÿ∑ ÿØÿ± ÿØÿ≥ÿ™ÿ±ÿ≥ ŸÜ€åÿ≥ÿ™ ‚Äî ÿßÿ≥⁄©ÿ±Ÿæÿ± ÿ®ÿß IP ÿß€åÿ±ÿßŸÜ',
+      }
+    }
+    if (s.id === 'yahoo') {
+      const n = base.globalMarkets.stocks.length
+      return {
+        ...s,
+        status: globalOk ? 'live' : 'seed',
+        note: globalOk
+          ? `${n} ŸÜŸÖÿßÿØ ¬∑ ${base.globalMarkets.sectorPerformance?.length || 0} ÿ≥⁄©ÿ™Ÿàÿ± ¬∑ ${base.globalMarkets.materialsByCountry?.length || 0} ŸÖŸàÿßÿØ/⁄©ÿ¥Ÿàÿ±`
+          : 'Yahoo Finance ŸáŸÜŸàÿ≤ ŸÑŸàÿØ ŸÜÿ¥ÿØŸá',
+        lastOk: globalOk ? base.globalMarkets.updatedAt || now : s.lastOk,
+      }
+    }
+    return s
+  })
+  if (productionOk) {
+    const n = base.productionOps.companies.length
+    const has = base.sources.some((s) => s.id === 'bourseview-ops')
+    const row: SourceStatus = {
+      id: 'bourseview-ops',
+      name: 'ÿ®Ÿàÿ±ÿ≥‚ÄåŸà€åŸà ¬∑ ÿ™ŸàŸÑ€åÿØ/ÿßŸÜÿ±⁄ò€å',
+      status: 'live',
+      note: `${n} ÿ¥ÿ±⁄©ÿ™ Ÿæÿ±ÿ™ŸÅŸà ¬∑ ÿ™ŸàŸÑ€åÿØ ŸÖÿßŸáÿßŸÜŸá + ÿ¢ÿ®/ÿ®ÿ±ŸÇ/⁄Øÿßÿ≤`,
+      lastOk: base.productionOps.updatedAt || now,
+    }
+    base.sources = has
+      ? base.sources.map((s) => (s.id === 'bourseview-ops' ? row : s))
+      : [...base.sources, row]
+  }
+  base.updatedAt = overviewApi?.updatedAt || steelApi?.updatedAt || base.globalMarkets.updatedAt || now
+
+  return {
+    data: base,
+    histories,
+    candles,
+    fred,
+    sectors: scraped?.sectors || [],
+    scrapeMeta: {
+      ...(scraped?.meta || {}),
+      stocksLive: Boolean(
+        mineralStockRows?.some(
+          (row) =>
+            row.returnsSource !== 'error' &&
+            ((row.closePrice != null && row.closePrice > 0) ||
+              (row.lastPrice != null && row.lastPrice > 0) ||
+              row.dailyPct != null),
+        ),
+      ),
+      overviewApiAt: overviewApi?.updatedAt,
+      custeelOk: steelStatus.custeelOk,
+      imeOk: steelStatus.imeOk || scraped?.meta?.imeOk,
+    },
+  }
+}
+
+export const REFRESH_MS = 60 * 1000

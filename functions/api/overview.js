@@ -832,7 +832,7 @@ function resolveMarketStats({
   }
 }
 
-function mergeImpacts(rahavard, board, arena, rahavardIfb) {
+function mergeImpacts(rahavard, board, arena, _rahavardIfb) {
   const out = { boursePos: [], bourseNeg: [], ifbPos: [], ifbNeg: [] }
   const sources = []
   if (rahavard?.ok) {
@@ -840,11 +840,8 @@ function mergeImpacts(rahavard, board, arena, rahavardIfb) {
     out.bourseNeg = rahavard.bourseNeg || []
     sources.push('rahavard365')
   }
-  if (rahavardIfb?.ok) {
-    out.ifbPos = rahavardIfb.ifbPos || []
-    out.ifbNeg = rahavardIfb.ifbNeg || []
-    sources.push('rahavard365-ifb-index')
-  }
+  // Rahavard's IFB endpoint exposes price changes, not index-point effects.
+  // The Farabourse panels below therefore use the board calculation.
   if (arena?.impacts) {
     if (!out.boursePos.length) out.boursePos = arena.impacts.boursePos || []
     if (!out.bourseNeg.length) out.bourseNeg = arena.impacts.bourseNeg || []
@@ -1237,7 +1234,8 @@ export async function onRequestGet(context) {
   moneyFlowStore = merged.store
 
   const usd = quotes.price_dollar_rl?.value ?? null
-  const tedpix = indices.tedpix || (quotes.bourse
+  const taIndices = tradersPulse?.indices || {}
+  const tedpix = taIndices.tedpix || indices.tedpix || (quotes.bourse
     ? {
         name: quotes.bourse.name,
         value: quotes.bourse.value,
@@ -1274,7 +1272,7 @@ export async function onRequestGet(context) {
     quotes,
     indices: {
       tedpix,
-      equalWeight: indices.equalWeight || null,
+      equalWeight: taIndices.equalWeight || indices.equalWeight || null,
       ifb: indices.ifb || null,
     },
     intraday: {

@@ -1346,13 +1346,15 @@ async function fetchNavApi(): Promise<NavApiBundle | null> {
     if (!json?.ok || !json.holdings?.length || !json.nav || !String(json.source || '').startsWith('bourseview')) return null
     return json
   }
+  // The build snapshot comes from the same authenticated BourseView session.
+  // Read it first so a slow upstream login never blocks first paint.
   try {
-    const live = await read('/api/nav')
-    if (live) return live
+    const snapshot = await read('/data/nav.json')
+    if (snapshot) return snapshot
   } catch {
-    /* use only the build-time BourseView snapshot */
+    /* fall through to the live endpoint */
   }
-  try { return await read('/data/nav.json') } catch { return null }
+  try { return await read('/api/nav') } catch { return null }
 }
 
 function applyNavLive(base: DashboardData, bundle: NavApiBundle | null | undefined) {
@@ -1434,16 +1436,15 @@ async function fetchProductionOpsApi(): Promise<ProductionOpsBundle | null> {
   }
 
   try {
-    const live = await read('/api/production', 6000)
-    if (live) return live
-  } catch {
-    /* BourseView unavailable */
-  }
-  try {
-    const snapshot = await read('/data/production.json', 4000)
+    const snapshot = await read('/data/production.json', 2500)
     if (snapshot && String(snapshot.source || '').startsWith('bourseview')) return snapshot
   } catch {
     /* no verified BourseView snapshot */
+  }
+  try {
+    return await read('/api/production', 6000)
+  } catch {
+    /* BourseView unavailable */
   }
   return null
 }
@@ -1472,16 +1473,15 @@ async function fetchFinancialsApi(): Promise<FinancialsBundle | null> {
     return json
   }
   try {
-    const live = await read('/api/financials', 6000)
-    if (live) return live
-  } catch {
-    /* BourseView unavailable */
-  }
-  try {
-    const snapshot = await read('/data/financials.json', 4000)
+    const snapshot = await read('/data/financials.json', 2500)
     if (snapshot && String(snapshot.source || '').startsWith('bourseview')) return snapshot
   } catch {
     /* no verified BourseView snapshot */
+  }
+  try {
+    return await read('/api/financials', 6000)
+  } catch {
+    /* BourseView unavailable */
   }
   return null
 }
@@ -1508,11 +1508,15 @@ async function fetchMineralStocksApi(): Promise<MineralStockSnap[] | null> {
     const stocks = Array.isArray(json) ? json : json.stocks
     return stocks?.length ? stocks : null
   }
+  // CI refreshes this BourseView-only snapshot before deployment, so the
+  // visible table does not wait for an authenticated upstream request.
   try {
-    return await read('/api/stocks', 8000)
+    const snapshot = await read('/data/stocks.json', 2500)
+    if (snapshot) return snapshot
   } catch {
-    return null
+    /* fall through */
   }
+  try { return await read('/api/stocks', 6000) } catch { return null }
 }
 
 function weightedPct(
@@ -1935,6 +1939,31 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
       imeOk: steelStatus.imeOk || scraped?.meta?.imeOk,
     },
   }
+}
+
+
+/**
+ * Fast first paint for the market overview. This intentionally does not touch
+ * any BourseView endpoint, so authenticated requests cannot hold headline
+ * indices, market value, trade value or the TradersArena pulse hostage.
+ */
+export async function loadOverviewPreview(): Promise<DashboardData> {
+  const base: DashboardData = structuredClone(seedDashboard)
+  const [current, overviewApi, intraday] = await Promise.all([
+    fetchTgjuAjax(),
+    fetchOverviewApi(),
+    fetchTgjuIntraday(),
+  ])
+  applyLiveQuotes(base, current)
+  applyFreshOverview(base, overviewApi, intraday)
+  const impacts = normalizeImpacts(overviewApi?.impacts)
+  if (impacts) base.impacts = impacts
+  if (overviewApi?.topTrades?.length) base.topTrades = overviewApi.topTrades
+  if (overviewApi?.marketPulseHistory?.length) {
+    base.overview.marketPulseHistory = overviewApi.marketPulseHistory
+  }
+  base.updatedAt = overviewApi?.updatedAt || new Date().toISOString()
+  return base
 }
 
 export const REFRESH_MS = 60 * 1000

@@ -15,7 +15,9 @@ const execFileAsync = promisify(execFile)
 // GitHub's curl reaches BourseView reliably; Node/undici intermittently resets
 // the large quote-history responses. Keep the normal Fetch API contract for
 // the existing parsers while using curl as the transport.
-globalThis.fetch = async (input, init = {}) => {
+const nativeFetch = globalThis.fetch
+
+globalThis.fetch = process.env.BOURSEVIEW_NATIVE_FETCH === '1' ? nativeFetch : async (input, init = {}) => {
   const url = typeof input === 'string' ? input : input.url
   const args = ['--silent', '--show-error', '--location', '--max-time', '90']
   const headers = new Headers(init.headers || {})

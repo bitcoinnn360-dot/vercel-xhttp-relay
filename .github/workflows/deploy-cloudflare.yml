@@ -35,7 +35,18 @@ jobs:
         run: printf '%s' "$BOURSEVIEW_COOKIE" | npx wrangler pages secret put BOURSEVIEW_COOKIE --project-name=arz-digital-dashboard
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          BOURSEVIEW_COOKIE: ${{ secrets.BOURSEVIEW_COOKIE_V2 }}
+          BOURSEVIEW_COOKIE: ${{ secrets.BOURSEVIEW_COOKIE_V3 }}
+      - name: Verify BourseView credential from runner
+        run: |
+          BV_COOKIE="$BOURSEVIEW_COOKIE"
+          [[ "$BV_COOKIE" == authentication=* ]] || BV_COOKIE="authentication=$BV_COOKIE"
+          status=$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 30 \
+            --cookie "$BV_COOKIE" \
+            'https://www.bourseview.com/api/v2/exchanges/IRTSENO/stocks/IRO1MADN0001/quotes?timeFrame=daily&lastN=3&expand=shamsiDate')
+          echo "BourseView runner status=$status"
+          test "$status" = "200"
+        env:
+          BOURSEVIEW_COOKIE: ${{ secrets.BOURSEVIEW_COOKIE_V3 }}
       - name: Deploy production
         run: npx wrangler pages deploy dist --project-name=arz-digital-dashboard --branch=main --commit-dirty=true
         env:

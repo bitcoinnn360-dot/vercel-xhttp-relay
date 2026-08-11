@@ -20,7 +20,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - run: npx wrangler pages functions build functions --outfile=dist/_worker.js --output-routes-path=dist/_routes.json
+      - run: npx wrangler pages functions build functions --outdir=dist/.functions-worker --output-routes-path=dist/_routes.json
+      - run: cp dist/.functions-worker/index.js dist/_worker.js
       - uses: actions/upload-artifact@v4
         with:
           name: arz-digital-dashboard-dist

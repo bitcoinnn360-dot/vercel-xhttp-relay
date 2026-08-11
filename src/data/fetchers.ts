@@ -1511,7 +1511,7 @@ async function fetchMineralStocksApi(): Promise<MineralStockSnap[] | null> {
   // CI refreshes this BourseView-only snapshot before deployment, so the
   // visible table does not wait for an authenticated upstream request.
   try {
-    const snapshot = await read('/data/stocks.json', 2500)
+    const snapshot = await read('/data/mineral_stocks.json', 2500)
     if (snapshot) return snapshot
   } catch {
     /* fall through */

@@ -170,6 +170,12 @@ export function parseTradersArenaMarket(data, industryFlows = null) {
   const flowStocks = segFlow(st)
   const flowEquityFunds = segFlow(sf)
   const flowFixedIncome = segFlow(nsf)
+  // کارت «پول حقیقی امروز» فقط بازار سهام را نشان می‌دهد:
+  // سهام و حق‌تقدم + صندوق‌های سهامی؛ صندوق درآمد ثابت و سایر گروه‌ها دخیل نیستند.
+  const equityRetailMoneyFlow =
+    Number.isFinite(flowStocks) && Number.isFinite(flowEquityFunds)
+      ? round1(flowStocks + flowEquityFunds)
+      : null
   const ind = industryFlows || {}
 
   return {
@@ -188,6 +194,7 @@ export function parseTradersArenaMarket(data, industryFlows = null) {
     orderBuyQueueBillionToman: orderBuyQueue,
     orderSellQueueBillionToman: orderSellQueue,
     retailMoneyFlowBillionToman: bt(m[5]),
+    equityRetailMoneyFlowBillionToman: equityRetailMoneyFlow,
     flowStocksBillionToman: flowStocks,
     flowEquityFundsBillionToman: flowEquityFunds,
     flowFixedIncomeBillionToman: flowFixedIncome,
@@ -433,3 +440,4 @@ export function historyForDay(store, dateJalali) {
   if (s.dateJalali === day && s.history?.length) return s.history
   return Array.isArray(s.days?.[day]) ? s.days[day] : []
 }
+

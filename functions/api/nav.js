@@ -213,13 +213,9 @@ export async function onRequestGet(context) {
         liveOwn != null
           ? liveOwn
           : Math.round((shares / outstanding) * 1e6) / 1e4
-      // Last trade price may still be pre-increase; scale by old/new capital shares.
-      let price = meta.price
-      let priceAdjusted = false
-      if (h.priceAdjustFromShares > 0 && h.priceAdjustToShares > 0) {
-        price = meta.price * (h.priceAdjustFromShares / h.priceAdjustToShares)
-        priceAdjusted = true
-      }
+      // BourseView's quote is already on the post-increase share base.
+      // A second adjustment made فملی show 13,300 instead of 18,240.
+      const price = meta.price
       const marketValueMr = round0((shares * price) / 1e6)
       const costPerShare = shares > 0 ? round0((h.costMr * 1e6) / shares) : 0
       return {
@@ -234,8 +230,6 @@ export async function onRequestGet(context) {
         marketValueMr,
         costPerShare,
         pricePerShare: round0(price),
-        priceRaw: priceAdjusted ? round0(meta.price) : undefined,
-        priceAdjusted,
         unrealizedMr: marketValueMr - h.costMr,
         portfolioPct: 0,
         asOf: meta.asOf,

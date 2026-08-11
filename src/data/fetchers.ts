@@ -1966,4 +1966,21 @@ export async function loadOverviewPreview(): Promise<DashboardData> {
   return base
 }
 
+
+/** Fast first paint for the four BourseView-only panels from build snapshots. */
+export async function loadBourseViewPreview(): Promise<DashboardData> {
+  const base: DashboardData = structuredClone(seedDashboard)
+  const [stocks, nav, production, financials] = await Promise.all([
+    fetchMineralStocksApi(),
+    fetchNavApi(),
+    fetchProductionOpsApi(),
+    fetchFinancialsApi(),
+  ])
+  if (stocks?.length) applyMineralStockReturns(base, stocks)
+  applyNavLive(base, nav)
+  applyProductionOps(base, production)
+  applyFinancials(base, financials)
+  return base
+}
+
 export const REFRESH_MS = 60 * 1000

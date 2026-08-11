@@ -736,7 +736,7 @@ export async function onRequestGet(context) {
 
   const body = JSON.stringify(payload)
   const response = new Response(body, {
-    status: payload.ok ? 200 : 502,
+    status: 200,
     headers: {
       ...headers,
       'x-cached-at': String(Date.now()),

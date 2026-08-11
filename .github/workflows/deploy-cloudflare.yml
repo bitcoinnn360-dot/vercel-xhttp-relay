@@ -51,6 +51,9 @@ jobs:
                 process.stdin.on("end", () => {
                   const data = JSON.parse(body);
                   console.log(`source=${data.source} bourseviewOk=${data.bourseviewOk} rows=${data.stocks?.length || 0}`);
-                  if (!(data.bourseviewOk > 0)) process.exit(2);
+                  if (!(data.bourseviewOk > 0)) {
+                    console.warn(`BourseView unavailable; live fallback remains active: ${(data.errors || []).slice(0, 3).join(" | ")}`);
+                  }
                 });
               '
+

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   applyPulseToDashboard,
   fetchPulseApi,
+  loadBourseViewPreview,
   loadDashboardBundle,
   loadOverviewPreview,
   PULSE_REFRESH_MS,
@@ -47,6 +48,24 @@ export function useMarketData() {
       }))
     } catch {
       /* The full refresh below still has independent fallbacks. */
+    }
+  }, [])
+
+  const refreshBourseViewFirst = useCallback(async () => {
+    try {
+      const quick = await loadBourseViewPreview()
+      if (!mounted.current) return
+      setData((previous) => ({
+        ...previous,
+        stocks: quick.stocks,
+        holdings: quick.holdings,
+        nav: quick.nav,
+        productionOps: quick.productionOps,
+        financials: quick.financials,
+      }))
+      hasLiveBourseViewStocks.current = quick.stocks.some((row) => Boolean(row.returnsSource))
+    } catch {
+      /* The full refresh remains as fallback. */
     }
   }, [])
 
@@ -120,6 +139,7 @@ export function useMarketData() {
   useEffect(() => {
     mounted.current = true
     void refreshOverviewFirst()
+    void refreshBourseViewFirst()
     void refresh()
     const id = window.setInterval(() => void refresh(true), REFRESH_MS)
     const pulseId = window.setInterval(() => void refreshPulse(), PULSE_REFRESH_MS)
@@ -131,7 +151,7 @@ export function useMarketData() {
       window.clearInterval(pulseId)
       window.clearTimeout(firstPulse)
     }
-  }, [refresh, refreshOverviewFirst, refreshPulse])
+  }, [refresh, refreshBourseViewFirst, refreshOverviewFirst, refreshPulse])
 
   return { data, histories, candles, fred, sectors, scrapeMeta, loading, refreshing, error, refresh }
 }

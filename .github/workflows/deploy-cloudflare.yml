@@ -1,0 +1,37 @@
+name: Deploy dashboard to Cloudflare Pages
+
+on:
+  push:
+    branches:
+      - cursor/fix-index-history-ta-retail-db3c
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-pages-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Build Pages Functions worker
+        run: |
+          npx wrangler pages functions build functions \
+            --outdir=dist/.functions-worker \
+            --output-routes-path=dist/_routes.json
+          cp dist/.functions-worker/index.js dist/_worker.js
+      - name: Deploy production
+        run: npx wrangler pages deploy dist --project-name=arz-digital-dashboard --branch=main --commit-dirty=true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

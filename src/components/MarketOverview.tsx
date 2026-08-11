@@ -267,7 +267,7 @@ export function MarketOverview({
         <div className="panel p-4">
           <h3 className="mb-2 text-sm font-bold">روند تاریخی شاخص کل (کندل از ۱۴۰۱)</h3>
           <p className="mb-2 text-[10px] text-[var(--color-muted)]">
-            OHLC از TGJU · نمایش هفتگی ({candles.length || histories.bourse?.length || 0} روز خام)
+            OHLC از TGJU · مقدار روز جاری از شاخص زنده · نمایش هفتگی ({candles.length || histories.bourse?.length || 0} روز خام)
           </p>
           <CandlestickChart
             data={

@@ -155,6 +155,8 @@ export function parseTradersArenaMarket(data, industryFlows = null) {
   const st = Array.isArray(data.st) ? data.st : []
   const sf = Array.isArray(data.sf) ? data.sf : []
   const nsf = Array.isArray(data.nsf) ? data.nsf : []
+  const iw = Array.isArray(data.iw) ? data.iw : []
+  const ia = Array.isArray(data.ia) ? data.ia : []
   const pp = Array.isArray(data.pp) ? data.pp[0] : data.pp
   const pm = Array.isArray(data.pm) ? data.pm[0] : data.pm
   const positive = Number(pp) || 0
@@ -183,6 +185,16 @@ export function parseTradersArenaMarket(data, industryFlows = null) {
     time: clampPulseHistoryTime(today.time) || (today.time > PULSE_HIST_END ? PULSE_HIST_END : today.time),
     dateJalali: data.j || today.dateJalali,
     source: 'tradersarena',
+    indices: {
+      tedpix:
+        Number.isFinite(Number(iw[0]))
+          ? { name: 'شاخص کل بورس', value: Number(iw[0]), change: Number(iw[1]) || 0, changePct: Number(iw[2]) || 0, source: 'tradersarena' }
+          : null,
+      equalWeight:
+        Number.isFinite(Number(ia[0]))
+          ? { name: 'شاخص کل (هم‌وزن)', value: Number(ia[0]), change: Number(ia[1]) || 0, changePct: Number(ia[2]) || 0, source: 'tradersarena' }
+          : null,
+    },
     breadth: {
       positive,
       negative,

@@ -507,7 +507,912 @@ async function fetchScrapedMarket(): Promise<{
       mineralStocks: json.mineralStocks,
       sectors: json.sectors || [],
       meta: {
-        updatedAt: json.updatedAt…9095 tokens truncated…dle | null = null
+        updatedAt: json.updatedAt,
+        tsetmcOk: Boolean(json.tsetmc?.ok),
+        imeOk: Boolean(json.ime?.ok),
+        infra: json.infra,
+      },
+      overviewLive,
+      marketPulse: json.marketPulse,
+      candles1401: json.candles1401,
+    }
+  } catch {
+    return null
+  }
+}
+
+async function fetchTgjuIntraday(): Promise<IntradayPoint[]> {
+  try {
+    const res = await fetchWithTimeout(
+      'https://api.tgju.org/v1/market/indicator/today-table-data/bourse?lang=fa',
+      5000,
+      { headers: { Accept: 'application/json' } },
+    )
+    if (!res.ok) return []
+    const json = (await res.json()) as { data?: string[][] }
+    const rows = json.data || []
+    const points = rows
+      .map((row) => ({
+        time: String(row[1] || '').trim(),
+        value: parseFaNumber(row[0]),
+        change: parseFaNumber(String(row[2] || '').replace(/<[^>]+>/g, '')),
+      }))
+      .filter((p) => p.time && Number.isFinite(p.value))
+    return points.reverse()
+  } catch {
+    return []
+  }
+}
+
+type OverviewApi = {
+  ok?: boolean
+  updatedAt?: string
+  dateJalali?: string
+  dateGregorian?: string
+  indices?: {
+    tedpix?: { name?: string; value?: number; change?: number; changePct?: number; source?: string }
+    equalWeight?: { name?: string; value?: number; change?: number; changePct?: number; source?: string }
+    ifb?: { name?: string; value?: number; change?: number; changePct?: number; source?: string }
+  }
+  usdRate?: number
+  bourseMarketValueHmt?: number
+  ifbMarketValueHmt?: number
+  totalMarketValueHmt?: number
+  totalMarketValueUsdM?: number
+  marketValueSource?: string
+  totalTradeValueHmt?: number
+  totalTradeValueSource?: string
+  impacts?: DashboardData['impacts'] | null
+  impactsFromSourceArena?: boolean
+  impactsFromRahavard?: boolean
+  impactsSource?: string
+  topTrades?: DashboardData['topTrades']
+  topTradesSource?: string
+  marketPulse?: DashboardData['overview']['marketPulse']
+  marketPulseHistory?: DashboardData['overview']['marketPulseHistory']
+  retailMoneyFlowYtd?: number
+  retailMoneyFlowYtdSource?: string
+  moneyFlowAsOfJalali?: string
+  moneyFlowSeries?: { date: string; dateJalali?: string; value: number }[]
+  intraday?: { points?: IntradayPoint[]; note?: string; source?: string }
+  parsistahlil?: {
+    ok?: boolean
+    retailTradeValueBillionToman?: number
+    retailMoneyFlowDailyBillionToman?: number
+    dateJalali?: string
+    error?: string
+  }
+  blocked?: string[]
+  errors?: string[]
+}
+
+async function fetchOverviewApi(): Promise<OverviewApi | null> {
+  try {
+    const res = await fetchWithTimeout('/api/overview', 6000, { cache: 'no-store' })
+    if (!res.ok) return null
+    return (await res.json()) as OverviewApi
+  } catch {
+    return null
+  }
+}
+
+const PULSE_SESSION_KEY = 'midco-pulse-history-v7'
+export const PULSE_REFRESH_MS = 30 * 1000
+/** Cash session chart starts at 09:00 Tehran (user-facing axis). */
+export const PULSE_HIST_START = '09:00'
+/** Cash equities / bond / equity-ETF board close. */
+export const PULSE_CASH_END = '12:30'
+/** Gold commodity ETFs keep trading into the afternoon (~17:00). */
+export const PULSE_HIST_END = '17:00'
+
+export function clampPulseHistoryTime(hhmm: string | undefined | null): string | null {
+  const t = String(hhmm || '')
+  if (!/^\d{2}:\d{2}$/.test(t)) return null
+  if (t < PULSE_HIST_START) return null
+  if (t > PULSE_HIST_END) return PULSE_HIST_END
+  return t
+}
+
+/** Current Tehran wall-clock HH:MM (no seconds). */
+export function tehranNowHhmm(now = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Tehran',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(now)
+  const hh = parts.find((p) => p.type === 'hour')?.value || '00'
+  const mm = parts.find((p) => p.type === 'minute')?.value || '00'
+  return `${hh}:${mm}`
+}
+
+/** Axis end for live pulse charts: now, never past 17:00, never before 09:00. */
+export function pulseChartEndLabel(now = new Date()): string {
+  const t = tehranNowHhmm(now)
+  if (t < PULSE_HIST_START) return PULSE_HIST_START
+  if (t > PULSE_HIST_END) return PULSE_HIST_END
+  return t
+}
+
+/** Cash-board breadth chart (مثبت/منفی): 09:00 → now, capped at 13:00. */
+export const PULSE_BREADTH_END = '13:00'
+
+export function pulseBreadthChartEndLabel(now = new Date()): string {
+  const t = tehranNowHhmm(now)
+  if (t < PULSE_HIST_START) return PULSE_HIST_START
+  if (t > PULSE_BREADTH_END) return PULSE_BREADTH_END
+  return t
+}
+
+function hhmmToMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number)
+  return h * 60 + m
+}
+
+function minutesToHhmm(total: number): string {
+  const h = Math.floor(total / 60)
+  const m = total % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+type PulseApi = {
+  ok?: boolean
+  marketPulse?: DashboardData['overview']['marketPulse']
+  marketPulseHistory?: DashboardData['overview']['marketPulseHistory']
+  dateJalali?: string
+  availableDays?: string[]
+}
+
+function pulseStorage(): Storage | null {
+  try {
+    if (typeof localStorage !== 'undefined') return localStorage
+  } catch {
+    /* private mode */
+  }
+  try {
+    if (typeof sessionStorage !== 'undefined') return sessionStorage
+  } catch {
+    /* ignore */
+  }
+  return null
+}
+
+function readSessionPulse(): {
+  dateJalali?: string
+  history: NonNullable<DashboardData['overview']['marketPulseHistory']>
+} {
+  try {
+    const store = pulseStorage()
+    if (!store) return { history: [] }
+    const raw = store.getItem(PULSE_SESSION_KEY) || sessionStorage.getItem('midco-pulse-history-v4')
+    if (!raw) return { history: [] }
+    const parsed = JSON.parse(raw) as { dateJalali?: string; history?: DashboardData['overview']['marketPulseHistory'] }
+    return { dateJalali: parsed.dateJalali, history: Array.isArray(parsed.history) ? parsed.history : [] }
+  } catch {
+    return { history: [] }
+  }
+}
+
+function writeSessionPulse(
+  dateJalali: string | undefined,
+  history: NonNullable<DashboardData['overview']['marketPulseHistory']>,
+) {
+  try {
+    const store = pulseStorage()
+    store?.setItem(PULSE_SESSION_KEY, JSON.stringify({ dateJalali, history }))
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+function mergePulsePoints(
+  ...lists: Array<DashboardData['overview']['marketPulseHistory'] | undefined>
+): NonNullable<DashboardData['overview']['marketPulseHistory']> {
+  const byTime = new Map<string, NonNullable<DashboardData['overview']['marketPulseHistory']>[number]>()
+  for (const list of lists) {
+    for (const p of list || []) {
+      if (!p?.time) continue
+      const t = clampPulseHistoryTime(String(p.time))
+      if (!t) continue
+      byTime.set(t, { ...byTime.get(t), ...p, time: t })
+    }
+  }
+  return [...byTime.values()].sort((a, b) => String(a.time).localeCompare(String(b.time))).slice(-720)
+}
+
+/** Build a continuous HH:MM series from 09:00 → end (usually «now»), forward-filling known samples. */
+export function densifyFlowSeries(
+  points: Record<string, string | number | null | undefined>[],
+  keys: string[],
+  endLabel?: string,
+): Record<string, string | number>[] {
+  const end = clampPulseHistoryTime(endLabel) || pulseChartEndLabel()
+  const start = PULSE_HIST_START
+  const byLabel = new Map<string, Record<string, string | number | null | undefined>>()
+  for (const p of points || []) {
+    const label = clampPulseHistoryTime(String(p.label || ''))
+    if (!label || label > end) continue
+    byLabel.set(label, { ...byLabel.get(label), ...p, label })
+  }
+
+  const startMin = hhmmToMinutes(start)
+  const endMin = hhmmToMinutes(end)
+  if (endMin < startMin) return []
+
+  const last: Record<string, number> = {}
+  const out: Record<string, string | number>[] = []
+  for (let mins = startMin; mins <= endMin; mins += 1) {
+    const label = minutesToHhmm(mins)
+    const sample = byLabel.get(label)
+    const next: Record<string, string | number> = { label }
+    for (const k of keys) {
+      const raw = sample?.[k]
+      if (raw != null && raw !== '' && Number.isFinite(Number(raw))) last[k] = Number(raw)
+      next[k] = last[k] ?? 0
+    }
+    out.push(next)
+  }
+  return out
+}
+
+export async function fetchPulseApi(): Promise<{
+  marketPulse?: DashboardData['overview']['marketPulse']
+  marketPulseHistory: NonNullable<DashboardData['overview']['marketPulseHistory']>
+} | null> {
+  try {
+    const res = await fetchWithTimeout('/api/pulse', 4000, { cache: 'no-store' })
+    if (!res.ok) return null
+    const json = (await res.json()) as PulseApi
+    const session = readSessionPulse()
+    const dateJalali = json.dateJalali || json.marketPulse?.dateJalali || session.dateJalali
+    if (session.dateJalali && dateJalali && session.dateJalali !== dateJalali) {
+      session.history = []
+    }
+    const history = mergePulsePoints(session.history, json.marketPulseHistory)
+    writeSessionPulse(dateJalali, history)
+    return { marketPulse: json.marketPulse, marketPulseHistory: history }
+  } catch {
+    return null
+  }
+}
+
+/** Merge a pulse tick into existing dashboard overview (client-side densify). */
+export function applyPulseToDashboard(
+  data: DashboardData,
+  pulse: {
+    marketPulse?: DashboardData['overview']['marketPulse']
+    marketPulseHistory?: DashboardData['overview']['marketPulseHistory']
+  } | null,
+): DashboardData {
+  if (!pulse) return data
+  const next = { ...data, overview: { ...data.overview } }
+  if (pulse.marketPulse) next.overview.marketPulse = pulse.marketPulse
+  const session = readSessionPulse()
+  const dateJalali = pulse.marketPulse?.dateJalali || session.dateJalali
+  const history = mergePulsePoints(session.history, next.overview.marketPulseHistory, pulse.marketPulseHistory)
+  writeSessionPulse(dateJalali, history)
+  next.overview.marketPulseHistory = history
+  return next
+}
+
+function patchIndex(
+  target: { name: string; value: number; change: number; changePct: number },
+  live?: { name?: string; value?: number; change?: number; changePct?: number },
+) {
+  if (!live || live.value == null || !Number.isFinite(live.value)) return false
+  if (live.name) target.name = live.name
+  target.value = live.value
+  if (live.change != null && Number.isFinite(live.change)) target.change = live.change
+  if (live.changePct != null && Number.isFinite(live.changePct)) target.changePct = live.changePct
+  return true
+}
+
+type ImpactRow = { symbol: string; impact: number }
+
+/** Normalize SourceArena / legacy shapes into UI `{ boursePos, bourseNeg, ifbPos, ifbNeg }`. */
+function normalizeImpacts(raw: unknown): DashboardData['impacts'] | null {
+  if (!raw || typeof raw !== 'object') return null
+  const obj = raw as Record<string, unknown>
+
+  const toRows = (v: unknown): ImpactRow[] => {
+    if (!Array.isArray(v)) return []
+    return v
+      .map((row) => {
+        if (!row || typeof row !== 'object') return null
+        const r = row as Record<string, unknown>
+        const symbol = String(r.symbol ?? r.name ?? '').trim()
+        const impact = Number(r.impact ?? r.effect)
+        if (!symbol || !Number.isFinite(impact)) return null
+        return { symbol, impact }
+      })
+      .filter((x): x is ImpactRow => Boolean(x))
+  }
+
+  // Legacy mistaken shape from earlier SourceArena wiring
+  if ('positive' in obj || 'negative' in obj) {
+    const pos = toRows(obj.positive)
+    const neg = toRows(obj.negative)
+    if (!pos.length && !neg.length) return null
+    return { boursePos: pos, bourseNeg: neg, ifbPos: [], ifbNeg: [] }
+  }
+
+  const out = {
+    boursePos: toRows(obj.boursePos),
+    bourseNeg: toRows(obj.bourseNeg),
+    ifbPos: toRows(obj.ifbPos),
+    ifbNeg: toRows(obj.ifbNeg),
+  }
+  if (!out.boursePos.length && !out.bourseNeg.length && !out.ifbPos.length && !out.ifbNeg.length) {
+    return null
+  }
+  return out
+}
+
+function applyFreshOverview(base: DashboardData, api: OverviewApi | null, intradayFallback: IntradayPoint[]) {
+  const o = base.overview
+  const sources = { ...(o.fieldSources || {}) }
+  const notes = [...(o.liveNotes || [])]
+
+  if (api?.indices) {
+    if (patchIndex(o.tedpix, api.indices.tedpix)) sources.tedpix = api.indices.tedpix?.source || 'live'
+    if (patchIndex(o.equalWeight, api.indices.equalWeight)) sources.equalWeight = 'shakhesban-live'
+    if (patchIndex(o.ifb, api.indices.ifb)) sources.ifb = 'shakhesban-live'
+  }
+
+  if (api?.totalMarketValueHmt != null && Number.isFinite(api.totalMarketValueHmt)) {
+    o.totalMarketValueHmt = api.totalMarketValueHmt
+    sources.marketValue = api.marketValueSource || 'sourcearena-bourse+ifb'
+    notes.unshift(
+      `ارزش بازار: بورس ${api.bourseMarketValueHmt ?? '—'} + فرابورس ${api.ifbMarketValueHmt ?? '—'} = ${api.totalMarketValueHmt} همت (SourceArena)`,
+    )
+  }
+  if (api?.totalMarketValueUsdM != null && Number.isFinite(api.totalMarketValueUsdM)) {
+    o.totalMarketValueUsdM = api.totalMarketValueUsdM
+    sources.usdMarketValue = 'marketValue÷tgjuUsd'
+  }
+  if (api?.totalTradeValueHmt != null && Number.isFinite(api.totalTradeValueHmt)) {
+    o.totalTradeValueHmt = api.totalTradeValueHmt
+    sources.totalTrade = api.totalTradeValueSource || 'sourcearena'
+  }
+
+  if (api?.usdRate != null && Number.isFinite(api.usdRate)) {
+    o.usdRate = api.usdRate
+    sources.usdRate = 'tgju'
+    if (o.totalMarketValueHmt > 0 && (api.totalMarketValueUsdM == null || !Number.isFinite(api.totalMarketValueUsdM))) {
+      o.totalMarketValueUsdM = Math.round((o.totalMarketValueHmt * 1e13) / api.usdRate / 1e6)
+      sources.usdMarketValue = 'marketValue÷tgjuUsd'
+    }
+  }
+
+  if (api?.impactsFromSourceArena && api.impacts) {
+    // applied on base via caller — store flag on overview
+    o.impactsLive = true
+    sources.impacts = api.impactsSource || 'sourcearena'
+  }
+  if (api?.impactsFromRahavard && api.impacts) {
+    o.impactsLive = true
+    sources.impacts = api.impactsSource || 'rahavard365'
+  }
+  if (api?.dateJalali) {
+    o.dateJalali = api.dateJalali
+    sources.dateJalali = 'tehran-live'
+  }
+  if (api?.dateGregorian) {
+    o.dateGregorian = api.dateGregorian
+  }
+  if (api?.marketPulse) {
+    o.marketPulse = api.marketPulse
+    sources.marketPulse = api.marketPulse.source || 'tradersarena'
+    const equityRetailFlow = api.marketPulse.equityRetailMoneyFlowBillionToman
+    if (equityRetailFlow != null && Number.isFinite(equityRetailFlow)) {
+      o.retailMoneyFlowDaily = equityRetailFlow
+      sources.retailMoneyFlowDaily = 'tradersarena-equity'
+    }
+  }
+  if (api?.marketPulseHistory?.length) {
+    o.marketPulseHistory = api.marketPulseHistory
+  }
+  if (api?.topTrades?.length) {
+    // applied on base via caller
+    sources.topTrades = api.topTradesSource || 'sourcearena-all'
+  }
+
+  const pars = api?.parsistahlil
+  if (pars?.ok) {
+    if (pars.retailTradeValueBillionToman != null) {
+      o.retailTradeValueBillionToman = pars.retailTradeValueBillionToman
+      o.retailTradeValueHmt = pars.retailTradeValueBillionToman / 1000
+      sources.retailTrade = 'parsistahlil-live'
+    }
+    notes.unshift(
+      `پارسیس زنده: معاملات خرد=${pars.retailTradeValueBillionToman ?? '—'} میلیارد تومان` +
+        (pars.dateJalali ? ` (${pars.dateJalali})` : ''),
+    )
+  } else if (api) {
+    notes.unshift(`پارسیس در API زنده خوانده نشد${pars?.error ? `: ${pars.error}` : ''}`)
+  }
+
+  if (api?.retailMoneyFlowYtd != null && Number.isFinite(api.retailMoneyFlowYtd)) {
+    o.retailMoneyFlowYtd = api.retailMoneyFlowYtd
+    sources.retailMoneyFlowYtd = api.retailMoneyFlowYtdSource || 'parsistahlil-cumulative'
+    notes.unshift(
+      `YTD پول حقیقی از ابتدای ۱۴۰۴: ${api.retailMoneyFlowYtd}` +
+        (api.moneyFlowAsOfJalali ? ` (تا ${api.moneyFlowAsOfJalali})` : ''),
+    )
+  }
+  if (api?.moneyFlowSeries?.length) {
+    o.moneyFlowSeries = api.moneyFlowSeries.map((r) => ({
+      date: r.date,
+      value: r.value,
+    }))
+  }
+
+  const intraday = api?.intraday?.points?.length ? api.intraday.points : intradayFallback
+  if (intraday.length) {
+    o.intradayIndex = intraday.map((p) => ({ time: p.time.slice(0, 5), value: p.value }))
+    sources.intraday = api?.intraday?.source || 'tgju-today-table'
+    notes.unshift(api?.intraday?.note || 'نمودار درون‌روزی از today-table TGJU (رزولوشن چنددقیقه‌ای).')
+  }
+
+  if (api?.blocked?.length) o.blockedSources = api.blocked
+  o.fieldSources = sources
+  o.liveNotes = notes.slice(0, 12)
+  o.dataSource = 'live'
+  return Boolean(api?.ok) || intraday.length > 0
+}
+
+function applyOverviewLive(
+  base: DashboardData,
+  live: NonNullable<Awaited<ReturnType<typeof fetchScrapedMarket>>>['overviewLive'],
+  candles?: import('./types').CandlePoint[],
+) {
+  if (!live?.ok) {
+    if (candles?.length) base.overview.candles1401 = candles
+    return false
+  }
+  const o = base.overview
+  const sources: Record<string, string> = {}
+
+  if (live.indices) {
+    if (patchIndex(o.tedpix, live.indices.tedpix)) sources.tedpix = live.indices.tedpix?.source || 'shakhesban'
+    if (patchIndex(o.equalWeight, live.indices.equalWeight)) sources.equalWeight = 'shakhesban'
+    if (patchIndex(o.ifb, live.indices.ifb)) sources.ifb = 'shakhesban'
+  }
+
+  if (live.totalMarketValueHmt != null) {
+    o.totalMarketValueHmt = live.totalMarketValueHmt
+    sources.marketValue = live.marketValueSource || 'interim'
+  }
+  if (live.totalMarketValueUsdM != null) {
+    o.totalMarketValueUsdM = live.totalMarketValueUsdM
+    sources.usdMarketValue = 'marketValue÷tgjuUsd'
+  }
+  if (live.usdRate != null) {
+    o.usdRate = live.usdRate
+    sources.usdRate = 'tgju'
+  }
+  if (live.totalTradeValueHmt != null) {
+    o.totalTradeValueHmt = live.totalTradeValueHmt
+    sources.totalTrade = live.totalTradeValueSource || 'interim'
+  }
+  if (live.retailTradeValueBillionToman != null) {
+    o.retailTradeValueBillionToman = live.retailTradeValueBillionToman
+    o.retailTradeValueHmt = live.retailTradeValueHmt ?? live.retailTradeValueBillionToman / 1000
+    sources.retailTrade = 'parsistahlil'
+  }
+  if (live.retailMoneyFlowYtd != null) {
+    o.retailMoneyFlowYtd = live.retailMoneyFlowYtd
+    sources.retailMoneyFlowYtd = live.retailMoneyFlowYtdSource || 'parsistahlil-cumulative'
+  }
+  if (live.moneyFlowSeries?.length) {
+    o.moneyFlowSeries = live.moneyFlowSeries.map((r) => ({
+      date: r.date,
+      value: Number(r.value),
+    }))
+  }
+
+  const liveAny = live as {
+    impactsFromSourceArena?: boolean
+    impactsFromRahavard?: boolean
+    impactsFromTsetmc?: boolean
+    impactsSource?: string
+    impacts?: unknown
+    dateJalali?: string
+    marketPulse?: DashboardData['overview']['marketPulse']
+    marketPulseHistory?: DashboardData['overview']['marketPulseHistory']
+  }
+  const normalized = normalizeImpacts(liveAny.impacts)
+  if (
+    normalized &&
+    (liveAny.impactsFromSourceArena || liveAny.impactsFromRahavard || liveAny.impactsFromTsetmc || liveAny.impactsSource)
+  ) {
+    base.impacts = normalized
+    o.impactsLive = true
+    sources.impacts =
+      liveAny.impactsSource ||
+      (liveAny.impactsFromRahavard ? 'rahavard365' : liveAny.impactsFromSourceArena ? 'sourcearena' : 'tsetmc')
+  } else {
+    o.impactsLive = false
+    sources.impacts = 'pdf-seed'
+  }
+  if (liveAny.dateJalali) o.dateJalali = liveAny.dateJalali
+  if (liveAny.marketPulse) {
+    o.marketPulse = liveAny.marketPulse
+    const equityRetailFlow = liveAny.marketPulse.equityRetailMoneyFlowBillionToman
+    if (equityRetailFlow != null && Number.isFinite(equityRetailFlow)) {
+      o.retailMoneyFlowDaily = equityRetailFlow
+      sources.retailMoneyFlowDaily = 'tradersarena-equity'
+    }
+  }
+  if (liveAny.marketPulseHistory?.length) o.marketPulseHistory = liveAny.marketPulseHistory
+
+  if (live.topTrades?.length) {
+    base.topTrades = live.topTrades
+    sources.topTrades = live.topTradesSource || 'shakhesban'
+  }
+
+  if (candles?.length) o.candles1401 = candles
+  const intradayPts = (live as { intraday?: { points?: { time: string; value: number }[] } }).intraday?.points
+  if (intradayPts?.length) {
+    o.intradayIndex = intradayPts.map((p) => ({ time: p.time.slice(0, 5), value: p.value }))
+    sources.intraday = 'tgju-today-table'
+  }
+  o.liveNotes = live.notes
+  o.fieldSources = sources
+  o.blockedSources = live.blocked || []
+  o.dataSource = 'live'
+  return true
+}
+
+type SteelChainBundle = {
+  ok?: boolean
+  updatedAt?: string
+  custeelOk?: boolean
+  imeOk?: boolean
+  steel?: DashboardData['steel']
+  imeChain?: DashboardData['imeChain']
+  inventories?: DashboardData['inventories'] | null
+  bfRate?: DashboardData['bfRate'] | null
+  billetStocks?: NonNullable<DashboardData['billetStocks']> | null
+  histories?: Record<string, { date: string; value: number }[]>
+  source?: string
+}
+
+async function fetchSteelChainApi(): Promise<SteelChainBundle | null> {
+  // Static first (always fast). Live /api/steel can take 15–30s on Custeel — never block the
+  // dashboard Promise.all on that; a short race is enough to pick up a warm edge cache.
+  let staticBundle: SteelChainBundle | null = null
+  try {
+    const res = await fetchWithTimeout('/data/steel_chain.json', 5000, { cache: 'no-store' })
+    if (res.ok) {
+      const json = (await res.json()) as SteelChainBundle
+      if (json?.ok || json?.steel?.length || json?.imeChain?.length) staticBundle = json
+    }
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    const res = await fetchWithTimeout('/api/steel', 2500, { cache: 'no-store' })
+    if (res.ok) {
+      const json = (await res.json()) as SteelChainBundle
+      if (json?.ok || json?.steel?.length || json?.imeChain?.length) {
+        // Prefer live only when it actually beat the short budget (warm CF cache / fast path).
+        if (json.custeelOk || !staticBundle) return json
+        // If live fell back to static itself, keep whichever has the newer asOf on FOB rows.
+        const liveAsOf = (json.steel || []).find((s) => s.asOf)?.asOf
+        const staticAsOf = (staticBundle.steel || []).find((s) => s.asOf)?.asOf
+        if (liveAsOf && (!staticAsOf || liveAsOf >= staticAsOf)) return json
+      }
+    }
+  } catch {
+    /* fall through to static */
+  }
+  return staticBundle
+}
+
+function applySteelChain(base: DashboardData, bundle: SteelChainBundle | null | undefined) {
+  if (!bundle) return { custeelOk: false, imeOk: false }
+  const byId = new Map(base.steel.map((s) => [s.id, s]))
+  for (const row of bundle.steel || []) {
+    if (!row?.id) continue
+    const prev = byId.get(row.id)
+    byId.set(row.id, {
+      ...(prev || row),
+      ...row,
+      nameFa: row.nameFa || prev?.nameFa || row.name,
+      unit: row.unit || prev?.unit || 'دلار/تن',
+    })
+  }
+  // attach short history sparklines
+  if (bundle.histories) {
+    for (const [id, pts] of Object.entries(bundle.histories)) {
+      const row = byId.get(id)
+      if (!row || !pts?.length) continue
+      row.history = pts.slice(-60).map((p) => ({ t: p.date, v: p.value }))
+    }
+  }
+  const preferred = [
+    'seaborne62',
+    'portside62',
+    'pb61',
+    'brbf',
+    'chile_conc',
+    'iran_hem',
+    'iran_conc',
+    'br_pellet',
+    'ime_ore',
+    'ime_pellet',
+    'tangshan_billet',
+    'iran_export_billet',
+    'ime_billet',
+    'hr_shanghai',
+    'ime_hr',
+    'rebar_beijing',
+    'ime_rebar',
+    'ime_conc',
+    'ime_dri',
+  ]
+  const merged: DashboardData['steel'] = []
+  const seen = new Set<string>()
+  for (const id of preferred) {
+    const row = byId.get(id)
+    if (row) {
+      merged.push(row)
+      seen.add(id)
+    }
+  }
+  for (const [id, row] of byId) {
+    if (!seen.has(id)) merged.push(row)
+  }
+  base.steel = merged
+
+  if (bundle.imeChain?.length) base.imeChain = bundle.imeChain
+  if (bundle.inventories?.value != null) base.inventories = bundle.inventories
+  if (bundle.bfRate?.rate != null) base.bfRate = bundle.bfRate
+  if (bundle.billetStocks?.value != null) base.billetStocks = bundle.billetStocks
+
+  syncPeriodicFromSteel(base, bundle)
+
+  const custeelOk = Boolean(
+    bundle.custeelOk ||
+      bundle.source?.includes('custeel') ||
+      (bundle.steel || []).some((s) => String(s.source || '').includes('custeel')),
+  )
+  const imeOk = Boolean(
+    bundle.imeOk ||
+      (bundle.imeChain?.length && (bundle.source?.includes('ime') || (bundle.imeChain || []).some((r) => r.source?.includes('ime')))),
+  )
+  base.sources = base.sources.map((s) => {
+    if (s.id === 'custeel') {
+      return {
+        ...s,
+        status: custeelOk ? 'live' : s.status,
+        note: custeelOk ? `زنده · ${bundle.source || 'custeel'}` : s.note,
+        lastOk: custeelOk ? bundle.updatedAt || s.lastOk : s.lastOk,
+      }
+    }
+    if (s.id === 'ime') {
+      return {
+        ...s,
+        status: imeOk ? 'live' : bundle.imeOk === false ? 'blocked' : s.status,
+        note: imeOk
+          ? `آمار فیزیکی offer-stat · ${bundle.imeChain?.length || 0} قلم`
+          : 'IME از این محیط در دسترس نیست — IP ایران / VPS',
+        lastOk: imeOk ? bundle.updatedAt || s.lastOk : s.lastOk,
+      }
+    }
+    return s
+  })
+  return { custeelOk, imeOk }
+}
+
+/** Map live Custeel / IME quotes onto the periodic-changes table. */
+const PERIODIC_STEEL_MAP: { name: string; id: string; imeProduct?: string }[] = [
+  { name: 'کنسانتره شیلی', id: 'chile_conc' },
+  { name: 'گندله برزیل', id: 'br_pellet' },
+  { name: 'بیلت تانگشان', id: 'tangshan_billet' },
+  { name: 'میلگرد هبی', id: 'rebar_beijing' },
+  { name: 'ورق گرم شانگهای', id: 'hr_shanghai' },
+  { name: 'بیلت صادراتی ایران', id: 'iran_export_billet' },
+  { name: 'کنسانتره IME', id: 'ime_conc', imeProduct: 'کنسانتره' },
+  { name: 'گندله IME', id: 'ime_pellet', imeProduct: 'گندله' },
+  { name: 'آهن اسفنجی IME', id: 'ime_dri', imeProduct: 'اسفنج' },
+  { name: 'بیلت فخوز IME', id: 'ime_billet', imeProduct: 'بیلت' },
+  { name: 'میلگرد IME', id: 'ime_rebar', imeProduct: 'میلگرد' },
+  { name: 'ورق گرم IME', id: 'ime_hr', imeProduct: 'ورق گرم' },
+]
+
+function pctChange(from: number | null | undefined, to: number | null | undefined): number | null {
+  if (from == null || to == null || !(from > 0) || !Number.isFinite(to)) return null
+  return Math.round((to / from - 1) * 1000) / 10
+}
+
+function valueOnOrBefore(
+  pts: { date: string; value: number }[],
+  isoDay: string,
+): number | null {
+  let best: number | null = null
+  for (const p of pts) {
+    if (!p?.date || p.value == null) continue
+    if (p.date <= isoDay) best = p.value
+  }
+  return best
+}
+
+function daysAgoIso(days: number, now = new Date()): string {
+  const d = new Date(now.getTime() - days * 86400000)
+  return d.toISOString().slice(0, 10)
+}
+
+function syncPeriodicFromSteel(base: DashboardData, bundle: SteelChainBundle) {
+  const byId = new Map((bundle.steel || []).map((s) => [s.id, s]))
+  const hist = bundle.histories || {}
+  for (const map of PERIODIC_STEEL_MAP) {
+    const row = base.periodic.find((p) => p.name === map.name)
+    if (!row) continue
+    const steel = byId.get(map.id)
+    let price = steel?.value
+    if (price == null && map.imeProduct && bundle.imeChain?.length) {
+      const ime = bundle.imeChain.find((r) => String(r.product || '').includes(map.imeProduct!))
+      if (ime?.priceRialKg != null) price = ime.priceRialKg
+    }
+    if (price != null && Number.isFinite(price)) row.price = price
+
+    const pts = hist[map.id] || []
+    if (pts.length >= 2) {
+      const last = pts[pts.length - 1]?.value
+      const w = pctChange(valueOnOrBefore(pts, daysAgoIso(7)), last)
+      const m = pctChange(valueOnOrBefore(pts, daysAgoIso(30)), last)
+      const y = pctChange(valueOnOrBefore(pts, daysAgoIso(365)), last)
+      if (w != null) row.weeklyPct = w
+      if (m != null) row.monthlyPct = m
+      if (y != null) row.yoyPct = y
+    } else if (steel?.changePct != null && Number.isFinite(steel.changePct)) {
+      // at least refresh daily-ish move into weekly slot when history is thin
+      row.weeklyPct = Math.round(steel.changePct * 10) / 10
+    }
+  }
+}
+
+type NavApiBundle = {
+  ok?: boolean
+  holdings?: DashboardData['holdings']
+  nav?: DashboardData['nav']
+  source?: string
+  ownershipNote?: string
+}
+
+async function fetchNavApi(): Promise<NavApiBundle | null> {
+  try {
+    const res = await fetchWithTimeout('/api/nav', 6000, { cache: 'no-store' })
+    if (!res.ok) return null
+    const json = (await res.json()) as NavApiBundle
+    if (!json?.ok || !json.holdings?.length || !json.nav) return null
+    return json
+  } catch {
+    return null
+  }
+}
+
+function applyNavLive(base: DashboardData, bundle: NavApiBundle | null | undefined) {
+  if (!bundle?.ok || !bundle.holdings?.length || !bundle.nav) return false
+  base.holdings = bundle.holdings
+  base.nav = { ...base.nav, ...bundle.nav, prev: bundle.nav.prev || base.nav.prev }
+  base.overview.fieldSources = {
+    ...(base.overview.fieldSources || {}),
+    nav: bundle.source || 'bourseview',
+  }
+  return true
+}
+
+async function fetchGlobalMarketsApi(): Promise<GlobalMarketsBundle | null> {
+  const read = async (url: string, ms: number): Promise<GlobalMarketsBundle | null> => {
+    const res = await fetchWithTimeout(url, ms, { cache: 'no-store' })
+    if (!res.ok) return null
+    const json = (await res.json()) as GlobalMarketsBundle & { ok?: boolean }
+    if (!json?.stocks?.length) return null
+    return {
+      stocks: json.stocks,
+      industries: json.industries || [],
+      sectorPerformance: json.sectorPerformance || [],
+      materialsIndustries: json.materialsIndustries || [],
+      metalsMiningByCountry: json.metalsMiningByCountry || json.materialsByCountry || [],
+      materialsByCountry: json.metalsMiningByCountry || json.materialsByCountry || [],
+      countrySectors: [],
+      news: [],
+      updatedAt: json.updatedAt,
+      source: json.source,
+      note: json.note,
+      served: json.served,
+    }
+  }
+
+  // Static first — never block SPA on Yahoo scrape.
+  let staticBundle: GlobalMarketsBundle | null = null
+  try {
+    staticBundle = await read('/data/global_markets.json', 4000)
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    const live = await read('/api/global', 4000)
+    if (live && live.stocks.length >= (staticBundle?.stocks.length || 0)) return live
+  } catch {
+    /* fall through */
+  }
+  return staticBundle
+}
+
+function applyGlobalMarkets(base: DashboardData, bundle: GlobalMarketsBundle | null | undefined) {
+  if (!bundle?.stocks?.length) return false
+  base.globalMarkets = {
+    stocks: bundle.stocks,
+    industries: bundle.industries || [],
+    sectorPerformance: bundle.sectorPerformance || [],
+    materialsIndustries: bundle.materialsIndustries || [],
+    metalsMiningByCountry: bundle.metalsMiningByCountry || bundle.materialsByCountry || [],
+    materialsByCountry: bundle.metalsMiningByCountry || bundle.materialsByCountry || [],
+    countrySectors: [],
+    news: [],
+    updatedAt: bundle.updatedAt,
+    source: bundle.source || 'yahoo-finance',
+    note: bundle.note,
+    served: bundle.served,
+  }
+  return true
+}
+
+async function fetchProductionOpsApi(): Promise<ProductionOpsBundle | null> {
+  const read = async (url: string, ms: number): Promise<ProductionOpsBundle | null> => {
+    const res = await fetchWithTimeout(url, ms, { cache: 'no-store' })
+    if (!res.ok) return null
+    const json = (await res.json()) as ProductionOpsBundle & { ok?: boolean }
+    if (!json?.companies?.length) return null
+    return json
+  }
+
+  let staticBundle: ProductionOpsBundle | null = null
+  try {
+    staticBundle = await read('/data/production.json', 4000)
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    const live = await read('/api/production', 6000)
+    if (live && live.companies.length >= (staticBundle?.companies.length || 0)) return live
+  } catch {
+    /* fall through */
+  }
+  return staticBundle
+}
+
+function applyProductionOps(base: DashboardData, bundle: ProductionOpsBundle | null | undefined) {
+  if (!bundle?.companies?.length) return false
+  base.productionOps = {
+    ok: bundle.ok !== false,
+    companies: bundle.companies,
+    industryEnergyRates: bundle.industryEnergyRates || [],
+    updatedAt: bundle.updatedAt,
+    source: bundle.source || 'bourseview',
+    note: bundle.note,
+    served: bundle.served,
+    errors: bundle.errors,
+  }
+  return true
+}
+
+async function fetchFinancialsApi(): Promise<FinancialsBundle | null> {
+  const read = async (url: string, ms: number): Promise<FinancialsBundle | null> => {
+    const res = await fetchWithTimeout(url, ms, { cache: 'no-store' })
+    if (!res.ok) return null
+    const json = (await res.json()) as FinancialsBundle
+    if (!json?.companies?.length) return null
+    return json
+  }
+  let staticBundle: FinancialsBundle | null = null
   try {
     staticBundle = await read('/data/financials.json', 4000)
   } catch {

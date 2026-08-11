@@ -1,5 +1,9 @@
+Exit code: 0
+Wall time: 0.7 seconds
+Total output lines: 1451
+Output:
 /**
- * Cloudflare Pages Function — live overview refresh
+ * Cloudflare Pages Function â€” live overview refresh
  * GET /api/overview
  *
  * Pulls fresh:
@@ -20,10 +24,12 @@ import {
 const TGJU_AJAX = 'https://call2.tgju.org/ajax.json'
 const TGJU_TODAY = 'https://api.tgju.org/v1/market/indicator/today-table-data/bourse?lang=fa'
 const TSETMC_OVERVIEW = 'https://cdn.tsetmc.com/api/MarketData/GetMarketOverview/'
+// Official TSETMC ranking: 2 = Farabourse, 7 = IFB total index.
+const TSETMC_IFB_EFFECT = 'https://cdn.tsetmc.com/api/Index/GetInstEffect/0/2/7'
 const SHAKH_INDEX = 'https://www.shakhesban.com/markets/index'
 const SHAKH_LIST = 'https://www.shakhesban.com/stocks/list-data'
 const TA_HEATMAP_STOCK_FUNDS = 'https://tradersarena.ir/data/heatmap/stock-funds'
-/** Default featured watch under حقیقی/حقوقی — already the live «ارزش» ranking table. */
+/** Default featured watch under Ø­Ù‚ÛŒÙ‚ÛŒ/Ø­Ù‚ÙˆÙ‚ÛŒ â€” already the live Â«Ø§Ø±Ø²Ø´Â» ranking table. */
 const TA_MAINWATCH_SYMBOLS = 'https://tradersarena.ir/data/mainwatch/symbols'
 const PARSIS_HOME = 'https://parsistahlil.ir/'
 const SOURCEARENA_API = 'https://apis.sourcearena.ir/api/'
@@ -113,6 +119,40 @@ async function fetchTsetmcMarketSummary() {
   }
 }
 
+/**
+ * Official IFB index constituents ranked by their actual index-point effect.
+ * This must not be replaced with a market-cap Ã— price-change approximation:
+ * TSETMC publishes the calculated effect itself as instEffectValue.
+ */
+async function fetchTsetmcIfbEffects() {
+  const payload = await fetchJson(TSETMC_IFB_EFFECT, 5000)
+  const rows = Array.isArray(payload)
+    ? payload
+    : payload?.instrumentEffect || payload?.instrumentEffects || payload?.data || payload?.items || []
+  if (!Array.isArray(rows)) throw new Error('TSETMC IFB effect: unexpected response')
+
+  const normalized = rows
+    .map((row) => {
+      const instrument = row?.instrument || row?.ins || {}
+      const symbol = String(
+        instrument?.lVal18AFC || instrument?.symbol || row?.lVal18AFC || row?.symbol || row?.namad || '',
+      ).trim()
+      const name = String(
+        instrument?.lVal30 || instrument?.name || row?.lVal30 || row?.name || symbol,
+      ).trim()
+      const effect = parseNum(row?.instEffectValue ?? row?.effectValue ?? row?.indexEffect ?? row?.effect)
+      return symbol && effect != null ? { symbol, name, effect } : null
+    })
+    .filter(Boolean)
+
+  if (!normalized.length) throw new Error('TSETMC IFB effect: no usable rows')
+  return {
+    ok: true,
+    ifbPos: normalized.filter((x) => x.effect > 0).sort((a, b) => b.effect - a.effect).slice(0, 5),
+    ifbNeg: normalized.filter((x) => x.effect < 0).sort((a, b) => a.effect - b.effect).slice(0, 5),
+  }
+}
+
 async function fetchJsonRetry(url, attempts = 2) {
   let lastErr
   for (let i = 0; i < attempts; i++) {
@@ -154,9 +194,9 @@ function tgjuQuote(row, id, name) {
 
 function parseShakhesbanIndices(html) {
   const wanted = {
-    'ش-کل-بورس': 'tedpix',
-    'ش-کل-هم-وزن': 'equalWeight',
-    'ش-کل-فرابورس': 'ifb',
+    'Ø´-Ú©Ù„-Ø¨ÙˆØ±Ø³': 'tedpix',
+    'Ø´-Ú©Ù„-Ù‡Ù…-ÙˆØ²Ù†': 'equalWeight',
+    'Ø´-Ú©Ù„-ÙØ±Ø§Ø¨ÙˆØ±Ø³': 'ifb',
   }
   const out = {}
   const trRe = /<tr[^>]*>([\s\S]*?)<\/tr>/g
@@ -247,7 +287,7 @@ function parseShakhesbanTbody(tbody) {
     while ((td = tdRe1.exec(block))) vals[td[2]] = td[1]
     while ((td = tdRe2.exec(block))) vals[td[1]] = td[2]
     const marketFa = vals['info.market_fa'] || ''
-    if (marketFa === 'آتی') continue
+    if (marketFa === 'Ø¢ØªÛŒ') continue
     const yesterday = parseNum(vals['info.PriceYesterday']) || 0
     const close = parseNum(vals['info.last_price.PClosing']) || 0
     const last = parseNum(vals['info.last_trade.PDrCotVal']) || 0
@@ -318,11 +358,11 @@ async function scrapeShakhesbanPages({ maxPages = 12, orderCol = 'trades.arzesh_
 }
 
 async function scrapeShakhesbanBoardLite(maxPages = 4) {
-  // Full board (سهام+صندوق+اوراق) — no market=stock filter. Used for IFB impacts + fallback pulse.
+  // Full board (Ø³Ù‡Ø§Ù…+ØµÙ†Ø¯ÙˆÙ‚+Ø§ÙˆØ±Ø§Ù‚) â€” no market=stock filter. Used for IFB impacts + fallback pulse.
   return scrapeShakhesbanPages({ maxPages, orderCol: 'trades.arzesh_bazar' })
 }
 
-/** Normalize Persian symbols for set membership (دارا یکم ↔ دارایکم). */
+/** Normalize Persian symbols for set membership (Ø¯Ø§Ø±Ø§ ÛŒÚ©Ù… â†” Ø¯Ø§Ø±Ø§ÛŒÚ©Ù…). */
 function normalizeSymbolKey(s) {
   return String(s || '')
     .replace(/\s+/g, '')
@@ -333,8 +373,8 @@ function normalizeSymbolKey(s) {
 }
 
 /**
- * Equity-fund universe from TradersArena heatmap «صندوق های سهامی»
- * (includes اهرمی / بخشی / شاخصی / کلاسیک subclasses).
+ * Equity-fund universe from TradersArena heatmap Â«ØµÙ†Ø¯ÙˆÙ‚ Ù‡Ø§ÛŒ Ø³Ù‡Ø§Ù…ÛŒÂ»
+ * (includes Ø§Ù‡Ø±Ù…ÛŒ / Ø¨Ø®Ø´ÛŒ / Ø´Ø§Ø®ØµÛŒ / Ú©Ù„Ø§Ø³ÛŒÚ© subclasses).
  */
 async function fetchEquityFundSymbolSet() {
   const res = await fetch(TA_HEATMAP_STOCK_FUNDS, {
@@ -354,28 +394,28 @@ async function fetchEquityFundSymbolSet() {
       if (key) set.add(key)
     }
   }
-  // shakhesban ticker spelling for دارا یکم
-  set.add(normalizeSymbolKey('دارایکم'))
-  set.add(normalizeSymbolKey('دارا یکم'))
+  // shakhesban ticker spelling for Ø¯Ø§Ø±Ø§ ÛŒÚ©Ù…
+  set.add(normalizeSymbolKey('Ø¯Ø§Ø±Ø§ÛŒÚ©Ù…'))
+  set.add(normalizeSymbolKey('Ø¯Ø§Ø±Ø§ ÛŒÚ©Ù…'))
   return set
 }
 
 function isEquityFundRow(row, fundSet) {
-  if ((row?.marketFa || '') !== 'صندوق') return false
+  if ((row?.marketFa || '') !== 'ØµÙ†Ø¯ÙˆÙ‚') return false
   const key = normalizeSymbolKey(row.symbol)
   if (fundSet && fundSet.size && fundSet.has(key)) return true
   const flow = row.flow || ''
   const title = row.title || row.name || ''
-  if (flow.includes('بورس کالا')) return false
-  if (/طلا|سکه|نقره|زعفران|درآمد\s*ثابت|املاک|مستغلات/.test(title)) return false
-  if (/(سهامی|در سهام|اهرم|بخشی|شاخصی|مختلط)/.test(title)) return true
+  if (flow.includes('Ø¨ÙˆØ±Ø³ Ú©Ø§Ù„Ø§')) return false
+  if (/Ø·Ù„Ø§|Ø³Ú©Ù‡|Ù†Ù‚Ø±Ù‡|Ø²Ø¹ÙØ±Ø§Ù†|Ø¯Ø±Ø¢Ù…Ø¯\s*Ø«Ø§Ø¨Øª|Ø§Ù…Ù„Ø§Ú©|Ù…Ø³ØªØºÙ„Ø§Øª/.test(title)) return false
+  if (/(Ø³Ù‡Ø§Ù…ÛŒ|Ø¯Ø± Ø³Ù‡Ø§Ù…|Ø§Ù‡Ø±Ù…|Ø¨Ø®Ø´ÛŒ|Ø´Ø§Ø®ØµÛŒ|Ù…Ø®ØªÙ„Ø·)/.test(title)) return true
   return false
 }
 
 function isTopTradeCandidate(row, fundSet) {
   if (!row || !(row.tradeValue > 0)) return false
   const marketFa = row.marketFa || ''
-  if (!marketFa || marketFa === 'سهام') return true
+  if (!marketFa || marketFa === 'Ø³Ù‡Ø§Ù…') return true
   return isEquityFundRow(row, fundSet)
 }
 
@@ -393,22 +433,22 @@ function buildTopTradesFromBoard(rows, fundSet, limit = TOP_TRADES_LIMIT) {
 function isBondLikeName(name) {
   const n = String(name || '').trim()
   if (!n) return true
-  if (/^اراد\d*/i.test(n)) return true
-  if (/^اخزا\d*/i.test(n)) return true
-  if (/^اجاره/i.test(n)) return true
-  if (/^مرابحه/i.test(n)) return true
-  if (/^صکوک/i.test(n)) return true
-  if (/^تسه\d*/i.test(n)) return true
-  if (/اختيار|اختیار/i.test(n)) return true
-  if (/^ص[ا-ی]{2,}/.test(n) && /\d{2,}$/.test(n)) return true
-  if (/\d{2,}$/.test(n) && /(?:اراد|صبا|طبیعت|آسمان|سامان|گستر|قرن)/.test(n)) return true
+  if (/^Ø§Ø±Ø§Ø¯\d*/i.test(n)) return true
+  if (/^Ø§Ø®Ø²Ø§\d*/i.test(n)) return true
+  if (/^Ø§Ø¬Ø§Ø±Ù‡/i.test(n)) return true
+  if (/^Ù…Ø±Ø§Ø¨Ø­Ù‡/i.test(n)) return true
+  if (/^ØµÚ©ÙˆÚ©/i.test(n)) return true
+  if (/^ØªØ³Ù‡\d*/i.test(n)) return true
+  if (/Ø§Ø®ØªÙŠØ§Ø±|Ø§Ø®ØªÛŒØ§Ø±/i.test(n)) return true
+  if (/^Øµ[Ø§-ÛŒ]{2,}/.test(n) && /\d{2,}$/.test(n)) return true
+  if (/\d{2,}$/.test(n) && /(?:Ø§Ø±Ø§Ø¯|ØµØ¨Ø§|Ø·Ø¨ÛŒØ¹Øª|Ø¢Ø³Ù…Ø§Ù†|Ø³Ø§Ù…Ø§Ù†|Ú¯Ø³ØªØ±|Ù‚Ø±Ù†)/.test(n)) return true
   return false
 }
 
 /**
  * Top trades from TradersArena main watch table (third table on homepage,
- * under حقیقی/حقوقی). Rows are [id, isin, name, volume, tradeValueRial, ...].
- * Sort by trade value — same order the site shows when sorted by «ارزش».
+ * under Ø­Ù‚ÛŒÙ‚ÛŒ/Ø­Ù‚ÙˆÙ‚ÛŒ). Rows are [id, isin, name, volume, tradeValueRial, ...].
+ * Sort by trade value â€” same order the site shows when sorted by Â«Ø§Ø±Ø²Ø´Â».
  */
 async function fetchMainWatchTradeRows() {
   const res = await fetch(TA_MAINWATCH_SYMBOLS, {
@@ -452,20 +492,19 @@ async function buildLiveTopTrades(_fundSet) {
   }
 }
 
-/** Dedicated scrape ordered by trade value: سهام + صندوق (filtered later). */
+/** Dedicated scrape ordered by trade value: Ø³Ù‡Ø§Ù… + ØµÙ†Ø¯ÙˆÙ‚ (filtered later). */
 function computeBoardImpacts(stocks, indices, maxMove = 0.22) {
-  const equities = stocks.filter((s) => !s.marketFa || s.marketFa === 'سهام')
-  const bourse = equities.filter((s) => !(s.flow || '').includes('فرابورس'))
-  const ifb = equities.filter((s) => (s.flow || '').includes('فرابورس'))
+  const equities = stocks.filter((s) => !s.marketFa || s.marketFa === 'Ø³Ù‡Ø§Ù…')
+  const bourse = equities.filter((s) => !(s.flow || '').includes('ÙØ±Ø§Ø¨ÙˆØ±Ø³'))
+  const ifb = equities.filter((s) => (s.flow || '').includes('ÙØ±Ø§Ø¨ÙˆØ±Ø³'))
   const indexB = indices?.tedpix?.value || 0
   const indexF = indices?.ifb?.value || 0
   const totalB = bourse.reduce((a, s) => a + (s.marketValue || 0), 0)
   const totalF = ifb.reduce((a, s) => a + (s.marketValue || 0), 0)
 
   /**
-   * TSE: prefer قیمت پایانی (final) — matches Rahavard official style.
-   * IFB: Rahavard has no IFB effects; prefer آخرین معامله so the panel
-   * does not freeze mid-session while final price barely moves.
+   * Index effects are a closing-price measure. Using last trade for IFB
+   * distorted the rank mid-session (e.g. pushed ÙˆØ³Ù¾Ù‡Ø± above Ú©Ú¯Ù‡Ø±).
    */
   const build = (rows, index, total, preferLastTrade) => {
     if (!index || !total) return { pos: [], neg: [] }
@@ -490,397 +529,26 @@ function computeBoardImpacts(stocks, indices, maxMove = 0.22) {
     }
     return {
       pos: items.filter((x) => x.impact > 0).sort((a, b) => b.impact - a.impact).slice(0, 5),
-      neg: items.filter((x) => x.impact < 0).sort((a, b) => a.impact - b.impact).slice(0, 5),
-    }
-  }
-
-  const b = build(bourse, indexB, totalB, false)
-  const f = build(ifb, indexF, totalF, false)
-  return {
-    boursePos: b.pos,
-    bourseNeg: b.neg,
-    ifbPos: f.pos,
-    ifbNeg: f.neg,
-    source: 'shakhesban-board',
-  }
-}
-
-/** Fallback pulse from board best-level only (when TradersArena is unreachable). */
-function buildMarketPulseFallback(stocks) {
-  let pos = 0
-  let neg = 0
-  let flat = 0
-  let orderBuy = 0
-  let orderSell = 0
-  let retailBuy = 0
-  let retailSell = 0
-  let buyCnt = 0
-  let sellCnt = 0
-  for (const s of stocks) {
-    let p = s.changePctLast ?? s.changePctClose ?? 0
-    if (Math.abs(p) < 1) p *= 100
-    if (p > 0.05) pos += 1
-    else if (p < -0.05) neg += 1
-    else flat += 1
-    orderBuy += (s.orderBuyVol || 0) * (s.orderBuyPx || 0)
-    orderSell += (s.orderSellVol || 0) * (s.orderSellPx || 0)
-    const px = s.last || s.close || 0
-    retailBuy += (s.buyIVol || 0) * px
-    retailSell += (s.sellIVol || 0) * px
-    buyCnt += s.orderBuyCnt || 0
-    sellCnt += s.orderSellCnt || 0
-  }
-  const today = jalaliToday()
-  const perBuy = buyCnt > 0 ? retailBuy / buyCnt / RIAL_PER_BILLION_TOMAN : null
-  const perSell = sellCnt > 0 ? retailSell / sellCnt / RIAL_PER_BILLION_TOMAN : null
-  return {
-    asOf: new Date().toISOString(),
-    time: today.time,
-    dateJalali: today.dateJalali,
-    source: 'shakhesban-board-fallback',
-    breadth: { positive: pos, negative: neg, flat, total: pos + neg + flat },
-    orderBuyBillionToman: Math.round((orderBuy / RIAL_PER_BILLION_TOMAN) * 10) / 10,
-    orderSellBillionToman: Math.round((orderSell / RIAL_PER_BILLION_TOMAN) * 10) / 10,
-    retailMoneyFlowBillionToman: Math.round(((retailBuy - retailSell) / RIAL_PER_BILLION_TOMAN) * 10) / 10,
-    retailBuyBillionToman: Math.round((retailBuy / RIAL_PER_BILLION_TOMAN) * 10) / 10,
-    retailSellBillionToman: Math.round((retailSell / RIAL_PER_BILLION_TOMAN) * 10) / 10,
-    perCapitaBuyMillionToman: perBuy != null ? Math.round(perBuy * 1000 * 100) / 100 : null,
-    perCapitaSellMillionToman: perSell != null ? Math.round(perSell * 1000 * 100) / 100 : null,
-    note: 'پشتیبان · بهترین سطح تابلو (بدون عمق ۵ خط)',
-  }
-}
-
-async function scrapeRahavardImpacts() {
-  const hdrs = {
-    Accept: 'application/json, text/plain, */*',
-    'User-Agent': UA,
-    Referer: 'https://rahavard365.com/',
-    Origin: 'https://rahavard365.com',
-  }
-  const load = async (kind) => {
-    const res = await fetch(`${RAHAVARD_API}/home/${kind}-instrument-effect-d`, {
-      headers: hdrs,
-      signal: AbortSignal.timeout(UPSTREAM_MS),
-    })
-    if (!res.ok) throw new Error(`rahavard ${kind} ${res.status}`)
-    const payload = await res.json()
-    const list = payload?.data?.list || []
-    return list
-      .map((row) => {
-        const symbol = String(row?.trade_symbol || row?.short_name || '').trim()
-        const impact = parseNum(row?.instrument_effect_value)
-        if (!symbol || impact == null) return null
-        return { symbol, impact: Math.round(impact * 10) / 10 }
-      })
-      .filter(Boolean)
-      .slice(0, 5)
-  }
-  try {
-    const [pos, neg] = await Promise.all([load('positive'), load('negative')])
-    return {
-      ok: Boolean(pos.length || neg.length),
-      source: 'rahavard365',
-      boursePos: [...pos].sort((a, b) => b.impact - a.impact).slice(0, 5),
-      bourseNeg: [...neg].sort((a, b) => a.impact - b.impact).slice(0, 5),
-    }
-  } catch (e) {
-    return { ok: false, source: 'rahavard365', error: String(e), boursePos: [], bourseNeg: [] }
-  }
-}
-
-/** Farabourse movers from Rahavard «شاخص قیمت فرابورس» (index id 109) — ستون تغییر. */
-const RAHAVARD_IFB_PRICE_INDEX_ID = 109
-
-async function scrapeRahavardIfbMovers() {
-  const hdrs = {
-    Accept: 'application/json, text/plain, */*',
-    'User-Agent': UA,
-    Referer: `https://rahavard365.com/index/${RAHAVARD_IFB_PRICE_INDEX_ID}/assets`,
-    Origin: 'https://rahavard365.com',
-  }
-  try {
-    const res = await fetch(`${RAHAVARD_API}/index/${RAHAVARD_IFB_PRICE_INDEX_ID}/assets`, {
-      headers: hdrs,
-      signal: AbortSignal.timeout(UPSTREAM_MS),
-    })
-    if (!res.ok) throw new Error(`rahavard ifb ${res.status}`)
-    const payload = await res.json()
-    const rows = Array.isArray(payload?.data) ? payload.data : []
-    const scored = []
-    for (const row of rows) {
-      const symbol = String(row?.slug || row?.asset_name || '').trim()
-      // ستون «تغییر» روی جدول دارایی‌های شاخص — نه درصد تغییر
-      const change = parseNum(row?.real_close_price_change)
-      if (!symbol || change == null) continue
-      scored.push({ symbol, impact: Math.round(change * 10) / 10 })
-    }
-    const pos = scored.filter((r) => r.impact > 0).sort((a, b) => b.impact - a.impact).slice(0, 5)
-    const neg = scored.filter((r) => r.impact < 0).sort((a, b) => a.impact - b.impact).slice(0, 5)
-    return {
-      ok: Boolean(pos.length || neg.length),
-      source: 'rahavard365-ifb-index',
-      ifbPos: pos,
-      ifbNeg: neg,
-      universe: scored.length,
-    }
-  } catch (e) {
-    return { ok: false, source: 'rahavard365-ifb-index', error: String(e), ifbPos: [], ifbNeg: [] }
-  }
-}
-
-async function scrapeSourceArena(token) {
-  const tok = (token || '').trim()
-  if (!tok) return { ok: false, error: 'SOURCEARENA_TOKEN missing' }
-
-  // فقط «در یک نگاه» برای ارزش بازار — all/ind را کم صدا بزن تا سقف روزانه نخورد
-  const [bourseRes, ifbRes] = await Promise.allSettled([
-    fetchJsonRetry(`${SOURCEARENA_API}?token=${encodeURIComponent(tok)}&market=market_bourse`),
-    fetchJsonRetry(`${SOURCEARENA_API}?token=${encodeURIComponent(tok)}&market=market_farabourse`),
-  ])
-
-  if (bourseRes.status !== 'fulfilled' || ifbRes.status !== 'fulfilled') {
-    const err =
-      (bourseRes.status === 'rejected' && String(bourseRes.reason)) ||
-      (ifbRes.status === 'rejected' && String(ifbRes.reason)) ||
-      'sourcearena failed'
-    return { ok: false, error: err }
-  }
-
-  if (bourseRes.value?.Error) return { ok: false, error: String(bourseRes.value.Error) }
-  if (ifbRes.value?.Error) return { ok: false, error: String(ifbRes.value.Error) }
-
-  const bourse = bourseRes.value?.bourse
-  const ifb = ifbRes.value?.['fara-bourse']
-  if (!bourse || !ifb) return { ok: false, error: 'unexpected sourcearena payload' }
-
-  const bMv = toHmt(parseBillionRial(bourse.market_value))
-  const fMv = toHmt(parseBillionRial(ifb.market_value))
-  const bTr = toHmt(parseBillionRial(bourse.trade_value))
-  const fTr = toHmt(parseBillionRial(ifb.trade_value))
-  if (bMv == null || fMv == null) return { ok: false, error: 'missing market_value' }
-
-  let totalTrade = null
-  let tradeSource = null
-  if (bTr != null && fTr != null && fTr <= Math.max(bTr * 4, 80)) {
-    totalTrade = Math.round((bTr + fTr) * 100) / 100
-    tradeSource = 'sourcearena-bourse+ifb'
-  } else if (bTr != null) {
-    totalTrade = bTr
-    tradeSource = 'sourcearena-bourse-only'
-  }
-
-  return {
-    ok: true,
-    source: 'sourcearena',
-    bourseMarketValueHmt: bMv,
-    ifbMarketValueHmt: fMv,
-    totalMarketValueHmt: Math.round((bMv + fMv) * 10) / 10,
-    totalTradeValueHmt: totalTrade,
-    totalTradeValueSource: tradeSource,
-    marketValueSource: 'sourcearena-bourse+ifb',
-    impacts: null,
-    impactsFromSourceArena: false,
-    topTrades: [],
-    topTradesSource: null,
-    bourseRaw: bourse,
-    ifbRaw: ifb,
-  }
-}
-
-const SA_GLANCE_CACHE_URL = 'https://pulse-cache.internal/sourcearena-glance-v1'
-
-async function loadSaGlanceCache(cache) {
-  try {
-    if (!cache) return null
-    const hit = await cache.match(SA_GLANCE_CACHE_URL)
-    if (!hit) return null
-    const json = await hit.json()
-    return json && typeof json === 'object' ? json : null
-  } catch {
-    return null
-  }
-}
-
-async function saveSaGlanceCache(cache, glance, dateJalali) {
-  if (!cache || !glance?.ok) return
-  try {
-    await cache.put(
-      SA_GLANCE_CACHE_URL,
-      new Response(
-        JSON.stringify({
-          ...glance,
-          dateJalali: dateJalali || null,
-          cachedAt: new Date().toISOString(),
-        }),
-        {
-          headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=86400' },
-        },
-      ),
-    )
-  } catch {
-    /* ignore */
-  }
-}
-
-/** Board-derived MV/TV when SourceArena is rate-limited. */
-function computeBoardMarketStats(stocks) {
-  const equities = (stocks || []).filter((s) => !s.marketFa || s.marketFa === 'سهام')
-  const bourse = equities.filter((s) => !(s.flow || '').includes('فرابورس'))
-  const ifb = equities.filter((s) => (s.flow || '').includes('فرابورس'))
-  const bMv = bourse.reduce((a, s) => a + (s.marketValue || 0), 0)
-  const fMv = ifb.reduce((a, s) => a + (s.marketValue || 0), 0)
-  const tradeAll = (stocks || []).reduce((a, s) => a + (s.tradeValue || 0), 0)
-  if (bMv <= 0 && fMv <= 0) return null
-  return {
-    ok: true,
-    bourseMarketValueHmt: Math.round((bMv / RIAL_PER_HEMAT) * 10) / 10,
-    ifbMarketValueHmt: Math.round((fMv / RIAL_PER_HEMAT) * 10) / 10,
-    totalMarketValueHmt: Math.round(((bMv + fMv) / RIAL_PER_HEMAT) * 10) / 10,
-    totalTradeValueHmt: Math.round((tradeAll / RIAL_PER_HEMAT) * 100) / 100,
-    marketValueSource: 'shakhesban-board',
-    totalTradeValueSource: 'shakhesban-board',
-  }
-}
-
-function isFreshMvSnapshot(snap, todayGregorian, todayJalali) {
-  if (!snap || snap.totalMarketValueHmt == null) return false
-  const asOf = snap.asOf || snap.cachedAt || snap.updatedAt
-  if (asOf) {
-    try {
-      const g = new Date(asOf).toLocaleDateString('en-CA', { timeZone: 'Asia/Tehran' })
-      return g === todayGregorian
-    } catch {
-      /* fall through */
-    }
-  }
-  return Boolean(snap.dateJalali && snap.dateJalali === todayJalali)
-}
-
-function applyIndexMove(hmt, changePct) {
-  if (hmt == null || !Number.isFinite(Number(hmt))) return null
-  const pct = Number(changePct)
-  if (!Number.isFinite(pct)) return Math.round(Number(hmt) * 10) / 10
-  return Math.round(Number(hmt) * (1 + pct / 100) * 10) / 10
-}
-
-/**
- * Resolve MV + trade value with fallbacks:
- * SourceArena → today's CF cache → last SA/static adjusted by today's index move → board
- * Trade: prefer live TradersArena over stale snapshots
- */
-function resolveMarketStats({
-  sourcearena,
-  boardStats,
-  tradersPulse,
-  saCache,
-  staticLive,
-  usd,
-  todayJalali,
-  todayGregorian,
-  tedpixChangePct,
-  ifbChangePct,
-}) {
-  let bourseMarketValueHmt = null
-  let ifbMarketValueHmt = null
-  let totalMarketValueHmt = null
-  let totalTradeValueHmt = null
-  let marketValueSource = null
-  let totalTradeValueSource = null
-
-  if (sourcearena?.ok && sourcearena.totalMarketValueHmt != null) {
-    bourseMarketValueHmt = sourcearena.bourseMarketValueHmt
-    ifbMarketValueHmt = sourcearena.ifbMarketValueHmt
-    totalMarketValueHmt = sourcearena.totalMarketValueHmt
-    marketValueSource = sourcearena.marketValueSource || 'sourcearena-bourse+ifb'
-    if (sourcearena.totalTradeValueHmt != null) {
-      totalTradeValueHmt = sourcearena.totalTradeValueHmt
-      totalTradeValueSource = sourcearena.totalTradeValueSource || 'sourcearena'
-    }
-  } else {
-    const baselines = [saCache, staticLive].filter((b) => b && b.totalMarketValueHmt != null)
-    const sameDay = baselines.find((b) => isFreshMvSnapshot(b, todayGregorian, todayJalali))
-    const baseline = sameDay || baselines[0] || null
-
-    if (baseline) {
-      const fromToday = isFreshMvSnapshot(baseline, todayGregorian, todayJalali)
-      if (fromToday) {
-        bourseMarketValueHmt = baseline.bourseMarketValueHmt ?? null
-        ifbMarketValueHmt = baseline.ifbMarketValueHmt ?? null
-        totalMarketValueHmt = baseline.totalMarketValueHmt
-        marketValueSource = `${baseline.marketValueSource || 'sourcearena'}+cache`
-      } else {
-        // Snapshot is from a prior session — move with today's index % so KPI isn't frozen
-        bourseMarketValueHmt = applyIndexMove(baseline.bourseMarketValueHmt, tedpixChangePct)
-        ifbMarketValueHmt = applyIndexMove(baseline.ifbMarketValueHmt, ifbChangePct)
-        if (bourseMarketValueHmt != null && ifbMarketValueHmt != null) {
-          totalMarketValueHmt = Math.round((bourseMarketValueHmt + ifbMarketValueHmt) * 10) / 10
-        } else {
-          totalMarketValueHmt = applyIndexMove(baseline.totalMarketValueHmt, tedpixChangePct)
-        }
-        marketValueSource = `${baseline.marketValueSource || 'sourcearena'}+index-adjusted`
-      }
-      if (baseline.totalTradeValueHmt != null) {
-        totalTradeValueHmt = baseline.totalTradeValueHmt
-        totalTradeValueSource = `${baseline.totalTradeValueSource || 'sourcearena'}+${fromToday ? 'cache' : 'stale'}`
-      }
-    } else if (boardStats?.ok) {
-      bourseMarketValueHmt = boardStats.bourseMarketValueHmt
-      ifbMarketValueHmt = boardStats.ifbMarketValueHmt
-      totalMarketValueHmt = boardStats.totalMarketValueHmt
-      marketValueSource = boardStats.marketValueSource
-    }
-  }
-
-  // Live trade value from TradersArena (same poll as pulse) when SA trade missing
-  if (totalTradeValueHmt == null && tradersPulse?.totalTradeValueHmt != null) {
-    totalTradeValueHmt = tradersPulse.totalTradeValueHmt
-    totalTradeValueSource = 'tradersarena'
-  } else if (totalTradeValueHmt == null && boardStats?.totalTradeValueHmt != null) {
-    totalTradeValueHmt = boardStats.totalTradeValueHmt
-    totalTradeValueSource = boardStats.totalTradeValueSource
-  }
-
-  // Prefer fresher TA trade over stale SA cache / deployed snapshot for "today"
-  if (
-    tradersPulse?.totalTradeValueHmt != null &&
-    (totalTradeValueSource || '').match(/cache|deployed|static|stale/)
-  ) {
-    totalTradeValueHmt = tradersPulse.totalTradeValueHmt
-    totalTradeValueSource = 'tradersarena'
-  }
-
-  let totalMarketValueUsdM = null
-  if (totalMarketValueHmt != null && usd > 0) {
-    totalMarketValueUsdM = Math.round((totalMarketValueHmt * RIAL_PER_HEMAT) / usd / 1e6)
-  }
-
-  return {
-    bourseMarketValueHmt,
-    ifbMarketValueHmt,
-    totalMarketValueHmt,
-    totalTradeValueHmt,
-    totalMarketValueUsdM,
-    marketValueSource,
-    totalTradeValueSource,
-  }
-}
-
-function mergeImpacts(rahavard, board, arena, _rahavardIfb) {
-  const out = { boursePos: [], bourseNeg: [], ifbPos: [], ifbNeg: [] }
-  const sources = []
+      neg:…3698 tokens truncated… = []
   if (rahavard?.ok) {
     out.boursePos = rahavard.boursePos || []
     out.bourseNeg = rahavard.bourseNeg || []
     sources.push('rahavard365')
   }
-  // Rahavard's IFB endpoint exposes price changes, not index-point effects.
-  // The Farabourse panels below therefore use the board calculation.
+  // Rahavard's IFB endpoint returns price changes, not index-point effects.
+  // Leave Farabourse slots to the board calculation below.
   if (arena?.impacts) {
     if (!out.boursePos.length) out.boursePos = arena.impacts.boursePos || []
     if (!out.bourseNeg.length) out.bourseNeg = arena.impacts.bourseNeg || []
     if (!out.ifbPos.length) out.ifbPos = arena.impacts.ifbPos || []
     if (!out.ifbNeg.length) out.ifbNeg = arena.impacts.ifbNeg || []
     sources.push('sourcearena')
+  }
+  // TSETMC is authoritative for IFB impact ordering and values.
+  if (tsetmcIfb?.ok) {
+    out.ifbPos = tsetmcIfb.ifbPos || []
+    out.ifbNeg = tsetmcIfb.ifbNeg || []
+    sources.push('tsetmc-ifb-effect')
   }
   if (board) {
     if (!out.boursePos.length) out.boursePos = board.boursePos || []
@@ -894,18 +562,18 @@ function mergeImpacts(rahavard, board, arena, _rahavardIfb) {
 }
 
 const JALALI_MONTHS = {
-  فروردین: 1,
-  اردیبهشت: 2,
-  خرداد: 3,
-  تیر: 4,
-  مرداد: 5,
-  شهریور: 6,
-  مهر: 7,
-  آبان: 8,
-  آذر: 9,
-  دی: 10,
-  بهمن: 11,
-  اسفند: 12,
+  ÙØ±ÙˆØ±Ø¯ÛŒÙ†: 1,
+  Ø§Ø±Ø¯ÛŒØ¨Ù‡Ø´Øª: 2,
+  Ø®Ø±Ø¯Ø§Ø¯: 3,
+  ØªÛŒØ±: 4,
+  Ù…Ø±Ø¯Ø§Ø¯: 5,
+  Ø´Ù‡Ø±ÛŒÙˆØ±: 6,
+  Ù…Ù‡Ø±: 7,
+  Ø¢Ø¨Ø§Ù†: 8,
+  Ø¢Ø°Ø±: 9,
+  Ø¯ÛŒ: 10,
+  Ø¨Ù‡Ù…Ù†: 11,
+  Ø§Ø³ÙÙ†Ø¯: 12,
 }
 
 function parseJalaliDate(raw) {
@@ -922,7 +590,7 @@ function parseJalaliDate(raw) {
     }
   }
   m = s.match(
-    /^(\d{1,2})\s*(فروردین|اردیبهشت|خرداد|تیر|مرداد|شهریور|مهر|آبان|آذر|دی|بهمن|اسفند)\s*(\d{4})$/,
+    /^(\d{1,2})\s*(ÙØ±ÙˆØ±Ø¯ÛŒÙ†|Ø§Ø±Ø¯ÛŒØ¨Ù‡Ø´Øª|Ø®Ø±Ø¯Ø§Ø¯|ØªÛŒØ±|Ù…Ø±Ø¯Ø§Ø¯|Ø´Ù‡Ø±ÛŒÙˆØ±|Ù…Ù‡Ø±|Ø¢Ø¨Ø§Ù†|Ø¢Ø°Ø±|Ø¯ÛŒ|Ø¨Ù‡Ù…Ù†|Ø§Ø³ÙÙ†Ø¯)\s*(\d{4})$/,
   )
   if (!m) return null
   const d = Number(m[1])
@@ -937,22 +605,22 @@ function parseJalaliDate(raw) {
 function parseParsistahlilHtml(html, cid, url) {
   const text = stripHtml(html.replace(/<script[\s\S]*?<\/script>/g, ' '))
   let retail = null
-  let m = text.match(/معاملات\s*#?خرد[\s\S]{0,80}?مبلغ\s*([\d,]+)\s*میلیارد/) || text.match(/مبلغ\s*([\d,]+)\s*میلیارد تومان بود/)
+  let m = text.match(/Ù…Ø¹Ø§Ù…Ù„Ø§Øª\s*#?Ø®Ø±Ø¯[\s\S]{0,80}?Ù…Ø¨Ù„Øº\s*([\d,]+)\s*Ù…ÛŒÙ„ÛŒØ§Ø±Ø¯/) || text.match(/Ù…Ø¨Ù„Øº\s*([\d,]+)\s*Ù…ÛŒÙ„ÛŒØ§Ø±Ø¯ ØªÙˆÙ…Ø§Ù† Ø¨ÙˆØ¯/)
   if (m) retail = parseNum(m[1])
 
   let totalTrades = null
-  m = text.match(/ارزش کل معاملات امروز بازار\s*([\d,]+)\s*میلیارد/)
+  m = text.match(/Ø§Ø±Ø²Ø´ Ú©Ù„ Ù…Ø¹Ø§Ù…Ù„Ø§Øª Ø§Ù…Ø±ÙˆØ² Ø¨Ø§Ø²Ø§Ø±\s*([\d,]+)\s*Ù…ÛŒÙ„ÛŒØ§Ø±Ø¯/)
   if (m) totalTrades = parseNum(m[1])
 
   let flow = null
-  m = text.match(/مبلغ\s*([\d,]+)\s*میلیارد تومان\s*(ورود|خروج)\s*حقیقی/)
+  m = text.match(/Ù…Ø¨Ù„Øº\s*([\d,]+)\s*Ù…ÛŒÙ„ÛŒØ§Ø±Ø¯ ØªÙˆÙ…Ø§Ù†\s*(ÙˆØ±ÙˆØ¯|Ø®Ø±ÙˆØ¬)\s*Ø­Ù‚ÛŒÙ‚ÛŒ/)
   if (m) {
     flow = parseNum(m[1])
-    if (flow != null) flow = m[2] === 'خروج' ? -Math.abs(flow) : Math.abs(flow)
+    if (flow != null) flow = m[2] === 'Ø®Ø±ÙˆØ¬' ? -Math.abs(flow) : Math.abs(flow)
   }
 
   let dateJalaliRaw = null
-  m = text.match(/مورخ\s*(\d{1,2}\s*[\u0600-\u06FF]+\s*\d{4}|\d{4}\/\d{2}\/\d{2})/)
+  m = text.match(/Ù…ÙˆØ±Ø®\s*(\d{1,2}\s*[\u0600-\u06FF]+\s*\d{4}|\d{4}\/\d{2}\/\d{2})/)
   if (m) dateJalaliRaw = m[1].trim()
   const parsed = parseJalaliDate(dateJalaliRaw)
   if (retail == null && flow == null) return null
@@ -1079,7 +747,7 @@ function mergeMoneyFlowStore(store, days) {
   return { store: next, added }
 }
 
-const OVERVIEW_CACHE_URL = 'https://pulse-cache.internal/midco-overview-v2'
+const OVERVIEW_CACHE_URL = 'https://pulse-cache.internal/midco-overview-v3'
 const OVERVIEW_CACHE_TTL_MS = 45_000
 
 export async function onRequestGet(context) {
@@ -1137,13 +805,14 @@ export async function onRequestGet(context) {
     fetchEquityFundSymbolSet(),
     scrapeRahavardIfbMovers(),
     fetchTsetmcMarketSummary(),
+    fetchTsetmcIfbEffects(),
   ])
 
   if (tasks[0].status === 'fulfilled') {
     const current = tasks[0].value.current || {}
     quotes = {
-      bourse: tgjuQuote(current.bourse, 'bourse', 'شاخص کل بورس'),
-      price_dollar_rl: tgjuQuote(current.price_dollar_rl, 'price_dollar_rl', 'دلار آزاد'),
+      bourse: tgjuQuote(current.bourse, 'bourse', 'Ø´Ø§Ø®Øµ Ú©Ù„ Ø¨ÙˆØ±Ø³'),
+      price_dollar_rl: tgjuQuote(current.price_dollar_rl, 'price_dollar_rl', 'Ø¯Ù„Ø§Ø± Ø¢Ø²Ø§Ø¯'),
     }
   } else errors.push(`tgju: ${tasks[0].reason}`)
 
@@ -1199,6 +868,13 @@ export async function onRequestGet(context) {
     errors.push(`tsetmc-overview: ${tasks[14].reason}`)
   }
 
+  let tsetmcIfb = { ok: false }
+  if (tasks[15].status === 'fulfilled') {
+    tsetmcIfb = tasks[15].value
+  } else if (tasks[15].status === 'rejected') {
+    errors.push(`tsetmc-ifb-effects: ${tasks[15].reason}`)
+  }
+
   let boardRows = []
   if (tasks[7].status === 'fulfilled') {
     boardRows = tasks[7].value || []
@@ -1234,14 +910,14 @@ export async function onRequestGet(context) {
     topTradesSource = liveTop.topTradesSource
   } catch (e) {
     errors.push(`top-trades: ${e}`)
-    // last-resort: board equities only (may be stale/wrong — better than empty)
-    const fallbackRows = boardRows.filter((s) => (!s.marketFa || s.marketFa === 'سهام') && s.tradeValue > 0)
+    // last-resort: board equities only (may be stale/wrong â€” better than empty)
+    const fallbackRows = boardRows.filter((s) => (!s.marketFa || s.marketFa === 'Ø³Ù‡Ø§Ù…') && s.tradeValue > 0)
     topTrades = buildTopTradesFromBoard(fallbackRows, equityFundSet, TOP_TRADES_LIMIT)
     topTradesSource = topTrades.length ? 'shakhesban-board-fallback' : null
   }
 
   const boardImpacts = boardRows.length ? computeBoardImpacts(boardRows, indices) : null
-  const mergedImpacts = mergeImpacts(rahavard, boardImpacts, sourcearena, rahavardIfb)
+  const mergedImpacts = mergeImpacts(rahavard, boardImpacts, sourcearena, tsetmcIfb)
   // fill gaps from deployed cache
   if (mergedImpacts.impacts && impactsCache) {
     for (const k of ['boursePos', 'bourseNeg', 'ifbPos', 'ifbNeg']) {
@@ -1298,7 +974,8 @@ export async function onRequestGet(context) {
     tedpixChangePct: tedpix?.changePct,
     ifbChangePct: indices?.ifb?.changePct,
   })
-  // Official TSETMC values take priority for market capitalization.
+  // Official TSETMC values take priority for market capitalization. TradersArena
+  // remains the primary display source for TEDPIX and equal-weight index.
   if (tsetmcSummary?.ok) {
     const bMv = tsetmcSummary.bourseMarketValueHmt
     const fMv = tsetmcSummary.ifbMarketValueHmt
@@ -1333,7 +1010,7 @@ export async function onRequestGet(context) {
       ifb:
         tsetmcSummary?.ifb?.index != null
           ? {
-              name: 'شاخص کل فرابورس',
+              name: 'Ø´Ø§Ø®Øµ Ú©Ù„ ÙØ±Ø§Ø¨ÙˆØ±Ø³',
               value: tsetmcSummary.ifb.index,
               change: tsetmcSummary.ifb.indexChange || 0,
               changePct:
@@ -1346,7 +1023,7 @@ export async function onRequestGet(context) {
     },
     intraday: {
       source: 'tgju-today-table',
-      note: 'مسیر روزانه TGJU (رزولوشن چنددقیقه‌ای).',
+      note: 'Ù…Ø³ÛŒØ± Ø±ÙˆØ²Ø§Ù†Ù‡ TGJU (Ø±Ø²ÙˆÙ„ÙˆØ´Ù† Ú†Ù†Ø¯Ø¯Ù‚ÛŒÙ‚Ù‡â€ŒØ§ÛŒ).',
       points: intraday,
     },
     sourcearena,
@@ -1398,3 +1075,4 @@ export async function onRequestGet(context) {
   }
   return response
 }
+

@@ -25,10 +25,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Generate BourseView-only snapshots
-        run: |
-          node scripts/fetch_bourseview_snapshots.mjs
-          node scripts/fetch_production.mjs
-          node scripts/fetch_financials.mjs
+        run: node scripts/fetch_bourseview_snapshots.mjs
         env:
           BOURSEVIEW_COOKIE: ${{ secrets.BOURSEVIEW_COOKIE_V3 }}
       - run: npm run build

@@ -495,7 +495,7 @@ function computeBoardImpacts(stocks, indices, maxMove = 0.22) {
   }
 
   const b = build(bourse, indexB, totalB, false)
-  const f = build(ifb, indexF, totalF, true)
+  const f = build(ifb, indexF, totalF, false)
   return {
     boursePos: b.pos,
     bourseNeg: b.neg,

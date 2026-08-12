@@ -598,20 +598,20 @@
     },
     {
       "time": "12:50",
-      "positive": 613,
-      "negative": 215,
-      "flat": 94,
-      "orderBuy": 10142.4,
-      "orderSell": 555.4,
-      "retailFlow": 2505.7,
-      "flowStocks": 2389.6,
-      "flowEquityFunds": -572.6,
-      "flowFixedIncome": 688.6,
+      "positive": 606,
+      "negative": 217,
+      "flat": 92,
+      "orderBuy": 8481.7,
+      "orderSell": 502.3,
+      "retailFlow": 5657.6,
+      "flowStocks": 2465.6,
+      "flowEquityFunds": -560.4,
+      "flowFixedIncome": 3752.3,
       "flowBasicMetals": 71.1,
       "flowMetalOres": 551.8,
-      "flowGoldFunds": 429.3,
-      "perCapitaBuy": 96.31,
-      "perCapitaSell": 71.48
+      "flowGoldFunds": 703.2,
+      "perCapitaBuy": 108.16,
+      "perCapitaSell": 74.48
     },
     {
       "time": "12:55",
@@ -2216,20 +2216,20 @@
       },
       {
         "time": "12:50",
-        "positive": 613,
-        "negative": 215,
-        "flat": 94,
-        "orderBuy": 10142.4,
-        "orderSell": 555.4,
-        "retailFlow": 2505.7,
-        "flowStocks": 2389.6,
-        "flowEquityFunds": -572.6,
-        "flowFixedIncome": 688.6,
+        "positive": 606,
+        "negative": 217,
+        "flat": 92,
+        "orderBuy": 8481.7,
+        "orderSell": 502.3,
+        "retailFlow": 5657.6,
+        "flowStocks": 2465.6,
+        "flowEquityFunds": -560.4,
+        "flowFixedIncome": 3752.3,
         "flowBasicMetals": 71.1,
         "flowMetalOres": 551.8,
-        "flowGoldFunds": 429.3,
-        "perCapitaBuy": 96.31,
-        "perCapitaSell": 71.48
+        "flowGoldFunds": 703.2,
+        "perCapitaBuy": 108.16,
+        "perCapitaSell": 74.48
       },
       {
         "time": "12:55",
@@ -2268,8 +2268,8 @@
     ]
   },
   "current": {
-    "asOf": "2026-08-12T09:15:03.037501+00:00",
-    "time": "12:45",
+    "asOf": "2026-08-12T09:20:03.163294+00:00",
+    "time": "12:50",
     "dateJalali": "1405/05/20",
     "source": "tradersarena",
     "breadth": {
@@ -2292,5 +2292,5 @@
     "perCapitaSellMillionToman": 74.48,
     "note": "داده زنده TradersArena · ورود پول بازار + صنایع"
   },
-  "updatedAt": "2026-08-12T09:15:03.038403+00:00"
+  "updatedAt": "2026-08-12T09:20:03.164127+00:00"
 }

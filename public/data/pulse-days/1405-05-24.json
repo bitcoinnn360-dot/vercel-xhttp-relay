@@ -136,32 +136,49 @@
       "flowGoldFunds": 0.0,
       "perCapitaBuy": 87.4,
       "perCapitaSell": 129.88
+    },
+    {
+      "time": "09:50",
+      "positive": 392,
+      "negative": 385,
+      "flat": 126,
+      "orderBuy": 12110.6,
+      "orderSell": 3978.5,
+      "retailFlow": -4020.9,
+      "flowStocks": -1502.2,
+      "flowEquityFunds": -676.5,
+      "flowFixedIncome": -1842.3,
+      "flowBasicMetals": -16.4,
+      "flowMetalOres": 247.5,
+      "flowGoldFunds": 0.0,
+      "perCapitaBuy": 89.98,
+      "perCapitaSell": 130.67
     }
   ],
   "current": {
-    "asOf": "2026-08-15T06:15:02.342201+00:00",
-    "time": "09:45",
+    "asOf": "2026-08-15T06:20:01.907851+00:00",
+    "time": "09:50",
     "dateJalali": "1405/05/24",
     "source": "tradersarena",
     "breadth": {
-      "positive": 376,
-      "negative": 401,
-      "flat": 127,
-      "total": 904
+      "positive": 392,
+      "negative": 385,
+      "flat": 126,
+      "total": 903
     },
-    "orderBuyBillionToman": 12026.0,
-    "orderSellBillionToman": 4552.8,
-    "retailMoneyFlowBillionToman": -3848.1,
-    "equityRetailMoneyFlowBillionToman": -2132.8,
-    "flowStocksBillionToman": -1510.4,
-    "flowEquityFundsBillionToman": -622.4,
-    "flowFixedIncomeBillionToman": -1715.3,
+    "orderBuyBillionToman": 12110.6,
+    "orderSellBillionToman": 3978.5,
+    "retailMoneyFlowBillionToman": -4020.9,
+    "equityRetailMoneyFlowBillionToman": -2178.7,
+    "flowStocksBillionToman": -1502.2,
+    "flowEquityFundsBillionToman": -676.5,
+    "flowFixedIncomeBillionToman": -1842.3,
     "flowBasicMetalsBillionToman": -16.4,
     "flowMetalOresBillionToman": 247.5,
     "flowGoldFundsBillionToman": 0.0,
-    "perCapitaBuyMillionToman": 87.4,
-    "perCapitaSellMillionToman": 129.88,
+    "perCapitaBuyMillionToman": 89.98,
+    "perCapitaSellMillionToman": 130.67,
     "note": "داده زنده TradersArena · ورود پول بازار + صنایع"
   },
-  "updatedAt": "2026-08-15T06:15:02.343160+00:00"
+  "updatedAt": "2026-08-15T06:20:01.908766+00:00"
 }

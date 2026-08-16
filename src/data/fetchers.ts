@@ -1698,7 +1698,9 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
     ])
 
   const liveCount = applyLiveQuotes(base, current)
-  // market.json is a deploy-time fallback: never use its headline values because\n  // it can roll the live market view back by hours. Keep only its candle history.\n  const overviewLiveOk = applyOverviewLive(base, undefined, scraped?.candles1401)
+  // market.json is a deploy-time fallback: never use its headline values because
+  // it can roll the live market view back by hours. Keep only its candle history.
+  const overviewLiveOk = applyOverviewLive(base, undefined, scraped?.candles1401)
   const freshOk = applyFreshOverview(base, overviewApi, intradayFallback)
   const mineralStockRows = stocksApi?.stocks?.length ? stocksApi.stocks : null
   if (mineralStockRows) applyMineralStockReturns(base, mineralStockRows)

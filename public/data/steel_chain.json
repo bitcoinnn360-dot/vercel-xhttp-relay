@@ -1,10 +1,10 @@
 {
-  "updatedAt": "2026-08-16T11:32:58.731580+00:00",
+  "updatedAt": "2026-07-30T09:17:11.335053+00:00",
   "ok": true,
   "custeelOk": true,
   "imeOk": false,
-  "cnyUsd": 0.14831676,
-  "usdIrr": 1860200.0,
+  "cnyUsd": 0.14766665,
+  "usdIrr": 1926000.0,
   "steel": [
     {
       "id": "seaborne62",
@@ -162,10 +162,10 @@
   "imeChain": [],
   "inventories": {
     "label": "موجودی انبار سنگ‌آهن بنادر چین",
-    "value": 173930.0,
-    "wowChange": 840.0,
+    "value": 170550.0,
+    "wowChange": 420.0,
     "unit": "هزار تن",
-    "asOf": "2026-08-07",
+    "asOf": "2026-07-24",
     "source": "custeel-port-stocks-article"
   },
   "bfRate": {
@@ -179,117 +179,573 @@
   },
   "billetStocks": {
     "label": "موجودی بیلت تانگشان",
-    "value": 1529.0,
-    "wowChange": -142.0,
+    "value": 1782.0,
+    "wowChange": -35.0,
     "unit": "هزار تن",
     "source": "custeel-indicator"
   },
   "histories": {
     "pb61": [
       {
-        "date": "2026-08-14",
-        "value": 82.4
+        "date": "2026-07-03",
+        "value": 89.9
+      },
+      {
+        "date": "2026-07-06",
+        "value": 87.2
+      },
+      {
+        "date": "2026-07-07",
+        "value": 88.0
+      },
+      {
+        "date": "2026-07-08",
+        "value": 89.7
+      },
+      {
+        "date": "2026-07-09",
+        "value": 90.7
+      },
+      {
+        "date": "2026-07-10",
+        "value": 90.2
+      },
+      {
+        "date": "2026-07-13",
+        "value": 90.7
+      },
+      {
+        "date": "2026-07-14",
+        "value": 90.0
+      },
+      {
+        "date": "2026-07-15",
+        "value": 88.5
+      },
+      {
+        "date": "2026-07-16",
+        "value": 88.8
+      },
+      {
+        "date": "2026-07-17",
+        "value": 88.3
+      },
+      {
+        "date": "2026-07-20",
+        "value": 88.2
+      },
+      {
+        "date": "2026-07-21",
+        "value": 89.7
+      },
+      {
+        "date": "2026-07-22",
+        "value": 88.3
+      },
+      {
+        "date": "2026-07-23",
+        "value": 86.8
+      },
+      {
+        "date": "2026-07-24",
+        "value": 86.8
+      },
+      {
+        "date": "2026-07-27",
+        "value": 86.9
+      },
+      {
+        "date": "2026-07-28",
+        "value": 86.9
+      },
+      {
+        "date": "2026-07-29",
+        "value": 86.8
+      },
+      {
+        "date": "2026-07-30",
+        "value": 87.0
       }
     ],
     "brbf": [
       {
-        "date": "2026-08-14",
-        "value": 66.2
+        "date": "2026-07-03",
+        "value": 77.3
+      },
+      {
+        "date": "2026-07-06",
+        "value": 75.2
+      },
+      {
+        "date": "2026-07-07",
+        "value": 75.9
+      },
+      {
+        "date": "2026-07-08",
+        "value": 75.6
+      },
+      {
+        "date": "2026-07-09",
+        "value": 76.6
+      },
+      {
+        "date": "2026-07-10",
+        "value": 74.3
+      },
+      {
+        "date": "2026-07-13",
+        "value": 74.8
+      },
+      {
+        "date": "2026-07-14",
+        "value": 74.0
+      },
+      {
+        "date": "2026-07-15",
+        "value": 73.5
+      },
+      {
+        "date": "2026-07-16",
+        "value": 74.0
+      },
+      {
+        "date": "2026-07-17",
+        "value": 73.5
+      },
+      {
+        "date": "2026-07-20",
+        "value": 74.5
+      },
+      {
+        "date": "2026-07-21",
+        "value": 74.9
+      },
+      {
+        "date": "2026-07-22",
+        "value": 73.1
+      },
+      {
+        "date": "2026-07-23",
+        "value": 70.9
+      },
+      {
+        "date": "2026-07-24",
+        "value": 70.9
+      },
+      {
+        "date": "2026-07-28",
+        "value": 70.6
+      },
+      {
+        "date": "2026-07-29",
+        "value": 71.0
+      },
+      {
+        "date": "2026-07-30",
+        "value": 70.9
       }
     ],
     "br_pellet": [
       {
-        "date": "2026-08-14",
-        "value": 90.5
+        "date": "2026-07-03",
+        "value": 96.5
+      },
+      {
+        "date": "2026-07-06",
+        "value": 94.1
+      },
+      {
+        "date": "2026-07-07",
+        "value": 94.8
+      },
+      {
+        "date": "2026-07-08",
+        "value": 94.5
+      },
+      {
+        "date": "2026-07-09",
+        "value": 95.8
+      },
+      {
+        "date": "2026-07-10",
+        "value": 93.7
+      },
+      {
+        "date": "2026-07-13",
+        "value": 94.6
+      },
+      {
+        "date": "2026-07-14",
+        "value": 95.0
+      },
+      {
+        "date": "2026-07-15",
+        "value": 95.0
+      },
+      {
+        "date": "2026-07-16",
+        "value": 96.6
+      },
+      {
+        "date": "2026-07-17",
+        "value": 96.1
+      },
+      {
+        "date": "2026-07-20",
+        "value": 97.0
+      },
+      {
+        "date": "2026-07-21",
+        "value": 97.5
+      },
+      {
+        "date": "2026-07-22",
+        "value": 96.0
+      },
+      {
+        "date": "2026-07-23",
+        "value": 93.9
+      },
+      {
+        "date": "2026-07-24",
+        "value": 93.9
+      },
+      {
+        "date": "2026-07-28",
+        "value": 94.0
+      },
+      {
+        "date": "2026-07-29",
+        "value": 93.9
+      },
+      {
+        "date": "2026-07-30",
+        "value": 94.0
       }
     ],
     "iran_conc": [
       {
-        "date": "2026-08-14",
-        "value": 95.5
+        "date": "2026-07-03",
+        "value": 98.0
+      },
+      {
+        "date": "2026-07-06",
+        "value": 97.8
+      },
+      {
+        "date": "2026-07-07",
+        "value": 98.3
+      },
+      {
+        "date": "2026-07-08",
+        "value": 98.0
+      },
+      {
+        "date": "2026-07-09",
+        "value": 99.2
+      },
+      {
+        "date": "2026-07-10",
+        "value": 99.0
+      },
+      {
+        "date": "2026-07-13",
+        "value": 99.8
+      },
+      {
+        "date": "2026-07-14",
+        "value": 99.0
+      },
+      {
+        "date": "2026-07-15",
+        "value": 100.7
+      },
+      {
+        "date": "2026-07-16",
+        "value": 101.0
+      },
+      {
+        "date": "2026-07-17",
+        "value": 100.7
+      },
+      {
+        "date": "2026-07-20",
+        "value": 100.8
+      },
+      {
+        "date": "2026-07-21",
+        "value": 100.3
+      },
+      {
+        "date": "2026-07-22",
+        "value": 99.3
+      },
+      {
+        "date": "2026-07-23",
+        "value": 98.2
+      },
+      {
+        "date": "2026-07-24",
+        "value": 99.3
+      },
+      {
+        "date": "2026-07-27",
+        "value": 99.5
+      },
+      {
+        "date": "2026-07-28",
+        "value": 99.2
+      },
+      {
+        "date": "2026-07-29",
+        "value": 99.2
+      },
+      {
+        "date": "2026-07-30",
+        "value": 99.1
       }
     ],
     "iran_hem": [
       {
-        "date": "2026-08-14",
-        "value": 62.2
+        "date": "2026-07-03",
+        "value": 66.2
+      },
+      {
+        "date": "2026-07-06",
+        "value": 66.0
+      },
+      {
+        "date": "2026-07-07",
+        "value": 66.7
+      },
+      {
+        "date": "2026-07-08",
+        "value": 66.4
+      },
+      {
+        "date": "2026-07-09",
+        "value": 67.5
+      },
+      {
+        "date": "2026-07-10",
+        "value": 67.0
+      },
+      {
+        "date": "2026-07-13",
+        "value": 67.5
+      },
+      {
+        "date": "2026-07-14",
+        "value": 66.7
+      },
+      {
+        "date": "2026-07-15",
+        "value": 68.2
+      },
+      {
+        "date": "2026-07-16",
+        "value": 68.5
+      },
+      {
+        "date": "2026-07-17",
+        "value": 68.0
+      },
+      {
+        "date": "2026-07-20",
+        "value": 67.9
+      },
+      {
+        "date": "2026-07-21",
+        "value": 67.3
+      },
+      {
+        "date": "2026-07-22",
+        "value": 66.0
+      },
+      {
+        "date": "2026-07-23",
+        "value": 64.5
+      },
+      {
+        "date": "2026-07-24",
+        "value": 65.5
+      },
+      {
+        "date": "2026-07-27",
+        "value": 65.6
+      },
+      {
+        "date": "2026-07-28",
+        "value": 65.6
+      },
+      {
+        "date": "2026-07-29",
+        "value": 65.5
+      },
+      {
+        "date": "2026-07-30",
+        "value": 65.7
       }
     ],
     "chile_conc": [
       {
-        "date": "2026-08-14",
-        "value": 76.5
+        "date": "2026-07-03",
+        "value": 80.2
+      },
+      {
+        "date": "2026-07-06",
+        "value": 80.0
+      },
+      {
+        "date": "2026-07-07",
+        "value": 80.5
+      },
+      {
+        "date": "2026-07-08",
+        "value": 80.2
+      },
+      {
+        "date": "2026-07-09",
+        "value": 81.5
+      },
+      {
+        "date": "2026-07-10",
+        "value": 81.3
+      },
+      {
+        "date": "2026-07-13",
+        "value": 82.1
+      },
+      {
+        "date": "2026-07-14",
+        "value": 81.3
+      },
+      {
+        "date": "2026-07-15",
+        "value": 83.0
+      },
+      {
+        "date": "2026-07-16",
+        "value": 83.3
+      },
+      {
+        "date": "2026-07-17",
+        "value": 83.0
+      },
+      {
+        "date": "2026-07-20",
+        "value": 83.1
+      },
+      {
+        "date": "2026-07-21",
+        "value": 82.6
+      },
+      {
+        "date": "2026-07-22",
+        "value": 81.6
+      },
+      {
+        "date": "2026-07-23",
+        "value": 80.5
+      },
+      {
+        "date": "2026-07-24",
+        "value": 81.6
+      },
+      {
+        "date": "2026-07-27",
+        "value": 81.7
+      },
+      {
+        "date": "2026-07-28",
+        "value": 81.4
+      },
+      {
+        "date": "2026-07-29",
+        "value": 81.4
+      },
+      {
+        "date": "2026-07-30",
+        "value": 81.3
       }
     ],
     "rebar_beijing": [
       {
-        "date": "2026-08-14",
-        "value": 468.681
+        "date": "2026-07-30",
+        "value": 475.487
+      }
+    ],
+    "tangshan_billet": [
+      {
+        "date": "2026-07-30",
+        "value": 434.14
       }
     ]
   },
   "indicators": [
     {
       "label": "CUSPI",
-      "latest": "3485.72",
-      "change": "3.33"
+      "latest": "3500.90",
+      "change": "-9.44"
     },
     {
       "label": "CSPI",
-      "latest": "90.48",
-      "change": "-0.59"
+      "latest": "92.05",
+      "change": "-0.02"
     },
     {
       "label": "CSI Seaborne Index Fe62%",
-      "latest": "96.30",
-      "change": "-1.20"
+      "latest": "98.90",
+      "change": "0.10"
     },
     {
       "label": "CSI Portside Index Fe62%",
-      "latest": "90.97",
-      "change": "-0.27"
+      "latest": "92.03",
+      "change": "-0.07"
     },
     {
       "label": "China's BF Operating Rate",
-      "latest": "78.86%",
-      "change": "0.18%"
+      "latest": "78.57%",
+      "change": "-0.36%"
     },
     {
       "label": "China's EAF Operating Rate",
-      "latest": "54.83%",
-      "change": "-0.19%"
+      "latest": "56.05%",
+      "change": "0.84%"
     },
     {
       "label": "Operating Rate of China's Domestic Mines",
-      "latest": "63.52%",
-      "change": "-1.17%"
+      "latest": "63.78%",
+      "change": "-2.47%"
     },
     {
       "label": "Operating Rate of China's Coking Plants",
-      "latest": "69.70%",
-      "change": "-0.90%"
+      "latest": "72.95%",
+      "change": "0.11%"
     },
     {
       "label": "Tangshan Billet Stocks (kt)",
-      "latest": "1529",
-      "change": "-142"
+      "latest": "1782",
+      "change": "-35"
     },
     {
       "label": "Iron Ore Stocks at Ports (kt)",
-      "latest": "165930",
-      "change": "960"
+      "latest": "162670",
+      "change": "-50"
     },
     {
       "label": "Coke Stocks in Coking Plants (kt)",
-      "latest": "734",
-      "change": "-110"
+      "latest": "684",
+      "change": "102"
     },
     {
       "label": "Coke Stocks in Mills (kt)",
-      "latest": "4906",
-      "change": "-40"
+      "latest": "5108",
+      "change": "-45"
     }
   ],
-  "imeMeta": {},
+  "imeMeta": {
+    "error": "<urlopen error [Errno 104] Connection reset by peer>"
+  },
   "source": "custeel"
 }

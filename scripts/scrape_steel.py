@@ -1228,6 +1228,11 @@ def merge_steel(base: list[dict], extra: list[dict]) -> list[dict]:
 def main() -> int:
     print("steel chain scrape…")
     client = HttpClient()
+    previous: dict[str, Any] = {}
+    try:
+        previous = json.loads(OUT.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        pass
     cny_usd = fetch_cny_usd()
     usd_irr = fetch_usd_irr()
     print(f"  FX CNY/USD={cny_usd}  USD/IRR={usd_irr}")

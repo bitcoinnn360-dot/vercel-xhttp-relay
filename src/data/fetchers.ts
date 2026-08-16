@@ -1491,7 +1491,12 @@ function applyFinancials(base: DashboardData, bundle: FinancialsBundle | null | 
   return true
 }
 
-async function fetchMineralStocksApi(): Promise<MineralStockSnap[] | null> {
+type MineralStocksApiBundle = {
+  stocks: MineralStockSnap[]
+  served: 'live' | 'snapshot'
+}
+
+async function fetchMineralStocksApi(): Promise<MineralStocksApiBundle | null> {
   const read = async (url: string, ms: number) => {
     const res = await fetchWithTimeout(url, ms, { cache: 'no-store' })
     if (!res.ok) return null
@@ -1500,13 +1505,20 @@ async function fetchMineralStocksApi(): Promise<MineralStockSnap[] | null> {
     const stocks = Array.isArray(json) ? json : json.stocks
     return stocks?.length ? stocks : null
   }
-  // The preview loader handles first paint from a deploy snapshot; full refreshes
-  // must prefer the authenticated API so fresh prices never jump backwards.
+
+  // Live first. The snapshot is only a display fallback for a slow BourseView
+  // response; callers can distinguish it and never overwrite prior live data.
   try {
     const live = await read('/api/stocks', 10_000)
-    if (live) return live
+    if (live) return { stocks: live, served: 'live' }
   } catch {
-    /* fall back to the last verified build snapshot */
+    /* use the last verified build snapshot below */
+  }
+  try {
+    const snapshot = await read('/data/mineral_stocks.json', 2_500)
+    if (snapshot) return { stocks: snapshot, served: 'snapshot' }
+  } catch {
+    /* no usable table */
   }
   return null
 }
@@ -1688,7 +1700,7 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   const liveCount = applyLiveQuotes(base, current)
   // market.json is a deploy-time fallback: never use its headline values because\n  // it can roll the live market view back by hours. Keep only its candle history.\n  const overviewLiveOk = applyOverviewLive(base, undefined, scraped?.candles1401)
   const freshOk = applyFreshOverview(base, overviewApi, intradayFallback)
-  const mineralStockRows = stocksApi?.length ? stocksApi : null
+  const mineralStockRows = stocksApi?.stocks?.length ? stocksApi.stocks : null
   if (mineralStockRows) applyMineralStockReturns(base, mineralStockRows)
   else base.stocks = []
   const steelStatus = applySteelChain(base, steelApi)
@@ -1917,15 +1929,17 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
     sectors: scraped?.sectors || [],
     scrapeMeta: {
       ...(scraped?.meta || {}),
-      stocksLive: Boolean(
-        mineralStockRows?.some(
-          (row) =>
-            row.returnsSource !== 'error' &&
-            ((row.closePrice != null && row.closePrice > 0) ||
-              (row.lastPrice != null && row.lastPrice > 0) ||
-              row.dailyPct != null),
+      stocksLive:
+        stocksApi?.served === 'live' &&
+        Boolean(
+          mineralStockRows?.some(
+            (row) =>
+              row.returnsSource !== 'error' &&
+              ((row.closePrice != null && row.closePrice > 0) ||
+                (row.lastPrice != null && row.lastPrice > 0) ||
+                row.dailyPct != null),
+          ),
         ),
-      ),
       navLive: navOk,
       productionLive: productionOk,
       financialsLive: financialsOk,
@@ -1971,7 +1985,7 @@ export async function loadBourseViewPreview(): Promise<DashboardData> {
     fetchProductionOpsApi(),
     fetchFinancialsApi(),
   ])
-  if (stocks?.length) applyMineralStockReturns(base, stocks)
+  if (stocks?.stocks?.length) applyMineralStockReturns(base, stocks.stocks)
   applyNavLive(base, nav)
   applyProductionOps(base, production)
   applyFinancials(base, financials)

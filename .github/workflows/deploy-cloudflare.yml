@@ -40,6 +40,14 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           BOURSEVIEW_COOKIE: ${{ secrets.BOURSEVIEW_COOKIE_V4 }}
+      - name: Sync Custeel credentials
+        run: |
+          printf '%s' "$CUSTEEL_USER" | npx wrangler pages secret put CUSTEEL_USER --project-name=arz-digital-dashboard
+          printf '%s' "$CUSTEEL_PASS" | npx wrangler pages secret put CUSTEEL_PASS --project-name=arz-digital-dashboard
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CUSTEEL_USER: ${{ secrets.CUSTEEL_USER }}
+          CUSTEEL_PASS: ${{ secrets.CUSTEEL_PASS }}
       - name: Verify BourseView credential from runner
         run: |
           BV_COOKIE="$BOURSEVIEW_COOKIE"

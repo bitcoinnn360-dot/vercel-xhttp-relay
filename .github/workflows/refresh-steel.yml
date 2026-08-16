@@ -1,0 +1,54 @@
+name: Refresh Custeel steel-chain snapshot
+
+on:
+  schedule:
+    # Weekdays at 11:15 Tehran time (07:45 UTC).
+    - cron: '45 7 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-custeel-steel-chain
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: cursor/fix-index-history-ta-retail-db3c
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch current Custeel data
+        run: python3 scripts/scrape_steel.py
+        env:
+          CUSTEEL_USER: ${{ secrets.CUSTEEL_USER }}
+          CUSTEEL_PASS: ${{ secrets.CUSTEEL_PASS }}
+      - name: Reject an incomplete Custeel snapshot
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('public/data/steel_chain.json').read_text(encoding='utf-8'))
+          rows = data.get('steel') or []
+          histories = data.get('histories') or {}
+          print('custeelOk=', data.get('custeelOk'), 'rows=', len(rows), 'histories=', len(histories))
+          if not data.get('custeelOk') or not rows:
+              raise SystemExit('Custeel did not return a complete snapshot; keeping the last good file')
+          PY
+      - name: Publish updated snapshot
+        run: |
+          if git diff --quiet -- public/data/steel_chain.json; then
+            echo 'No steel-chain change'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/data/steel_chain.json
+          git commit -m 'data: refresh Custeel steel chain'
+          git push origin HEAD:cursor/fix-index-history-ta-retail-db3c

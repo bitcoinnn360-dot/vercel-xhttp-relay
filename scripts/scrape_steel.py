@@ -174,6 +174,9 @@ class HttpClient:
         method: str | None = None,
         attempts: int = 4,
     ) -> bytes:
+        if FAST_MODE:
+            timeout = min(timeout, 10)
+            attempts = 1
         last: Exception | None = None
         for i in range(attempts):
             try:
@@ -553,7 +556,7 @@ def scrape_custeel_fob(client: HttpClient) -> dict[str, Any]:
             continue
         # Parse enough articles for history (newest first)
         per_sid: dict[str, list[tuple[str, float]]] = {sid: [] for sid, _ in items}
-        for idx, (href, title) in enumerate(links[:5] if FAST_MODE else links):
+        for idx, (href, title) in enumerate(links[:1] if FAST_MODE else links):
             url = _abs_custeel(href)
             try:
                 html = _fetch_html(client, url, attempts=8 if idx < 3 else 4)
@@ -655,7 +658,7 @@ def scrape_custeel_domestic(client: HttpClient, cny_usd: float) -> dict[str, Any
             print(f"  domestic {sid}: no article links")
             continue
         pts: list[tuple[str, float, float | None, str]] = []
-        for idx, (href, title) in enumerate(links[:5] if FAST_MODE else links[:20]):
+        for idx, (href, title) in enumerate(links[:1] if FAST_MODE else links[:20]):
             url = _abs_custeel(href)
             try:
                 html = _fetch_html(client, url, attempts=8 if idx < 3 else 4)
@@ -1257,6 +1260,12 @@ def main() -> int:
         source = "ime"
     else:
         source = "none"
+
+    histories = dict(previous.get("histories") or {})
+    for sid, points in (series.get("histories") or {}).items():
+        by_date = {str(p.get("date")): p for p in histories.get(sid, []) if p.get("date")}
+        by_date.update({str(p.get("date")): p for p in points if p.get("date")})
+        histories[sid] = [by_date[d] for d in sorted(by_date)][-180:]
 
     payload = {
         "updatedAt": datetime.now(timezone.utc).isoformat(),

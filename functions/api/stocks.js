@@ -51,8 +51,8 @@ const MINERAL_STOCKS = [
   { name: 'کارخانجات تولیدی شهید قندی', symbol: 'بکام', isin: 'IRO1KGND0001', exchange: 'IRTSENO' },
 ]
 
-const CACHE_TTL_MS = 20 * 60 * 1000
-const CACHE_KEY = 'https://cache.local/mineral-stocks-bv-v11'
+const CACHE_TTL_MS = 2 * 60 * 1000
+const CACHE_KEY = 'https://cache.local/mineral-stocks-bv-v12'
 
 /** Manual share-count overrides when quote history lags capital-increase filings. */
 const OUTSTANDING_SHARES = {

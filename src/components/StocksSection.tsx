@@ -118,7 +118,9 @@ export function StocksSection({ data }: { data: DashboardData }) {
           <h2 className="section-title">وضعیت معاملات سهام معدنی و فلزی ایران</h2>
           <p className="section-sub">
             بورس‌ویو · پایانی / تعدیلی · فولادی+مس = فلزات
-            {liveCount ? ` · ${liveCount} نماد · ورود پول حقیقی ${fmtNum(flowSum, 1)} م‌ت` : ' · در حال دریافت…'}
+            {equities.length
+              ? ` · ${equities.length} نماد · ورود پول حقیقی ${fmtNum(flowSum, 1)} م‌ت${liveCount ? '' : ' · آخرین داده معتبر'}`
+              : ' · در حال دریافت…'}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

@@ -29,6 +29,7 @@ const TA_MAINWATCH_SYMBOLS = 'https://tradersarena.ir/data/mainwatch/symbols'
 const PARSIS_HOME = 'https://parsistahlil.ir/'
 const SOURCEARENA_API = 'https://apis.sourcearena.ir/api/'
 const RAHAVARD_API = 'https://rahavard365.com/api/v2'
+const CHARTIX_TOTAL_MARKET_VALUE = 'https://chartix.ir/market/saham/BRS00IRALLCAP'
 const TOP_TRADES_LIMIT = 12
 const BILLION_RIAL_PER_HEMAT = 10000
 const RIAL_PER_HEMAT = 1e13
@@ -114,6 +115,59 @@ async function fetchTsetmcMarketSummary() {
   }
 }
 
+
+/** Rahavard's public index feed. Index 60 is the actual IFB total index. */
+async function fetchRahavardMarketIndexes() {
+  const payload = await fetchJson(`${RAHAVARD_API}/market-data/indexes`, 5000)
+  const rows = Array.isArray(payload?.data) ? payload.data : []
+  const row = rows.find(
+    (item) => String(item?.index_id) === '60' || String(item?.title || item?.short_title || '').trim() === 'شاخص کل فرابورس',
+  )
+  const value = parseNum(row?.close_value)
+  if (value == null || value < 10000) throw new Error('rahavard IFB total index missing')
+  const change = parseNum(row?.close_value_change) ?? 0
+  let changePct = parseNum(row?.close_value_change_percent)
+  if (changePct != null && Math.abs(changePct) < 1) changePct *= 100
+  if (changePct == null) {
+    const previous = value - change
+    changePct = previous ? (change / previous) * 100 : 0
+  }
+  return {
+    ok: true,
+    ifb: {
+      name: 'شاخص کل فرابورس',
+      value,
+      change,
+      changePct: Math.round(changePct * 100) / 100,
+      time: row?.value_data_time || row?.end_date_time || null,
+      source: 'rahavard365-index-60',
+    },
+  }
+}
+
+/**
+ * Combined cash-equity capitalization: TSE, IFB first/second markets and base market.
+ */
+async function fetchChartixTotalMarketValue() {
+  const res = await fetch(CHARTIX_TOTAL_MARKET_VALUE, {
+    headers: { Accept: 'text/html,*/*', 'User-Agent': UA, Referer: 'https://chartix.ir/' },
+    signal: AbortSignal.timeout(6000),
+  })
+  if (!res.ok) throw new Error(`chartix total market value ${res.status}`)
+  const html = await res.text()
+  const meta = html.match(/<meta\s+name="description"\s+content="([^"]+)"/i)?.[1] || ''
+  const rial = parseNum(meta.match(/([\d,]{12,})/)?.[1])
+  const totalMarketValueHmt = rial != null ? Math.round((rial / RIAL_PER_HEMAT) * 10) / 10 : null
+  if (totalMarketValueHmt == null || totalMarketValueHmt < 10000 || totalMarketValueHmt > 50000) {
+    throw new Error('chartix total market value missing or out of range')
+  }
+  return {
+    ok: true,
+    totalMarketValueHmt,
+    source: 'chartix-tse+ifb+base',
+    fetchedAt: new Date().toISOString(),
+  }
+}
 
 /** Official ranking of Farabourse index effects; Flow 2, IFB index 7. */
 async function fetchTsetmcIfbEffects() {
@@ -714,6 +768,33 @@ async function scrapeSourceArena(token) {
 }
 
 const SA_GLANCE_CACHE_URL = 'https://pulse-cache.internal/sourcearena-glance-v1'
+const CHARTIX_MV_CACHE_URL = 'https://pulse-cache.internal/chartix-total-market-value-v1'
+
+async function loadChartixMarketValueCache(cache) {
+  try {
+    if (!cache) return null
+    const hit = await cache.match(CHARTIX_MV_CACHE_URL)
+    if (!hit) return null
+    const value = await hit.json()
+    return value?.totalMarketValueHmt >= 10000 ? value : null
+  } catch {
+    return null
+  }
+}
+
+async function saveChartixMarketValueCache(cache, value) {
+  if (!cache || !value?.ok || value.totalMarketValueHmt == null) return
+  try {
+    await cache.put(
+      CHARTIX_MV_CACHE_URL,
+      new Response(JSON.stringify(value), {
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=604800' },
+      }),
+    )
+  } catch {
+    /* ignore */
+  }
+}
 
 async function loadSaGlanceCache(cache) {
   try {
@@ -1169,6 +1250,8 @@ export async function onRequestGet(context) {
     scrapeRahavardIfbMovers(),
     fetchTsetmcMarketSummary(),
     fetchTsetmcIfbEffects(),
+    fetchRahavardMarketIndexes(),
+    fetchChartixTotalMarketValue(),
   ])
 
   if (tasks[0].status === 'fulfilled') {
@@ -1236,6 +1319,26 @@ export async function onRequestGet(context) {
     tsetmcIfb = tasks[15].value
   } else if (tasks[15].status === 'rejected') {
     errors.push(`tsetmc-ifb-effects: ${tasks[15].reason}`)
+  }
+
+  let rahavardIndexes = { ok: false }
+  if (tasks[16].status === 'fulfilled') {
+    rahavardIndexes = tasks[16].value
+  } else if (tasks[16].status === 'rejected') {
+    errors.push(`rahavard-indexes: ${tasks[16].reason}`)
+  }
+
+  let chartixMarketValue = { ok: false }
+  if (tasks[17].status === 'fulfilled') {
+    chartixMarketValue = tasks[17].value
+    await saveChartixMarketValueCache(cache, chartixMarketValue)
+  } else {
+    const cachedChartix = await loadChartixMarketValueCache(cache)
+    if (cachedChartix) {
+      chartixMarketValue = { ...cachedChartix, ok: true, source: 'chartix-tse+ifb+base+cache' }
+    } else if (tasks[17].status === 'rejected') {
+      errors.push(`chartix-market-value: ${tasks[17].reason}`)
+    }
   }
 
   let boardRows = []
@@ -1335,7 +1438,7 @@ export async function onRequestGet(context) {
     todayJalali: today.dateJalali,
     todayGregorian: today.dateGregorian,
     tedpixChangePct: tedpix?.changePct,
-    ifbChangePct: indices?.ifb?.changePct,
+    ifbChangePct: rahavardIndexes?.ifb?.changePct ?? indices?.ifb?.changePct,
   })
   // Official TSETMC values take priority for market capitalization.
   if (tsetmcSummary?.ok) {
@@ -1351,6 +1454,19 @@ export async function onRequestGet(context) {
         totalMarketValueUsdM: usd > 0 ? Math.round((totalMv * RIAL_PER_HEMAT) / usd / 1e6) : null,
         marketValueSource: 'tsetmc-official-bourse+ifb',
       }
+    }
+  }
+
+
+  // This complete total includes the IFB base market; bourse/IFB fields above
+  // remain available separately but must not replace the dashboard total.
+  if (chartixMarketValue?.ok && chartixMarketValue.totalMarketValueHmt != null) {
+    const totalMv = chartixMarketValue.totalMarketValueHmt
+    marketStats = {
+      ...marketStats,
+      totalMarketValueHmt: totalMv,
+      totalMarketValueUsdM: usd > 0 ? Math.round((totalMv * RIAL_PER_HEMAT) / usd / 1e6) : null,
+      marketValueSource: chartixMarketValue.source || 'chartix-tse+ifb+base',
     }
   }
 
@@ -1370,7 +1486,8 @@ export async function onRequestGet(context) {
       tedpix,
       equalWeight: taIndices.equalWeight || indices.equalWeight || null,
       ifb:
-        tsetmcSummary?.ifb?.index != null
+        rahavardIndexes?.ifb ||
+        (tsetmcSummary?.ifb?.index != null
           ? {
               name: 'شاخص کل فرابورس',
               value: tsetmcSummary.ifb.index,
@@ -1381,7 +1498,7 @@ export async function onRequestGet(context) {
                   : 0,
               source: 'tsetmc-official',
             }
-          : indices.ifb || null,
+          : indices.ifb || null),
     },
     intraday: {
       source: 'tgju-today-table',

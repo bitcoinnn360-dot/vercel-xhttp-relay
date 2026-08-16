@@ -646,7 +646,7 @@ type OverviewApi = {
 
 async function fetchOverviewApi(): Promise<OverviewApi | null> {
   try {
-    const res = await fetchWithTimeout('/api/overview', 6000, { cache: 'no-store' })
+    const res = await fetchWithTimeout('/api/overview', 12_000, { cache: 'no-store' })
     if (!res.ok) return null
     return (await res.json()) as OverviewApi
   } catch {
@@ -1686,7 +1686,7 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
     ])
 
   const liveCount = applyLiveQuotes(base, current)
-  const overviewLiveOk = applyOverviewLive(base, scraped?.overviewLive, scraped?.candles1401)
+  // market.json is a deploy-time fallback: never use its headline values because\n  // it can roll the live market view back by hours. Keep only its candle history.\n  const overviewLiveOk = applyOverviewLive(base, undefined, scraped?.candles1401)
   const freshOk = applyFreshOverview(base, overviewApi, intradayFallback)
   const mineralStockRows = stocksApi?.length ? stocksApi : null
   if (mineralStockRows) applyMineralStockReturns(base, mineralStockRows)
@@ -1929,7 +1929,7 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
       navLive: navOk,
       productionLive: productionOk,
       financialsLive: financialsOk,
-      overviewApiAt: overviewApi?.updatedAt,
+      overviewApiAt: overviewApi?.ok ? overviewApi.updatedAt || now : undefined,
       custeelOk: steelStatus.custeelOk,
       imeOk: steelStatus.imeOk || scraped?.meta?.imeOk,
     },

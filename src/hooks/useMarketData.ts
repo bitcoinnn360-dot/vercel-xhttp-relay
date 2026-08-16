@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   applyPulseToDashboard,
   fetchPulseApi,
-  loadBourseViewPreview,
   loadDashboardBundle,
   loadOverviewPreview,
   PULSE_REFRESH_MS,
@@ -33,12 +32,15 @@ export function useMarketData() {
   const [error, setError] = useState<string | null>(null)
   const mounted = useRef(true)
   const hasLiveBourseViewStocks = useRef(false)
+  const hasLiveOverview = useRef(false)
 
 
   const refreshOverviewFirst = useCallback(async () => {
     try {
       const quick = await loadOverviewPreview()
-      if (!mounted.current) return
+      // The full bundle may have already delivered newer live values while this
+      // lightweight request was in flight. Never let it overwrite them.
+      if (!mounted.current || hasLiveOverview.current) return
       setData((previous) => ({
         ...previous,
         overview: quick.overview,
@@ -47,25 +49,7 @@ export function useMarketData() {
         updatedAt: quick.updatedAt,
       }))
     } catch {
-      /* The full refresh below still has independent fallbacks. */
-    }
-  }, [])
-
-  const refreshBourseViewFirst = useCallback(async () => {
-    try {
-      const quick = await loadBourseViewPreview()
-      if (!mounted.current) return
-      setData((previous) => ({
-        ...previous,
-        stocks: quick.stocks,
-        holdings: quick.holdings,
-        nav: quick.nav,
-        productionOps: quick.productionOps,
-        financials: quick.financials,
-      }))
-      hasLiveBourseViewStocks.current = quick.stocks.some((row) => Boolean(row.returnsSource))
-    } catch {
-      /* The full refresh remains as fallback. */
+      /* The full refresh below still has its own independent fallbacks. */
     }
   }, [])
 
@@ -87,6 +71,10 @@ export function useMarketData() {
         if (bundle.data.overview) bundle.data.overview.impactsLive = false
       }
       const receivedLiveStocks = Boolean(bundle.scrapeMeta.stocksLive)
+      const receivedLiveOverview = Boolean(bundle.scrapeMeta.overviewApiAt)
+      const receivedLiveNav = Boolean(bundle.scrapeMeta.navLive)
+      const receivedLiveProduction = Boolean(bundle.scrapeMeta.productionLive)
+      const receivedLiveFinancials = Boolean(bundle.scrapeMeta.financialsLive)
       setData((previous) => {
         const sameSession = previous.overview.dateJalali === bundle.data.overview.dateJalali
         // A transient stock API failure used to replace the live table with the
@@ -94,6 +82,26 @@ export function useMarketData() {
         // same market day until a newer live snapshot arrives.
         if (sameSession && !receivedLiveStocks && hasLiveBourseViewStocks.current) {
           bundle.data.stocks = previous.stocks
+        }
+        if (sameSession && !receivedLiveNav && previous.holdings.length) {
+          bundle.data.holdings = previous.holdings
+          bundle.data.nav = previous.nav
+        }
+        if (sameSession && !receivedLiveProduction && previous.productionOps.companies.length) {
+          bundle.data.productionOps = previous.productionOps
+        }
+        if (sameSession && !receivedLiveFinancials && previous.financials.companies.length) {
+          bundle.data.financials = previous.financials
+        }
+        if (sameSession && !receivedLiveOverview && hasLiveOverview.current) {
+          bundle.data.overview = {
+            ...previous.overview,
+            marketPulse: bundle.data.overview.marketPulse || previous.overview.marketPulse,
+            marketPulseHistory:
+              bundle.data.overview.marketPulseHistory?.length
+                ? bundle.data.overview.marketPulseHistory
+                : previous.overview.marketPulseHistory,
+          }
         }
         if (sameSession && !bundle.data.overview.marketPulse && previous.overview.marketPulse) {
           bundle.data.overview.marketPulse = previous.overview.marketPulse
@@ -108,6 +116,7 @@ export function useMarketData() {
         return bundle.data
       })
       if (receivedLiveStocks) hasLiveBourseViewStocks.current = true
+      if (receivedLiveOverview) hasLiveOverview.current = true
       setHistories((previous) => ({ ...previous, ...bundle.histories }))
       setCandles((previous) => ({ ...previous, ...(bundle.candles || {}) }))
       setFred(bundle.fred)
@@ -139,7 +148,6 @@ export function useMarketData() {
   useEffect(() => {
     mounted.current = true
     void refreshOverviewFirst()
-    void refreshBourseViewFirst()
     void refresh()
     const id = window.setInterval(() => void refresh(true), REFRESH_MS)
     const pulseId = window.setInterval(() => void refreshPulse(), PULSE_REFRESH_MS)
@@ -151,7 +159,7 @@ export function useMarketData() {
       window.clearInterval(pulseId)
       window.clearTimeout(firstPulse)
     }
-  }, [refresh, refreshBourseViewFirst, refreshOverviewFirst, refreshPulse])
+  }, [refresh, refreshOverviewFirst, refreshPulse])
 
   return { data, histories, candles, fred, sectors, scrapeMeta, loading, refreshing, error, refresh }
 }

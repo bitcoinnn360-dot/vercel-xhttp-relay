@@ -180,6 +180,9 @@ export interface LiveBundle {
     updatedAt?: string
     tsetmcOk?: boolean
     stocksLive?: boolean
+    navLive?: boolean
+    productionLive?: boolean
+    financialsLive?: boolean
     imeOk?: boolean
     custeelOk?: boolean
     infra?: Record<string, string>
@@ -1354,7 +1357,7 @@ async function fetchNavApi(): Promise<NavApiBundle | null> {
   } catch {
     /* fall back to the last verified build snapshot */
   }
-  try { return await read('/data/nav.json', 2_500) } catch { return null }
+  return null
 }
 
 function applyNavLive(base: DashboardData, bundle: NavApiBundle | null | undefined) {
@@ -1440,10 +1443,7 @@ async function fetchProductionOpsApi(): Promise<ProductionOpsBundle | null> {
   } catch {
     /* fall back to the last verified build snapshot */
   }
-  try {
-    const snapshot = await read('/data/production.json', 2_500)
-    return snapshot && String(snapshot.source || '').startsWith('bourseview') ? snapshot : null
-  } catch { return null }
+  return null
 }
 
 function applyProductionOps(base: DashboardData, bundle: ProductionOpsBundle | null | undefined) {
@@ -1475,10 +1475,7 @@ async function fetchFinancialsApi(): Promise<FinancialsBundle | null> {
   } catch {
     /* fall back to the last verified build snapshot */
   }
-  try {
-    const snapshot = await read('/data/financials.json', 2_500)
-    return snapshot && String(snapshot.source || '').startsWith('bourseview') ? snapshot : null
-  } catch { return null }
+  return null
 }
 
 function applyFinancials(base: DashboardData, bundle: FinancialsBundle | null | undefined) {
@@ -1511,7 +1508,7 @@ async function fetchMineralStocksApi(): Promise<MineralStockSnap[] | null> {
   } catch {
     /* fall back to the last verified build snapshot */
   }
-  try { return await read('/data/mineral_stocks.json', 2_500) } catch { return null }
+  return null
 }
 
 function weightedPct(
@@ -1929,6 +1926,9 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
               row.dailyPct != null),
         ),
       ),
+      navLive: navOk,
+      productionLive: productionOk,
+      financialsLive: financialsOk,
       overviewApiAt: overviewApi?.updatedAt,
       custeelOk: steelStatus.custeelOk,
       imeOk: steelStatus.imeOk || scraped?.meta?.imeOk,

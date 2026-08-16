@@ -1242,8 +1242,11 @@ def main() -> int:
     indicators: dict[str, Any] = {"ok": False}
     if custeel_login(client):
         custeel_ok = True
-        indicators = scrape_custeel_indicators(client)
-        print(f"  indicators ok={indicators.get('ok')}")
+        try:
+            indicators = scrape_custeel_indicators(client)
+            print(f"  indicators ok={indicators.get('ok')}")
+        except Exception as exc:  # noqa: BLE001
+            print(f"  indicators fail: {exc}")
         series = scrape_custeel_series(client, cny_usd)
 
     print("  IME offer-stat…")

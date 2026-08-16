@@ -1339,22 +1339,22 @@ type NavApiBundle = {
 }
 
 async function fetchNavApi(): Promise<NavApiBundle | null> {
-  const read = async (url: string): Promise<NavApiBundle | null> => {
-    const res = await fetchWithTimeout(url, 6000, { cache: 'no-store' })
+  const read = async (url: string, ms: number): Promise<NavApiBundle | null> => {
+    const res = await fetchWithTimeout(url, ms, { cache: 'no-store' })
     if (!res.ok) return null
     const json = (await res.json()) as NavApiBundle
     if (!json?.ok || !json.holdings?.length || !json.nav || !String(json.source || '').startsWith('bourseview')) return null
     return json
   }
-  // The build snapshot comes from the same authenticated BourseView session.
-  // Read it first so a slow upstream login never blocks first paint.
+  // The preview loader paints the deploy snapshot immediately. Regular refreshes
+  // must prefer the API, otherwise the table regresses to deploy-time data.
   try {
-    const snapshot = await read('/data/nav.json')
-    if (snapshot) return snapshot
+    const live = await read('/api/nav', 10_000)
+    if (live) return live
   } catch {
-    /* fall through to the live endpoint */
+    /* fall back to the last verified build snapshot */
   }
-  try { return await read('/api/nav') } catch { return null }
+  try { return await read('/data/nav.json', 2_500) } catch { return null }
 }
 
 function applyNavLive(base: DashboardData, bundle: NavApiBundle | null | undefined) {
@@ -1434,19 +1434,16 @@ async function fetchProductionOpsApi(): Promise<ProductionOpsBundle | null> {
     if (!json?.companies?.length) return null
     return json
   }
-
   try {
-    const snapshot = await read('/data/production.json', 2500)
-    if (snapshot && String(snapshot.source || '').startsWith('bourseview')) return snapshot
+    const live = await read('/api/production', 10_000)
+    if (live) return live
   } catch {
-    /* no verified BourseView snapshot */
+    /* fall back to the last verified build snapshot */
   }
   try {
-    return await read('/api/production', 6000)
-  } catch {
-    /* BourseView unavailable */
-  }
-  return null
+    const snapshot = await read('/data/production.json', 2_500)
+    return snapshot && String(snapshot.source || '').startsWith('bourseview') ? snapshot : null
+  } catch { return null }
 }
 
 function applyProductionOps(base: DashboardData, bundle: ProductionOpsBundle | null | undefined) {
@@ -1473,17 +1470,15 @@ async function fetchFinancialsApi(): Promise<FinancialsBundle | null> {
     return json
   }
   try {
-    const snapshot = await read('/data/financials.json', 2500)
-    if (snapshot && String(snapshot.source || '').startsWith('bourseview')) return snapshot
+    const live = await read('/api/financials', 10_000)
+    if (live) return live
   } catch {
-    /* no verified BourseView snapshot */
+    /* fall back to the last verified build snapshot */
   }
   try {
-    return await read('/api/financials', 6000)
-  } catch {
-    /* BourseView unavailable */
-  }
-  return null
+    const snapshot = await read('/data/financials.json', 2_500)
+    return snapshot && String(snapshot.source || '').startsWith('bourseview') ? snapshot : null
+  } catch { return null }
 }
 
 function applyFinancials(base: DashboardData, bundle: FinancialsBundle | null | undefined) {
@@ -1508,15 +1503,15 @@ async function fetchMineralStocksApi(): Promise<MineralStockSnap[] | null> {
     const stocks = Array.isArray(json) ? json : json.stocks
     return stocks?.length ? stocks : null
   }
-  // CI refreshes this BourseView-only snapshot before deployment, so the
-  // visible table does not wait for an authenticated upstream request.
+  // The preview loader handles first paint from a deploy snapshot; full refreshes
+  // must prefer the authenticated API so fresh prices never jump backwards.
   try {
-    const snapshot = await read('/data/mineral_stocks.json', 2500)
-    if (snapshot) return snapshot
+    const live = await read('/api/stocks', 10_000)
+    if (live) return live
   } catch {
-    /* fall through */
+    /* fall back to the last verified build snapshot */
   }
-  try { return await read('/api/stocks', 6000) } catch { return null }
+  try { return await read('/data/mineral_stocks.json', 2_500) } catch { return null }
 }
 
 function weightedPct(

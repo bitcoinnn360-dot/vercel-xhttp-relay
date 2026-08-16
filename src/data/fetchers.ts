@@ -913,13 +913,13 @@ function applyFreshOverview(base: DashboardData, api: OverviewApi | null, intrad
 
   if (api?.indices) {
     if (patchIndex(o.tedpix, api.indices.tedpix)) sources.tedpix = api.indices.tedpix?.source || 'live'
-    if (patchIndex(o.equalWeight, api.indices.equalWeight)) sources.equalWeight = 'shakhesban-live'
-    if (patchIndex(o.ifb, api.indices.ifb)) sources.ifb = 'shakhesban-live'
+    if (patchIndex(o.equalWeight, api.indices.equalWeight)) sources.equalWeight = api.indices.equalWeight?.source || 'live'
+    if (patchIndex(o.ifb, api.indices.ifb)) sources.ifb = api.indices.ifb?.source || 'live'
   }
 
   if (api?.totalMarketValueHmt != null && Number.isFinite(api.totalMarketValueHmt)) {
     o.totalMarketValueHmt = api.totalMarketValueHmt
-    sources.marketValue = api.marketValueSource || 'sourcearena-bourse+ifb'
+    sources.marketValue = api.marketValueSource || 'live-total-market'
     notes.unshift(
       `ارزش بازار: بورس ${api.bourseMarketValueHmt ?? '—'} + فرابورس ${api.ifbMarketValueHmt ?? '—'} = ${api.totalMarketValueHmt} همت (SourceArena)`,
     )

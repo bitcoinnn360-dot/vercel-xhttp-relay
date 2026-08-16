@@ -31,7 +31,7 @@ UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 )
-SSL_CTX = ssl._create_unverified_context()
+SSL_CTX = ssl._create_unverified_context()\nFAST_MODE = os.environ.get(\"CUSTEEL_FAST\", \"\").strip() == \"1\"
 
 CUSTEEL_LOGIN = (
     "https://www.custeel.net/sec/dgserverlet"
@@ -480,7 +480,7 @@ def _fetch_html(client: HttpClient, url: str, *, attempts: int = 6) -> str:
     last: Exception | None = None
     for i in range(attempts):
         try:
-            return client.request(url, timeout=60, attempts=2).decode("utf-8", errors="replace")
+            return client.request(\n                url,\n                timeout=18 if FAST_MODE else 60,\n                attempts=1 if FAST_MODE else 2,\n            ).decode("utf-8", errors="replace")
         except Exception as exc:  # noqa: BLE001
             last = exc
             time.sleep(1.2 * (i + 1))
@@ -548,7 +548,7 @@ def scrape_custeel_fob(client: HttpClient) -> dict[str, Any]:
             continue
         # Parse enough articles for history (newest first)
         per_sid: dict[str, list[tuple[str, float]]] = {sid: [] for sid, _ in items}
-        for idx, (href, title) in enumerate(links):
+        for idx, (href, title) in enumerate(links[:5] if FAST_MODE else links):
             url = _abs_custeel(href)
             try:
                 html = _fetch_html(client, url, attempts=8 if idx < 3 else 4)
@@ -650,7 +650,7 @@ def scrape_custeel_domestic(client: HttpClient, cny_usd: float) -> dict[str, Any
             print(f"  domestic {sid}: no article links")
             continue
         pts: list[tuple[str, float, float | None, str]] = []
-        for idx, (href, title) in enumerate(links[:20]):
+        for idx, (href, title) in enumerate(links[:5] if FAST_MODE else links[:20]):
             url = _abs_custeel(href)
             try:
                 html = _fetch_html(client, url, attempts=8 if idx < 3 else 4)
@@ -1234,10 +1234,10 @@ def main() -> int:
         series = scrape_custeel_series(client, cny_usd)
 
     print("  IME offer-stat…")
-    ime = scrape_ime(client, usd_irr)
+    ime = scrape_ime(client, usd_irr) if not FAST_MODE else {\"ok\": False}
     print(f"  ime ok={ime.get('ok')} err={ime.get('error')}")
 
-    steel = merge_steel(series.get("steel") or [], (indicators.get("steelExtra") or []) + (ime.get("steel") or []))
+    steel = merge_steel(\n        series.get("steel") or [],\n        (indicators.get("steelExtra") or []) + (ime.get("steel") or []) + (previous.get("steel") or []),\n    )
 
     custeel_ready = bool(custeel_ok and series.get("ok", 0) > 0)
     ime_ready = bool(ime.get("ok"))

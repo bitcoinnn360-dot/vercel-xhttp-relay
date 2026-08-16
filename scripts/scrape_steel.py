@@ -1251,8 +1251,8 @@ def main() -> int:
     print(f"  ime ok={ime.get('ok')} err={ime.get('error')}")
 
     steel = merge_steel(
-        series.get("steel") or [],
-        (indicators.get("steelExtra") or []) + (ime.get("steel") or []) + (previous.get("steel") or []),
+        previous.get("steel") or [],
+        (indicators.get("steelExtra") or []) + (ime.get("steel") or []) + (series.get("steel") or []),
     )
 
     custeel_ready = bool(custeel_ok and series.get("ok", 0) > 0)

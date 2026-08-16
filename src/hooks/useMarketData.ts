@@ -153,11 +153,13 @@ export function useMarketData() {
     const pulseId = window.setInterval(() => void refreshPulse(), PULSE_REFRESH_MS)
     // first pulse tick shortly after load so charts start densifying
     const firstPulse = window.setTimeout(() => void refreshPulse(), 2500)
+    // The first cold /api/overview request can be slower than its cache hit.\n    // Retry it automatically so opening the dashboard never needs a manual refresh.\n    const overviewRetry = window.setTimeout(() => void refreshOverviewFirst(), 9000)
     return () => {
       mounted.current = false
       window.clearInterval(id)
       window.clearInterval(pulseId)
       window.clearTimeout(firstPulse)
+      window.clearTimeout(overviewRetry)
     }
   }, [refresh, refreshOverviewFirst, refreshPulse])
 

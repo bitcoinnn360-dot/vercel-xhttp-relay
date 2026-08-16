@@ -65,7 +65,7 @@ const NAV_STATIC = {
   },
 }
 
-const CACHE_TTL_MS = 5 * 60 * 1000
+const CACHE_TTL_MS = 2 * 60 * 1000
 const CACHE_KEY = 'https://cache.local/midco-nav-bv-v6'
 
 function normalizeCookie(raw) {
@@ -178,14 +178,29 @@ function buildHoldings(liveRows) {
 }
 
 export async function onRequestGet(context) {
-  const { env } = context
+  const { env, request } = context
+  const url = new URL(request.url)
+  const forceRefresh = url.searchParams.has('refresh') || url.searchParams.has('fresh')
   const cookie = normalizeCookie(env?.BOURSEVIEW_COOKIE || env?.BOURSEVIEW_TOKEN || '')
   const idToken = String(env?.BOURSEVIEW_ID_TOKEN || '').trim()
 
   const cache = typeof caches !== 'undefined' ? caches.default : null
-  if (cache) {
+  if (cache && !forceRefresh) {
     const hit = await cache.match(CACHE_KEY)
-    if (hit) return hit
+    if (hit) {
+      const cachedAt = Number(hit.headers.get('x-cached-at') || 0)
+      if (cachedAt && Date.now() - cachedAt < CACHE_TTL_MS) {
+        return new Response(hit.body, {
+          headers: {
+            'cache-control': 'public, max-age=60',
+            'access-control-allow-origin': '*',
+            'content-type': 'application/json; charset=utf-8',
+            'x-cached-at': String(cachedAt),
+            'x-cache': 'HIT',
+          },
+        })
+      }
+    }
   }
 
   if (!cookie) {
@@ -292,7 +307,7 @@ export async function onRequestGet(context) {
   }
 
   const headers = {
-    'cache-control': 'public, max-age=120',
+    'cache-control': 'public, max-age=60',
     'access-control-allow-origin': '*',
     'content-type': 'application/json; charset=utf-8',
   }
@@ -300,7 +315,7 @@ export async function onRequestGet(context) {
   if (cache && body.ok) {
     try {
       const cached = new Response(payload, {
-        headers: { ...headers, 'cache-control': `public, max-age=${Math.floor(CACHE_TTL_MS / 1000)}` },
+        headers: { ...headers, 'x-cached-at': String(Date.now()), 'x-cache': 'MISS' },
       })
       context.waitUntil(cache.put(CACHE_KEY, cached.clone()))
     } catch {

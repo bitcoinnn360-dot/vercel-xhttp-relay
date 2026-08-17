@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+data/
+results/trades_*.csv
+!results/trades_tight_swing_eq.csv
+!results/trades_fail_killzone.csv
+!results/trades_final_best.csv

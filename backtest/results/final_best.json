@@ -1,0 +1,62 @@
+{
+  "name": "hold8h_gap50_wick70",
+  "metrics": {
+    "trades": 82,
+    "wins": 41,
+    "losses": 41,
+    "winrate": 50.0,
+    "profit_factor": 1.638,
+    "net_R": 27.293,
+    "avg_R": 0.333,
+    "max_dd_R": 10.205,
+    "tp_exits": 16,
+    "sl_exits": 34,
+    "tp_bsl": 10,
+    "tp_ssl": 21,
+    "tp_fvg": 0,
+    "tp_rr": 51,
+    "name": "hold8h_gap50_wick70"
+  },
+  "params": {
+    "pivot_len": 5,
+    "max_failed_swing_gap": 50,
+    "ob_engulf_lookback": 30,
+    "require_fractal_leave": false,
+    "require_rejection": true,
+    "rej_wick_pct": 70.0,
+    "rej_close_in_half": true,
+    "require_mss": true,
+    "sl_buffer_pct": 0.0005,
+    "rr_fallback": 3.0,
+    "min_tp_rr": 3.0,
+    "prefer_liq_tp": true,
+    "prefer_fvg_tp": true,
+    "min_fvg_pct": 0.0003,
+    "cooldown_bars": 10,
+    "one_trade_at_a_time": true,
+    "fee_bps": 4.0,
+    "max_hold_bars": 96,
+    "use_ema_filter": true,
+    "ema_len": 200,
+    "session_start_hour": 7,
+    "session_end_hour": 16
+  },
+  "notes": {
+    "symbol": "BTCUSDT",
+    "timeframe": "5m",
+    "period": "2025-07-26 10:45:00+00:00 -> 2026-07-26 10:40:00+00:00",
+    "tp_logic": "BSL/SSL with min RR>=3, else untouched FVG mid with min RR>=3, else RR=3 fallback",
+    "filters": "rejection wick>=70%, EMA200 trend, London+NY session 07-16 UTC, max hold 8h, failed-swing gap<=50"
+  },
+  "alt_more_trades": {
+    "name": "hold8h_gap40_wick60",
+    "metrics": {
+      "trades": 120,
+      "winrate": 47.5,
+      "profit_factor": 1.515,
+      "net_R": 32.015,
+      "max_dd_R": 11.879
+    },
+    "diff": "wick 60% instead of 70%, gap 40 \u2014 more trades, slightly lower PF, higher net R"
+  }
+}

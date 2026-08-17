@@ -1,0 +1,17 @@
+{
+  "trades": 120,
+  "wins": 57,
+  "losses": 63,
+  "winrate": 47.5,
+  "profit_factor": 1.515,
+  "net_R": 32.015,
+  "avg_R": 0.267,
+  "max_dd_R": 11.879,
+  "tp_exits": 21,
+  "sl_exits": 51,
+  "tp_bsl": 19,
+  "tp_ssl": 28,
+  "tp_fvg": 0,
+  "tp_rr": 73,
+  "name": "O_minRR30_ema_sess+hold8h"
+}

@@ -1,0 +1,47 @@
+ICT Combo Engine + YOUR Sniper CVD v59
+======================================
+
+Chart stack (recommended)
+-------------------------
+1) BTCUSDT 5m
+2) Add indicator: Sniper_CVD_v59  (strategies/sniper-cvd-v59.pine)
+3) Add strategy: ICT Combo Engine (strategies/ict-combo-engine.pine)
+4) Optional: Options Levels overlay + session BSG indicator
+
+Wire Sniper → Combo (important)
+-------------------------------
+In Combo Engine inputs → group "CVD Confirm":
+
+  Confirm Mode tip:
+    Golden     → pick plot "GoldenBuySrc" / "GoldenSellSrc"
+    Any System → pick plot "AnyBuySrc" / "AnySellSrc"
+    Any Setup  → pick plot "SniperBuySrc" / "SniperSellSrc"
+
+  Sniper BUY source  → Sniper_CVD_v59 : GoldenBuySrc  (or Any/Sniper)
+  Sniper SELL source → Sniper_CVD_v59 : GoldenSellSrc (or Any/Sniper)
+
+If sources stay on `close`, CVD filter will almost never confirm (close is never a pulse).
+Start with Require Sniper CVD = OFF to verify mitigation fires, then turn ON after wiring.
+
+Layers
+------
+1 Entry   = Failed-swing mitigation + rejection (fixed)
+2 Bias    = Session PDH/PDL + S1–S4 sweep→IFVG
+3 Confirm = YOUR Sniper CVD (SW / Div / SN++ / LQ / Golden)
+4 Magnets = Options put / max pain / call (+ path %)
+5 Risk    = nearest-swing SL, killzone, EMA200, min RR
+
+Options
+-------
+GET /api/options-levels?currency=BTC → paste pine_inputs into Combo.
+
+Debug
+-----
+Data Window / shapes:
+  Failed HH/LL → Pending → Sess Bias → Sniper CVD Active (C) → MIT label
+  Gold diamonds = Sniper buy/sell pulse on that bar
+
+Why old mitigation did nothing
+------------------------------
+Fractal-leave default was ON and almost never unlocked. Fixed in
+ict-liquidity-reversal.pine (default OFF) and in Combo.

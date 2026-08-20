@@ -1,0 +1,58 @@
+[
+  {
+    "symbol": "کچاد",
+    "n_letters": 63,
+    "n_energy_rows": 129,
+    "n_product_rows": 716,
+    "n_missing_files": 0
+  },
+  {
+    "symbol": "کگل",
+    "n_letters": 63,
+    "n_energy_rows": 123,
+    "n_product_rows": 429,
+    "n_missing_files": 0
+  },
+  {
+    "symbol": "کگهر",
+    "n_letters": 63,
+    "n_energy_rows": 106,
+    "n_product_rows": 641,
+    "n_missing_files": 0
+  },
+  {
+    "symbol": "کنور",
+    "n_letters": 63,
+    "n_energy_rows": 80,
+    "n_product_rows": 308,
+    "n_missing_files": 0
+  },
+  {
+    "symbol": "ارفع",
+    "n_letters": 63,
+    "n_energy_rows": 113,
+    "n_product_rows": 228,
+    "n_missing_files": 0
+  },
+  {
+    "symbol": "کاوه",
+    "n_letters": 63,
+    "n_energy_rows": 58,
+    "n_product_rows": 309,
+    "n_missing_files": 0
+  },
+  {
+    "symbol": "فصبا",
+    "n_letters": 54,
+    "n_energy_rows": 52,
+    "n_product_rows": 151,
+    "n_missing_files": 0
+  },
+  {
+    "symbol": "فسبزوار",
+    "n_letters": 58,
+    "n_energy_rows": 53,
+    "n_product_rows": 190,
+    "n_missing_files": 0
+  }
+]

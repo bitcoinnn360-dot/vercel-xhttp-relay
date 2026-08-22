@@ -612,11 +612,28 @@
       "flowGoldFunds": 0.0,
       "perCapitaBuy": 91.21,
       "perCapitaSell": 87.16
+    },
+    {
+      "time": "12:15",
+      "positive": 724,
+      "negative": 93,
+      "flat": 90,
+      "orderBuy": 19001.3,
+      "orderSell": 780.4,
+      "retailFlow": -3964.7,
+      "flowStocks": 1842.1,
+      "flowEquityFunds": 511.8,
+      "flowFixedIncome": -6318.6,
+      "flowBasicMetals": 540.6,
+      "flowMetalOres": -1.7,
+      "flowGoldFunds": 191.7,
+      "perCapitaBuy": 91.22,
+      "perCapitaSell": 87.19
     }
   ],
   "current": {
-    "asOf": "2026-08-22T08:40:02.540682+00:00",
-    "time": "12:10",
+    "asOf": "2026-08-22T08:45:01.946714+00:00",
+    "time": "12:15",
     "dateJalali": "1405/05/31",
     "source": "tradersarena",
     "breadth": {
@@ -625,19 +642,19 @@
       "flat": 90,
       "total": 907
     },
-    "orderBuyBillionToman": 19130.3,
-    "orderSellBillionToman": 823.3,
-    "retailMoneyFlowBillionToman": -3882.9,
-    "equityRetailMoneyFlowBillionToman": 2289.1,
-    "flowStocksBillionToman": 1799.0,
-    "flowEquityFundsBillionToman": 490.1,
-    "flowFixedIncomeBillionToman": -6171.9,
-    "flowBasicMetalsBillionToman": 420.4,
-    "flowMetalOresBillionToman": 10.4,
-    "flowGoldFundsBillionToman": 0.0,
-    "perCapitaBuyMillionToman": 91.21,
-    "perCapitaSellMillionToman": 87.16,
+    "orderBuyBillionToman": 19001.3,
+    "orderSellBillionToman": 780.4,
+    "retailMoneyFlowBillionToman": -3964.7,
+    "equityRetailMoneyFlowBillionToman": 2353.9,
+    "flowStocksBillionToman": 1842.1,
+    "flowEquityFundsBillionToman": 511.8,
+    "flowFixedIncomeBillionToman": -6318.6,
+    "flowBasicMetalsBillionToman": 540.6,
+    "flowMetalOresBillionToman": -1.7,
+    "flowGoldFundsBillionToman": 191.7,
+    "perCapitaBuyMillionToman": 91.22,
+    "perCapitaSellMillionToman": 87.19,
     "note": "داده زنده TradersArena · ورود پول بازار + صنایع"
   },
-  "updatedAt": "2026-08-22T08:40:02.542861+00:00"
+  "updatedAt": "2026-08-22T08:45:01.948872+00:00"
 }

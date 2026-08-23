@@ -18,7 +18,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from html import unescape
 from http.cookiejar import CookieJar
 from pathlib import Path
@@ -1006,49 +1006,44 @@ def scrape_custeel_indicators(client: HttpClient) -> dict[str, Any]:
     return out
 
 
-def _jalali_today() -> str:
-    try:
-        import jdatetime  # type: ignore
+def _gregorian_to_jalali(value: datetime) -> str:
+    gy, gm, gd = value.year, value.month, value.day
+    g_d_m = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334]
+    gy2 = gy + 1 if gm > 2 else gy
+    days = 355666 + (365 * gy) + ((gy2 + 3) // 4) - ((gy2 + 99) // 100) + ((gy2 + 399) // 400) + gd + g_d_m[gm - 1]
+    jy = -1595 + (33 * (days // 12053))
+    days %= 12053
+    jy += 4 * (days // 1461)
+    days %= 1461
+    if days > 365:
+        jy += (days - 1) // 365
+        days = (days - 1) % 365
+    if days < 186:
+        jm = 1 + days // 31
+        jd = 1 + (days % 31)
+    else:
+        jm = 7 + (days - 186) // 30
+        jd = 1 + ((days - 186) % 30)
+    return f"{jy:04d}/{jm:02d}/{jd:02d}"
 
-        j = jdatetime.date.today()
-        return f"{j.year:04d}/{j.month:02d}/{j.day:02d}"
-    except Exception:
-        # crude fallback via algorithm
-        now = tehran_now()
-        gy, gm, gd = now.year, now.month, now.day
-        g_d_m = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334]
-        gy2 = gy + 1 if gm > 2 else gy
-        days = 355666 + (365 * gy) + ((gy2 + 3) // 4) - ((gy2 + 99) // 100) + ((gy2 + 399) // 400) + gd + g_d_m[gm - 1]
-        jy = -1595 + (33 * (days // 12053))
-        days %= 12053
-        jy += 4 * (days // 1461)
-        days %= 1461
-        if days > 365:
-            jy += (days - 1) // 365
-            days = (days - 1) % 365
-        if days < 186:
-            jm = 1 + days // 31
-            jd = 1 + (days % 31)
-        else:
-            jm = 7 + (days - 186) // 30
-            jd = 1 + ((days - 186) % 30)
-        return f"{jy:04d}/{jm:02d}/{jd:02d}"
+
+def _jalali_today() -> str:
+    return _gregorian_to_jalali(tehran_now())
 
 
 def _jalali_minus_days(days_back: int) -> str:
-    try:
-        import jdatetime  # type: ignore
+    return _gregorian_to_jalali(tehran_now() - timedelta(days=days_back))
 
-        j = jdatetime.date.today() - jdatetime.timedelta(days=days_back)
-        return f"{j.year:04d}/{j.month:02d}/{j.day:02d}"
-    except Exception:
-        return _jalali_today()
+
+def _jalali_week_start() -> str:
+    # datetime.weekday(): Monday=0 ... Saturday=5
+    return _jalali_minus_days((tehran_now().weekday() - 5) % 7)
 
 
 def scrape_ime(client: HttpClient, usd_irr: float | None) -> dict[str, Any]:
     """Pull recent physical trades from offer-stat backend (needs Iran-reachable IP)."""
     end = _jalali_today()
-    start = _jalali_minus_days(21)
+    start = _jalali_week_start()
     payload = {
         "Language": 8,
         "fari": False,
@@ -1082,7 +1077,9 @@ def scrape_ime(client: HttpClient, usd_irr: float | None) -> dict[str, Any]:
         # ASP.NET serializers often camel/lower mixed
         goods = str(row.get("GoodsName") or row.get("bArzehNameKala") or row.get("goodsName") or "")
         symbol = str(row.get("Symbol") or row.get("bArzehRadifNamad") or row.get("symbol") or "")
-        close = num(row.get("ClosePrice") or row.get("bArzehRadifGheymat") or row.get("closePrice"))
+        close = num(row.get("Price") if row.get("Price") is not None else row.get("ClosePrice") or row.get("bArzehRadifGheymat") or row.get("closePrice"))
+        quantity = num(row.get("Quantity") if row.get("Quantity") is not None else row.get("quantity") or row.get("bArzehRadifHajm"))
+        total_price = num(row.get("TotalPrice") if row.get("TotalPrice") is not None else row.get("totalPrice"))
         date = str(row.get("Date") or row.get("bArzehTarSal") or row.get("date") or "")
         producer = str(row.get("ProducerName") or row.get("producerName") or "")
         if not goods and not symbol:
@@ -1093,7 +1090,7 @@ def scrape_ime(client: HttpClient, usd_irr: float | None) -> dict[str, Any]:
                 symbol = str(vals[1] or "")
                 close = num(vals[4]) if close is None else close
                 date = str(vals[14] if len(vals) > 14 else vals[-1] or "")
-        if close is None or close <= 0:
+        if close is None or close <= 0 or quantity is None or quantity <= 0:
             continue
         normed.append(
             {
@@ -1101,6 +1098,8 @@ def scrape_ime(client: HttpClient, usd_irr: float | None) -> dict[str, Any]:
                 "symbol": symbol,
                 "producer": producer,
                 "close": close,
+                "quantity": quantity,
+                "totalPrice": total_price,
                 "date": date.replace("-", "/")[:10],
             }
         )
@@ -1134,11 +1133,12 @@ def scrape_ime(client: HttpClient, usd_irr: float | None) -> dict[str, Any]:
         hits = match_rows(spec)
         if not hits:
             continue
-        # latest by date then average that day's closes
+        # Weekly volume-weighted price across all actual trades.
         hits.sort(key=lambda r: r["date"], reverse=True)
         latest_date = hits[0]["date"]
-        day = [r for r in hits if r["date"] == latest_date]
-        avg = sum(r["close"] for r in day) / len(day)
+        traded_volume = sum(r["quantity"] for r in hits)
+        avg = sum(r["close"] * r["quantity"] for r in hits) / traded_volume
+        producers = sorted({r["producer"] for r in hits if r["producer"]})
         # IME physical ClosePrice is typically Rial/kg for steel chain
         price_rial_kg = avg
         chain.append(
@@ -1147,8 +1147,14 @@ def scrape_ime(client: HttpClient, usd_irr: float | None) -> dict[str, Any]:
                 "priceRialKg": round(price_rial_kg),
                 "ratioToBilletPct": 0.0,
                 "tradeDate": latest_date,
-                "source": "ime-offer-stat",
-                "samples": len(day),
+                "weekStart": start,
+                "weekEnd": end,
+                "source": "ime-offer-stat-weekly-weighted",
+                "samples": len(hits),
+                "tradedVolumeTon": round(traded_volume),
+                "producerCount": len(producers),
+                "producers": producers,
+                "calculation": "sum(price*quantity)/sum(quantity)",
             }
         )
         if usd_irr and usd_irr > 0:
@@ -1164,7 +1170,7 @@ def scrape_ime(client: HttpClient, usd_irr: float | None) -> dict[str, Any]:
                     "changePct": 0,
                     "region": "iran",
                     "asOf": latest_date,
-                    "source": "ime-offer-stat",
+                    "source": "ime-offer-stat-weekly-weighted",
                 }
             )
 
@@ -1301,3 +1307,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

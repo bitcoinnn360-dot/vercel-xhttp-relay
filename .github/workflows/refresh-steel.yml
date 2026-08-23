@@ -2,8 +2,8 @@ name: Refresh Custeel steel-chain snapshot
 
 on:
   schedule:
-    # Weekdays at 11:15 Tehran time (07:45 UTC).
-    - cron: '45 7 * * 1-5'
+    # Iran market week (Saturday-Wednesday), 11:15 Tehran (07:45 UTC).
+    - cron: '45 7 * * 0-3,6'
   workflow_dispatch:
 
 permissions:
@@ -69,3 +69,4 @@ jobs:
         run: npx wrangler pages deploy dist --project-name=arz-digital-dashboard --branch=main --commit-dirty=true
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+

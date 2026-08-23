@@ -20,7 +20,7 @@ import {
 const TGJU_AJAX = 'https://call2.tgju.org/ajax.json'
 const TGJU_TODAY = 'https://api.tgju.org/v1/market/indicator/today-table-data/bourse?lang=fa'
 const TSETMC_OVERVIEW = 'https://cdn.tsetmc.com/api/MarketData/GetMarketOverview/'
-const TSETMC_IFB_EFFECT = 'https://cdn.tsetmc.com/api/Index/GetInstEffect/0/2/7'
+const TSETMC_IFB_EFFECT = 'https://cdn.tsetmc.com/api/Index/GetInstEffect'
 const SHAKH_INDEX = 'https://www.shakhesban.com/markets/index'
 const SHAKH_LIST = 'https://www.shakhesban.com/stocks/list-data'
 const TA_HEATMAP_STOCK_FUNDS = 'https://tradersarena.ir/data/heatmap/stock-funds'
@@ -169,18 +169,24 @@ async function fetchChartixTotalMarketValue() {
   }
 }
 
-/** Official ranking of Farabourse index effects; Flow 2, IFB index 7. */
+/** Official IFB instrument effects. Fetch the full list, then rank locally. */
 async function fetchTsetmcIfbEffects() {
-  const payload = await fetchJson(TSETMC_IFB_EFFECT, 5000)
+  const overviewPayload = await fetchJson(`${TSETMC_OVERVIEW}2`, 5000)
+  const overview = overviewPayload?.marketOverview || overviewPayload?.data || overviewPayload || {}
+  const dEven = Math.trunc(
+    parseNum(overview?.marketActivityDEven ?? overview?.lastDataDEven ?? overview?.dEven) || 0,
+  )
+  const payload = await fetchJson(`${TSETMC_IFB_EFFECT}/${dEven}/0/500`, 6500)
   const rows = Array.isArray(payload)
     ? payload
-    : payload?.instrumentEffect || payload?.instrumentEffects || payload?.data || payload?.items || []
+    : payload?.instEffect || payload?.instrumentEffect || payload?.instrumentEffects || payload?.data || payload?.items || []
   if (!Array.isArray(rows)) throw new Error('TSETMC IFB effect: unexpected response')
   const all = rows
     .map((row) => {
       const inst = row?.instrument || row?.ins || {}
-      const symbol = String(inst?.lVal18AFC || inst?.symbol || row?.lVal18AFC || row?.symbol || row?.namad || '').trim()
-      const name = String(inst?.lVal30 || inst?.name || row?.lVal30 || row?.name || symbol).trim()
+      const clean = (value) => String(value || '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').trim()
+      const symbol = clean(inst?.lVal18AFC || inst?.symbol || row?.lVal18AFC || row?.symbol || row?.namad)
+      const name = clean(inst?.lVal30 || inst?.name || row?.lVal30 || row?.name || symbol)
       const effect = parseNum(row?.instEffectValue ?? row?.effectValue ?? row?.indexEffect ?? row?.effect)
       return symbol && effect != null ? { symbol, name, effect } : null
     })
@@ -188,6 +194,8 @@ async function fetchTsetmcIfbEffects() {
   if (!all.length) throw new Error('TSETMC IFB effect: no usable rows')
   return {
     ok: true,
+    dEven,
+    source: 'tsetmc-ifb-all-sorted',
     ifbPos: all.filter((x) => x.effect > 0).sort((a, b) => b.effect - a.effect).slice(0, 5),
     ifbNeg: all.filter((x) => x.effect < 0).sort((a, b) => a.effect - b.effect).slice(0, 5),
   }
@@ -1554,3 +1562,4 @@ export async function onRequestGet(context) {
   }
   return response
 }
+

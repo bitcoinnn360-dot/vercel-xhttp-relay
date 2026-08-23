@@ -21,6 +21,7 @@ const TGJU_AJAX = 'https://call2.tgju.org/ajax.json'
 const TGJU_TODAY = 'https://api.tgju.org/v1/market/indicator/today-table-data/bourse?lang=fa'
 const TSETMC_OVERVIEW = 'https://cdn.tsetmc.com/api/MarketData/GetMarketOverview/'
 const TSETMC_IFB_EFFECT = 'https://cdn.tsetmc.com/api/Index/GetInstEffect'
+const TSETMC_IFB_WATCH = 'https://cdn.tsetmc.com/api/ClosingPrice/GetMarketWatch?market=2&industrialGroup=&boardId=0&paperTypes[0]=1'
 const SHAKH_INDEX = 'https://www.shakhesban.com/markets/index'
 const SHAKH_LIST = 'https://www.shakhesban.com/stocks/list-data'
 const TA_HEATMAP_STOCK_FUNDS = 'https://tradersarena.ir/data/heatmap/stock-funds'
@@ -171,31 +172,29 @@ async function fetchChartixTotalMarketValue() {
 
 /** Official IFB instrument effects. Fetch the full list, then rank locally. */
 async function fetchTsetmcIfbEffects() {
-  const overviewPayload = await fetchJson(`${TSETMC_OVERVIEW}2`, 5000)
-  const overview = overviewPayload?.marketOverview || overviewPayload?.data || overviewPayload || {}
-  const dEven = Math.trunc(
-    parseNum(overview?.marketActivityDEven ?? overview?.lastDataDEven ?? overview?.dEven) || 0,
-  )
-  const payload = await fetchJson(`${TSETMC_IFB_EFFECT}/${dEven}/0/500`, 6500)
-  const rows = Array.isArray(payload)
-    ? payload
-    : payload?.instEffect || payload?.instrumentEffect || payload?.instrumentEffects || payload?.data || payload?.items || []
-  if (!Array.isArray(rows)) throw new Error('TSETMC IFB effect: unexpected response')
-  const all = rows
+  const watchPayload = await fetchJson(TSETMC_IFB_WATCH, 6500)
+  const watchRows = watchPayload?.marketwatch || watchPayload?.marketWatch || watchPayload?.data || []
+  if (!Array.isArray(watchRows)) throw new Error('TSETMC IFB market watch: unexpected response')
+  const clean = (value) => String(value || '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').trim()
+  const all = watchRows
     .map((row) => {
-      const inst = row?.instrument || row?.ins || {}
-      const clean = (value) => String(value || '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').trim()
-      const symbol = clean(inst?.lVal18AFC || inst?.symbol || row?.lVal18AFC || row?.symbol || row?.namad)
-      const name = clean(inst?.lVal30 || inst?.name || row?.lVal30 || row?.name || symbol)
-      const effect = parseNum(row?.instEffectValue ?? row?.effectValue ?? row?.indexEffect ?? row?.effect)
-      return symbol && effect != null ? { symbol, name, effect } : null
+      const symbol = clean(row?.lva || row?.symbol)
+      const name = clean(row?.lvc || row?.name || symbol)
+      const yesterday = parseNum(row?.py)
+      const priceChange = parseNum(row?.pcpc)
+      if (!symbol || yesterday == null || yesterday <= 0 || priceChange == null || priceChange === 0) return null
+      // Match the TSETMC MarketWatch «قیمت پایانی - درصد» column exactly.
+      const percent = Math.round((priceChange / yesterday) * 10000) / 100
+      // Rights/derivative rows are separate instruments in the API but are
+      // not shares in the dashboard's five-positive/five-negative panels.
+      if (/[23]$/.test(symbol) || isBondLikeName(name)) return null
+      return { symbol, name, effect: percent, priceChange }
     })
     .filter(Boolean)
-  if (!all.length) throw new Error('TSETMC IFB effect: no usable rows')
+  if (!all.length) throw new Error('TSETMC IFB market watch: no usable rows')
   return {
     ok: true,
-    dEven,
-    source: 'tsetmc-ifb-all-sorted',
+    source: 'tsetmc-ifb-marketwatch-percent',
     ifbPos: all.filter((x) => x.effect > 0).sort((a, b) => b.effect - a.effect).slice(0, 5),
     ifbNeg: all.filter((x) => x.effect < 0).sort((a, b) => a.effect - b.effect).slice(0, 5),
   }
@@ -1198,7 +1197,7 @@ function mergeMoneyFlowStore(store, days) {
   const next = recomputeMoneyFlowYtd({ ...store, series })
   return { store: next, added }
 }
-    )
+
   } catch {
     /* ignore */
   }
@@ -1997,7 +1996,6 @@ export async function onRequestGet(context) {
   }
   return response
 }
-
 const OVERVIEW_CACHE_URL = 'https://pulse-cache.internal/midco-overview-v3'
 const OVERVIEW_CACHE_TTL_MS = 45_000
 

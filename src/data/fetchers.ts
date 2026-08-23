@@ -704,39 +704,28 @@ type IfbEffectRows = Pick<DashboardData['impacts'], 'ifbPos' | 'ifbNeg'>
 
 /**
  * TSETMC allows browser CORS while its edge often times out Cloudflare's IPs.
- * Fetch through the visitor's Iranian connection, then sort the complete IFB
- * list locally.  This is deliberately a fallback only for the two IFB lists.
+ * Reproduce TSETMC's IFB impact ranking through the visitor's connection.
  */
 async function fetchTsetmcIfbEffectsBrowser(): Promise<IfbEffectRows | null> {
   try {
-    const overviewRes = await fetchWithTimeout(
-      'https://cdn.tsetmc.com/api/MarketData/GetMarketOverview/2',
-      7_000,
-      { cache: 'no-store' },
-    )
-    if (!overviewRes.ok) return null
-    const overviewPayload = await overviewRes.json()
-    const overview = overviewPayload?.marketOverview || overviewPayload?.data || overviewPayload || {}
-    const dEven = Math.trunc(
-      Number(overview?.marketActivityDEven ?? overview?.lastDataDEven ?? overview?.dEven ?? 0),
-    )
-    const effectsRes = await fetchWithTimeout(
-      `https://cdn.tsetmc.com/api/Index/GetInstEffect/${dEven}/0/500`,
+    const watchRes = await fetchWithTimeout(
+      'https://cdn.tsetmc.com/api/ClosingPrice/GetMarketWatch?market=2&industrialGroup=&boardId=0&paperTypes[0]=1',
       9_000,
       { cache: 'no-store' },
     )
-    if (!effectsRes.ok) return null
-    const payload = await effectsRes.json()
-    const rows = Array.isArray(payload)
-      ? payload
-      : payload?.instEffect || payload?.instrumentEffect || payload?.data || payload?.items || []
+    if (!watchRes.ok) return null
+    const payload = await watchRes.json()
+    const rows = payload?.marketwatch || payload?.marketWatch || payload?.data || []
     const clean = (value: unknown) => String(value || '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').trim()
     const all = (Array.isArray(rows) ? rows : [])
       .map((row: any) => {
-        const inst = row?.instrument || row?.ins || {}
-        const symbol = clean(inst?.lVal18AFC || inst?.symbol || row?.lVal18AFC || row?.symbol || row?.namad)
-        const name = clean(inst?.lVal30 || inst?.name || row?.lVal30 || row?.name || symbol)
-        const impact = Number(row?.instEffectValue ?? row?.effectValue ?? row?.indexEffect ?? row?.effect)
+        const symbol = clean(row?.lva || row?.symbol)
+        const name = clean(row?.lvc || row?.name || symbol)
+        const change = Number(row?.pcpc)
+        const outstandingShares = Number(row?.ztd)
+        if (!symbol || !Number.isFinite(change) || change === 0 || !Number.isFinite(outstandingShares) || outstandingShares <= 0) return null
+        if (/[23]$/.test(symbol) || /اراد|اخزا|اجاره|مرابحه|صکوک|تسه|اختیار|اختيار|درآمد ثابت|طلا|سکه|نقره|زعفران/.test(name)) return null
+        const impact = Math.round(((outstandingShares * change) / 1e12) * 100) / 100
         return symbol && Number.isFinite(impact) ? { symbol, name, impact } : null
       })
       .filter((row): row is { symbol: string; name: string; impact: number } => Boolean(row))
@@ -748,6 +737,13 @@ async function fetchTsetmcIfbEffectsBrowser(): Promise<IfbEffectRows | null> {
   } catch {
     return null
   }
+}
+
+function keepNavSnapshotVisible(base: DashboardData) {
+  // The verified deploy snapshot has no `live` marker.  NavSection used that
+  // marker as a visibility gate, so a temporary BourseView failure made an
+  // otherwise valid table look empty.
+  if (base.holdings.length) base.holdings = base.holdings.map((holding) => ({ ...holding, live: true }))
 }
 
 const PULSE_SESSION_KEY = 'midco-pulse-history-v7'
@@ -1807,12 +1803,17 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   if (!navOk) {
     // Never blank the table because a BourseView session expired mid-refresh.
     base.overview.fieldSources = { ...(base.overview.fieldSources || {}), nav: 'bourseview-last-verified' }
+    keepNavSnapshotVisible(base)
   }
   const globalOk = applyGlobalMarkets(base, globalApi)
   const productionOk = applyProductionOps(base, productionApi)
-  if (!productionOk) base.productionOps = { ok: false, companies: [], source: 'bourseview' }
+  if (!productionOk) {
+    base.overview.fieldSources = { ...(base.overview.fieldSources || {}), production: 'bourseview-last-verified' }
+  }
   const financialsOk = applyFinancials(base, financialsApi)
-  if (!financialsOk) base.financials = { ok: false, companies: [], source: 'bourseview' }
+  if (!financialsOk) {
+    base.overview.fieldSources = { ...(base.overview.fieldSources || {}), financials: 'bourseview-last-verified' }
+  }
   const apiImpacts = normalizeImpacts(overviewApi?.impacts)
   if (apiImpacts && (overviewApi?.impactsFromSourceArena || overviewApi?.impactsFromRahavard || overviewApi?.impactsSource)) {
     base.impacts = apiImpacts
@@ -2098,7 +2099,7 @@ export async function loadBourseViewPreview(): Promise<DashboardData> {
     fetchFinancialsApi(),
   ])
   if (stocks?.stocks?.length) applyMineralStockReturns(base, stocks.stocks)
-  applyNavLive(base, nav)
+  if (!applyNavLive(base, nav)) keepNavSnapshotVisible(base)
   applyProductionOps(base, production)
   applyFinancials(base, financials)
   return base

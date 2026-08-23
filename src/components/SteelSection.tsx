@@ -191,7 +191,7 @@ export function SteelSection({
           <div className="grid gap-4 lg:grid-cols-2">
             <RatioBlock
               title="ایران — بورس کالا"
-              subtitle={imeLive ? 'زنده از offer-stat' : 'seed / نیاز به IP ایران'}
+              subtitle={imeLive ? 'میانگین موزون معاملات هفته از بورس کالا' : 'آخرین داده ذخیره‌شده بورس کالا'}
               color="#2f5d7a"
               rows={chain.map((r) => ({
                 name: r.name,
@@ -202,7 +202,7 @@ export function SteelSection({
                 name: r.product,
                 price: fmtInt(r.priceRialKg),
                 ratio: r.ratioToBilletPct,
-                meta: r.tradeDate,
+                meta: r.weekStart && r.weekEnd ? `${r.weekStart} تا ${r.weekEnd}` : r.tradeDate,
               }))}
             />
             <RatioBlock
@@ -308,3 +308,4 @@ function RatioBlock({
     </div>
   )
 }
+

@@ -777,7 +777,10 @@ function jalaliMinusDays(n) {
 
 async function scrapeIme(usdIrr) {
   const end = jalaliToday()
-  const start = jalaliMinusDays(21)
+  // IME's reporting week starts on Saturday.  Keep the window pinned to the
+  // current week so every displayed price is comparable and reproducible.
+  const tehranWeekday = new Date(Date.now() + 3.5 * 3600000).getUTCDay()
+  const start = jalaliMinusDays((tehranWeekday + 1) % 7)
   const payload = {
     Language: 8,
     fari: false,
@@ -812,12 +815,14 @@ async function scrapeIme(usdIrr) {
     const goods = String(row.GoodsName || row.bArzehNameKala || row.goodsName || '')
     const symbol = String(row.Symbol || row.bArzehRadifNamad || row.symbol || '')
     const producer = String(row.ProducerName || row.producerName || '')
-    const close = num(row.ClosePrice || row.bArzehRadifGheymat || row.closePrice)
+    const close = num(row.Price ?? row.ClosePrice ?? row.bArzehRadifGheymat ?? row.closePrice)
+    const quantity = num(row.Quantity ?? row.quantity ?? row.bArzehRadifHajm)
+    const totalPrice = num(row.TotalPrice ?? row.totalPrice)
     const date = String(row.Date || row.bArzehTarSal || row.date || '')
       .replace(/-/g, '/')
       .slice(0, 10)
-    if (close == null || close <= 0) continue
-    normed.push({ goods, symbol, producer, close, date })
+    if (close == null || close <= 0 || quantity == null || quantity <= 0) continue
+    normed.push({ goods, symbol, producer, close, quantity, totalPrice, date })
   }
   if (!normed.length) throw new Error('ime empty')
 
@@ -835,15 +840,22 @@ async function scrapeIme(usdIrr) {
     if (!hits.length) continue
     hits.sort((a, b) => String(b.date).localeCompare(String(a.date)))
     const latest = hits[0].date
-    const day = hits.filter((r) => r.date === latest)
-    const avg = day.reduce((a, r) => a + r.close, 0) / day.length
+    const tradedVolumeTon = hits.reduce((sum, r) => sum + r.quantity, 0)
+    const avg = hits.reduce((sum, r) => sum + r.close * r.quantity, 0) / tradedVolumeTon
+    const producers = [...new Set(hits.map((r) => r.producer).filter(Boolean))]
     chain.push({
       product: spec.product,
       priceRialKg: Math.round(avg),
       ratioToBilletPct: 0,
       tradeDate: latest,
-      source: 'ime-offer-stat',
-      samples: day.length,
+      weekStart: start,
+      weekEnd: end,
+      source: 'ime-offer-stat-weekly-weighted',
+      samples: hits.length,
+      tradedVolumeTon: Math.round(tradedVolumeTon),
+      producerCount: producers.length,
+      producers,
+      calculation: 'sum(price*quantity)/sum(quantity)',
     })
     if (usdIrr > 0) {
       steel.push({
@@ -856,7 +868,7 @@ async function scrapeIme(usdIrr) {
         changePct: 0,
         region: 'iran',
         asOf: latest,
-        source: 'ime-offer-stat',
+        source: 'ime-offer-stat-weekly-weighted',
       })
     }
   }
@@ -1057,3 +1069,4 @@ export async function onRequestGet(context) {
     })
   }
 }
+

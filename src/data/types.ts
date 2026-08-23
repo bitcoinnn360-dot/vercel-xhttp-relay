@@ -209,6 +209,12 @@ export interface ImeSteelRow {
   tradeDate: string
   source?: string
   samples?: number
+  weekStart?: string
+  weekEnd?: string
+  tradedVolumeTon?: number
+  producerCount?: number
+  producers?: string[]
+  calculation?: string
 }
 
 export interface PeriodicRow {
@@ -510,4 +516,5 @@ export interface DashboardData {
   sources: SourceStatus[]
   updatedAt: string
 }
+
 

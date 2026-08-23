@@ -1805,8 +1805,8 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   const steelStatus = applySteelChain(base, steelApi)
   const navOk = applyNavLive(base, navApi)
   if (!navOk) {
-    base.holdings = []
-    base.overview.fieldSources = { ...(base.overview.fieldSources || {}), nav: 'bourseview-unavailable' }
+    // Never blank the table because a BourseView session expired mid-refresh.
+    base.overview.fieldSources = { ...(base.overview.fieldSources || {}), nav: 'bourseview-last-verified' }
   }
   const globalOk = applyGlobalMarkets(base, globalApi)
   const productionOk = applyProductionOps(base, productionApi)
@@ -2062,11 +2062,12 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
  */
 export async function loadOverviewPreview(): Promise<DashboardData> {
   const base: DashboardData = structuredClone(seedDashboard)
-  const [current, overviewApi, browserIfbEffects, intraday] = await Promise.all([
+  const [current, overviewApi, browserIfbEffects, intraday, retailMoneyFlowHistory] = await Promise.all([
     fetchTgjuAjax(),
     fetchOverviewApi(),
     fetchTsetmcIfbEffectsBrowser(),
     fetchTgjuIntraday(),
+    fetchRetailMoneyFlowHistory(),
   ])
   applyLiveQuotes(base, current)
   applyFreshOverview(base, overviewApi, intraday)
@@ -2077,6 +2078,7 @@ export async function loadOverviewPreview(): Promise<DashboardData> {
     base.overview.impactsLive = true
     base.overview.fieldSources = { ...(base.overview.fieldSources || {}), impacts: 'tsetmc-browser-full-ifb' }
   }
+  applyRetailMoneyFlowHistory(base, retailMoneyFlowHistory)
   if (overviewApi?.topTrades?.length) base.topTrades = overviewApi.topTrades
   if (overviewApi?.marketPulseHistory?.length) {
     base.overview.marketPulseHistory = overviewApi.marketPulseHistory

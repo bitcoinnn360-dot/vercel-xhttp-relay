@@ -45,50 +45,52 @@
   ],
   "ifbPos": [
     {
-      "symbol": "سباقر",
-      "impact": 6200
-    },
-    {
       "symbol": "فزر",
-      "impact": 4800
+      "impact": 59.05
     },
     {
-      "symbol": "چخزر",
-      "impact": 4600
+      "symbol": "کگهر",
+      "impact": 55.43
     },
     {
-      "symbol": "زاگرس",
-      "impact": 3240
+      "symbol": "ومپنا",
+      "impact": 41.85
     },
     {
-      "symbol": "پاریز",
-      "impact": 1360
+      "symbol": "آریان",
+      "impact": 39.59
+    },
+    {
+      "symbol": "مارون",
+      "impact": 35.12
     }
   ],
   "ifbNeg": [
     {
-      "symbol": "کشرق",
-      "impact": -4200
+      "symbol": "غصینو",
+      "impact": -12.18
     },
     {
-      "symbol": "دکپسول",
-      "impact": -2400
+      "symbol": "سامان",
+      "impact": -8.94
     },
     {
-      "symbol": "مارون",
-      "impact": -1550
+      "symbol": "شرانل",
+      "impact": -5.09
     },
     {
-      "symbol": "ساروج",
-      "impact": -1330
+      "symbol": "نیروترانسفو",
+      "impact": -3.28
     },
     {
-      "symbol": "بالاس",
-      "impact": -1060
+      "symbol": "ذرت",
+      "impact": -2.05
     }
   ],
-  "updatedAt": "2026-07-29T07:56:21.763Z",
+  "updatedAt": "2026-08-23T09:05:23.432Z",
   "sources": [
-    "rahavard365-ifb-index"
-  ]
+    "tsetmc-official-ifb"
+  ],
+  "dEven": 20260823
 }
+

@@ -45,61 +45,71 @@
   ],
   "ifbPos": [
     {
-      "symbol": "فماک",
-      "impact": 4.72,
-      "priceChange": 1050
+      "symbol": "فزر",
+      "impact": 31.86,
+      "priceChange": 5900,
+      "outstandingShares": 5400000000
     },
     {
-      "symbol": "نخریس",
-      "impact": 3,
-      "priceChange": 550
+      "symbol": "آریا",
+      "impact": 26.13,
+      "priceChange": 760,
+      "outstandingShares": 34378800000
     },
     {
-      "symbol": "فرود",
-      "impact": 3,
-      "priceChange": 210
+      "symbol": "ومپنا",
+      "impact": 22.8,
+      "priceChange": 1140,
+      "outstandingShares": 20000000000
     },
     {
-      "symbol": "ولتجار",
-      "impact": 3,
-      "priceChange": 86
+      "symbol": "ددانا",
+      "impact": 9.5,
+      "priceChange": 660,
+      "outstandingShares": 14400000000
     },
     {
-      "symbol": "زملارد",
-      "impact": 3,
-      "priceChange": 43
+      "symbol": "انتخاب",
+      "impact": 8.43,
+      "priceChange": 55,
+      "outstandingShares": 153340603000
     }
   ],
   "ifbNeg": [
     {
-      "symbol": "قتربت",
-      "impact": -3,
-      "priceChange": -330
+      "symbol": "آریان",
+      "impact": -21,
+      "priceChange": -140,
+      "outstandingShares": 150000000000
     },
     {
-      "symbol": "افرا",
-      "impact": -2.97,
-      "priceChange": -400
+      "symbol": "نیشکر",
+      "impact": -12.69,
+      "priceChange": -1110,
+      "outstandingShares": 11431145000
     },
     {
-      "symbol": "پلاست",
-      "impact": -2.97,
-      "priceChange": -71
+      "symbol": "وسپهر",
+      "impact": -7.5,
+      "priceChange": -100,
+      "outstandingShares": 75000000000
     },
     {
-      "symbol": "زفجر",
-      "impact": -2.96,
-      "priceChange": -1410
+      "symbol": "شرانل",
+      "impact": -7.26,
+      "priceChange": -1210,
+      "outstandingShares": 6000000000
     },
     {
-      "symbol": "حپارسا",
-      "impact": -2.94,
-      "priceChange": -610
+      "symbol": "کگهر",
+      "impact": -6.3,
+      "priceChange": -30,
+      "outstandingShares": 210000000000
     }
   ],
-  "updatedAt": "2026-08-23T12:57:32.581Z",
+  "updatedAt": "2026-08-23T13:27:18.197Z",
   "sources": [
-    "tsetmc-marketwatch-ifb-percent"
+    "tsetmc-marketwatch-ifb-impact"
   ],
   "dEven": 20260823
 }

@@ -14,12 +14,12 @@ const all = (Array.isArray(watchRows) ? watchRows : [])
   .map((row) => {
     const symbol = clean(row?.lva || row?.symbol)
     const name = clean(row?.lvc || row?.name || symbol)
-    const yesterday = Number(row?.py)
     const priceChange = Number(row?.pcpc)
-    if (!symbol || !Number.isFinite(yesterday) || yesterday <= 0 || !Number.isFinite(priceChange) || priceChange === 0) return null
+    const outstandingShares = Number(row?.ztd)
+    if (!symbol || !Number.isFinite(priceChange) || priceChange === 0 || !Number.isFinite(outstandingShares) || outstandingShares <= 0) return null
     if (/[23]$/.test(symbol) || isBondLike(name)) return null
-    const impact = Math.round((priceChange / yesterday) * 10000) / 100
-    return { symbol, impact, priceChange }
+    const impact = Math.round(((outstandingShares * priceChange) / 1e12) * 100) / 100
+    return { symbol, impact, priceChange, outstandingShares }
   })
   .filter(Boolean)
 if (all.length < 20) throw new Error(`TSETMC IFB list incomplete (${all.length})`)
@@ -28,7 +28,7 @@ const current = JSON.parse(await fs.readFile(OUT, 'utf8'))
 current.ifbPos = all.filter((row) => row.impact > 0).sort((a, b) => b.impact - a.impact).slice(0, 5)
 current.ifbNeg = all.filter((row) => row.impact < 0).sort((a, b) => a.impact - b.impact).slice(0, 5)
 current.updatedAt = new Date().toISOString()
-current.sources = ['tsetmc-marketwatch-ifb-percent']
+current.sources = ['tsetmc-marketwatch-ifb-impact']
 await fs.writeFile(OUT, `${JSON.stringify(current, null, 2)}\n`, 'utf8')
 console.log(`updated ${all.length} IFB market-watch instruments`)
 

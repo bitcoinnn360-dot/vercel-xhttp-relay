@@ -629,32 +629,49 @@
       "flowGoldFunds": 3.2,
       "perCapitaBuy": 96.38,
       "perCapitaSell": 90.28
+    },
+    {
+      "time": "12:20",
+      "positive": 448,
+      "negative": 373,
+      "flat": 83,
+      "orderBuy": 11808.3,
+      "orderSell": 3296.2,
+      "retailFlow": -4706.0,
+      "flowStocks": -486.5,
+      "flowEquityFunds": -498.2,
+      "flowFixedIncome": -3721.3,
+      "flowBasicMetals": 121.5,
+      "flowMetalOres": -222.4,
+      "flowGoldFunds": 3.2,
+      "perCapitaBuy": 96.79,
+      "perCapitaSell": 90.02
     }
   ],
   "current": {
-    "asOf": "2026-08-23T08:45:02.484129+00:00",
-    "time": "12:15",
+    "asOf": "2026-08-23T08:50:02.917722+00:00",
+    "time": "12:20",
     "dateJalali": "1405/06/01",
     "source": "tradersarena",
     "breadth": {
-      "positive": 447,
-      "negative": 374,
+      "positive": 448,
+      "negative": 373,
       "flat": 83,
       "total": 904
     },
-    "orderBuyBillionToman": 11833.7,
-    "orderSellBillionToman": 3461.7,
-    "retailMoneyFlowBillionToman": -4629.9,
-    "equityRetailMoneyFlowBillionToman": -944.7,
-    "flowStocksBillionToman": -449.6,
-    "flowEquityFundsBillionToman": -495.1,
-    "flowFixedIncomeBillionToman": -3685.3,
+    "orderBuyBillionToman": 11808.3,
+    "orderSellBillionToman": 3296.2,
+    "retailMoneyFlowBillionToman": -4706.0,
+    "equityRetailMoneyFlowBillionToman": -984.7,
+    "flowStocksBillionToman": -486.5,
+    "flowEquityFundsBillionToman": -498.2,
+    "flowFixedIncomeBillionToman": -3721.3,
     "flowBasicMetalsBillionToman": 121.5,
     "flowMetalOresBillionToman": -222.4,
     "flowGoldFundsBillionToman": 3.2,
-    "perCapitaBuyMillionToman": 96.38,
-    "perCapitaSellMillionToman": 90.28,
+    "perCapitaBuyMillionToman": 96.79,
+    "perCapitaSellMillionToman": 90.02,
     "note": "داده زنده TradersArena · ورود پول بازار + صنایع"
   },
-  "updatedAt": "2026-08-23T08:45:02.486093+00:00"
+  "updatedAt": "2026-08-23T08:50:02.919486+00:00"
 }

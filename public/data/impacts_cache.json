@@ -45,51 +45,61 @@
   ],
   "ifbPos": [
     {
-      "symbol": "فزر",
-      "impact": 59.05
+      "symbol": "فماک",
+      "impact": 4.72,
+      "priceChange": 1050
     },
     {
-      "symbol": "کگهر",
-      "impact": 55.43
+      "symbol": "نخریس",
+      "impact": 3,
+      "priceChange": 550
     },
     {
-      "symbol": "ومپنا",
-      "impact": 41.85
+      "symbol": "فرود",
+      "impact": 3,
+      "priceChange": 210
     },
     {
-      "symbol": "آریان",
-      "impact": 39.59
+      "symbol": "ولتجار",
+      "impact": 3,
+      "priceChange": 86
     },
     {
-      "symbol": "مارون",
-      "impact": 35.12
+      "symbol": "زملارد",
+      "impact": 3,
+      "priceChange": 43
     }
   ],
   "ifbNeg": [
     {
-      "symbol": "غصینو",
-      "impact": -12.18
+      "symbol": "قتربت",
+      "impact": -3,
+      "priceChange": -330
     },
     {
-      "symbol": "سامان",
-      "impact": -8.94
+      "symbol": "افرا",
+      "impact": -2.97,
+      "priceChange": -400
     },
     {
-      "symbol": "شرانل",
-      "impact": -5.09
+      "symbol": "پلاست",
+      "impact": -2.97,
+      "priceChange": -71
     },
     {
-      "symbol": "نیروترانسفو",
-      "impact": -3.28
+      "symbol": "زفجر",
+      "impact": -2.96,
+      "priceChange": -1410
     },
     {
-      "symbol": "ذرت",
-      "impact": -2.05
+      "symbol": "حپارسا",
+      "impact": -2.94,
+      "priceChange": -610
     }
   ],
-  "updatedAt": "2026-08-23T09:05:23.432Z",
+  "updatedAt": "2026-08-23T12:57:32.581Z",
   "sources": [
-    "tsetmc-official-ifb"
+    "tsetmc-marketwatch-ifb-percent"
   ],
   "dEven": 20260823
 }

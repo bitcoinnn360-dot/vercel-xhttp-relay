@@ -1260,6 +1260,7 @@ export async function onRequestGet(context) {
     fetchTsetmcIfbEffects(),
     fetchRahavardMarketIndexes(),
     fetchChartixTotalMarketValue(),
+    fetchJson(`${origin}/data/retail_money_flow_daily.json`).catch(() => null),
   ])
 
   if (tasks[0].status === 'fulfilled') {
@@ -1358,6 +1359,7 @@ export async function onRequestGet(context) {
 
   const pulseStoreStatic = tasks[8].status === 'fulfilled' ? tasks[8].value : null
   const impactsCache = tasks[9].status === 'fulfilled' ? tasks[9].value : null
+  const verifiedRetailFlow = tasks[18].status === 'fulfilled' ? tasks[18].value : null
 
   let tradersPulse = null
   if (tasks[10].status === 'fulfilled') {
@@ -1392,6 +1394,14 @@ export async function onRequestGet(context) {
 
   const boardImpacts = boardRows.length ? computeBoardImpacts(boardRows, indices) : null
   const mergedImpacts = mergeImpacts(rahavard, boardImpacts, sourcearena, tsetmcIfb)
+  // Collected from the complete official TSETMC IFB universe. Prefer this
+  // daily snapshot when Cloudflare's own IP cannot reach TSETMC directly.
+  if (impactsCache?.sources?.includes('tsetmc-official-ifb') && impactsCache?.ifbPos?.length && impactsCache?.ifbNeg?.length) {
+    mergedImpacts.impacts ||= { boursePos: [], bourseNeg: [], ifbPos: [], ifbNeg: [] }
+    mergedImpacts.impacts.ifbPos = impactsCache.ifbPos
+    mergedImpacts.impacts.ifbNeg = impactsCache.ifbNeg
+    mergedImpacts.source = `${mergedImpacts.source || ''}+tsetmc-cache`.replace(/^\+/, '')
+  }
   // fill gaps from deployed cache
   if (mergedImpacts.impacts && impactsCache) {
     for (const k of ['boursePos', 'bourseNeg', 'ifbPos', 'ifbNeg']) {
@@ -1423,6 +1433,25 @@ export async function onRequestGet(context) {
 
   const merged = mergeMoneyFlowStore(moneyFlowStore, parsistahlil.days || [])
   moneyFlowStore = merged.store
+  if (Array.isArray(verifiedRetailFlow?.series) && verifiedRetailFlow.series.length) {
+    const verified = verifiedRetailFlow.series
+      .map((row) => ({
+        date: String(row?.date || '').slice(5),
+        dateJalali: String(row?.date || ''),
+        value: Number(row?.value),
+      }))
+      .filter((row) => /^\d{4}\/\d{2}\/\d{2}$/.test(row.dateJalali) && Number.isFinite(row.value))
+      .sort((a, b) => a.dateJalali.localeCompare(b.dateJalali))
+    if (verified.length) {
+      moneyFlowStore = {
+        ...moneyFlowStore,
+        series: verified,
+        ytdBillionToman: Math.round(verified.reduce((sum, row) => sum + row.value, 0)),
+        asOfJalali: verified.at(-1).dateJalali,
+        source: verifiedRetailFlow.source || 'user-workbook',
+      }
+    }
+  }
 
   const usd = quotes.price_dollar_rl?.value ?? null
   const taIndices = tradersPulse?.indices || {}
@@ -1532,7 +1561,7 @@ export async function onRequestGet(context) {
     marketPulseHistory,
     parsistahlil,
     retailMoneyFlowYtd: moneyFlowStore.ytdBillionToman,
-    retailMoneyFlowYtdSource: 'parsistahlil-cumulative',
+    retailMoneyFlowYtdSource: moneyFlowStore.source || 'user-workbook',
     moneyFlowAsOfJalali: moneyFlowStore.asOfJalali,
     moneyFlowSeries: (moneyFlowStore.series || []).map((r) => ({
       date: r.date,

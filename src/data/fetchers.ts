@@ -84,13 +84,59 @@ interface RetailMoneyFlowHistory {
   series?: { date: string; value: number }[]
 }
 
+const RETAIL_FLOW_PULSE_URL =
+  'https://raw.githubusercontent.com/bitcoinnn360-dot/vercel-xhttp-relay/pulse-data/public/data/market_pulse.json'
+
 async function fetchRetailMoneyFlowHistory(): Promise<RetailMoneyFlowHistory | null> {
   try {
-    const res = await fetchWithTimeout('/data/retail_money_flow_daily.json', 5000, { cache: 'no-store' })
-    if (!res.ok) return null
-    const json = (await res.json()) as RetailMoneyFlowHistory
-    if (!Array.isArray(json.series) || !json.series.length) return null
-    return json
+    const read = async (url: string, ms: number) => {
+      const res = await fetchWithTimeout(url, ms, { cache: 'no-store' })
+      if (!res.ok) return null
+      const json = (await res.json()) as RetailMoneyFlowHistory
+      return Array.isArray(json.series) && json.series.length ? json : null
+    }
+    const [base, pulseArchive] = await Promise.all([
+      read('/data/retail_money_flow_daily.json', 5000),
+      fetchWithTimeout(RETAIL_FLOW_PULSE_URL, 5000, { cache: 'no-store' })
+        .then(async (res) => (res.ok ? await res.json() : null))
+        .catch(() => null),
+    ])
+    if (!base) return null
+    // The pulse collector already persists every trading day.  Only append a
+    // date after the cash close and only when it is newer than the verified
+    // workbook/manual baseline; partial intraday samples must never overwrite
+    // user-confirmed figures.
+    const rows = new Map<string, number>()
+    for (const row of base.series || []) {
+      const date = String(row.date || '').trim()
+      const value = Number(row.value)
+      if (/^14\d{2}\/\d{2}\/\d{2}$/.test(date) && Number.isFinite(value)) rows.set(date, value)
+    }
+    const baselineThrough = base.throughDateJalali || [...rows.keys()].sort().at(-1) || ''
+    const pulseDays = (pulseArchive?.days || {}) as Record<
+      string,
+      { time?: string; flowStocks?: number; flowEquityFunds?: number }[]
+    >
+    for (const [date, points] of Object.entries(pulseDays)) {
+      if (date <= baselineThrough || !Array.isArray(points)) continue
+      const finalPoint = points
+        .filter((point) => String(point.time || '') >= '12:25')
+        .sort((left, right) => String(left.time || '').localeCompare(String(right.time || '')))
+        .at(-1)
+      const stocks = Number(finalPoint?.flowStocks)
+      const funds = Number(finalPoint?.flowEquityFunds)
+      if (Number.isFinite(stocks) && Number.isFinite(funds)) rows.set(date, Math.round(stocks + funds))
+    }
+    const series = [...rows.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([date, value]) => ({ date, value }))
+    return {
+      ...base,
+      source: pulseArchive ? 'user-workbook+tradersarena-pulse-archive' : base.source,
+      throughDateJalali: series.at(-1)?.date || base.throughDateJalali,
+      rowCount: series.length,
+      series,
+    }
   } catch {
     return null
   }
@@ -649,6 +695,56 @@ async function fetchOverviewApi(): Promise<OverviewApi | null> {
     const res = await fetchWithTimeout('/api/overview', 12_000, { cache: 'no-store' })
     if (!res.ok) return null
     return (await res.json()) as OverviewApi
+  } catch {
+    return null
+  }
+}
+
+type IfbEffectRows = Pick<DashboardData['impacts'], 'ifbPos' | 'ifbNeg'>
+
+/**
+ * TSETMC allows browser CORS while its edge often times out Cloudflare's IPs.
+ * Fetch through the visitor's Iranian connection, then sort the complete IFB
+ * list locally.  This is deliberately a fallback only for the two IFB lists.
+ */
+async function fetchTsetmcIfbEffectsBrowser(): Promise<IfbEffectRows | null> {
+  try {
+    const overviewRes = await fetchWithTimeout(
+      'https://cdn.tsetmc.com/api/MarketData/GetMarketOverview/2',
+      7_000,
+      { cache: 'no-store' },
+    )
+    if (!overviewRes.ok) return null
+    const overviewPayload = await overviewRes.json()
+    const overview = overviewPayload?.marketOverview || overviewPayload?.data || overviewPayload || {}
+    const dEven = Math.trunc(
+      Number(overview?.marketActivityDEven ?? overview?.lastDataDEven ?? overview?.dEven ?? 0),
+    )
+    const effectsRes = await fetchWithTimeout(
+      `https://cdn.tsetmc.com/api/Index/GetInstEffect/${dEven}/0/500`,
+      9_000,
+      { cache: 'no-store' },
+    )
+    if (!effectsRes.ok) return null
+    const payload = await effectsRes.json()
+    const rows = Array.isArray(payload)
+      ? payload
+      : payload?.instEffect || payload?.instrumentEffect || payload?.data || payload?.items || []
+    const clean = (value: unknown) => String(value || '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').trim()
+    const all = (Array.isArray(rows) ? rows : [])
+      .map((row: any) => {
+        const inst = row?.instrument || row?.ins || {}
+        const symbol = clean(inst?.lVal18AFC || inst?.symbol || row?.lVal18AFC || row?.symbol || row?.namad)
+        const name = clean(inst?.lVal30 || inst?.name || row?.lVal30 || row?.name || symbol)
+        const impact = Number(row?.instEffectValue ?? row?.effectValue ?? row?.indexEffect ?? row?.effect)
+        return symbol && Number.isFinite(impact) ? { symbol, name, impact } : null
+      })
+      .filter((row): row is { symbol: string; name: string; impact: number } => Boolean(row))
+    if (!all.length) return null
+    return {
+      ifbPos: all.filter((r) => r.impact > 0).sort((a, b) => b.impact - a.impact).slice(0, 5),
+      ifbNeg: all.filter((r) => r.impact < 0).sort((a, b) => a.impact - b.impact).slice(0, 5),
+    }
   } catch {
     return null
   }
@@ -1677,7 +1773,7 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
   const base: DashboardData = structuredClone(seedDashboard)
   const now = new Date().toISOString()
 
-  const [current, histEntries, candleEntries, fredEntries, scraped, overviewApi, intradayFallback, stocksApi, steelApi, navApi, globalApi, productionApi, financialsApi, retailMoneyFlowHistory] =
+  const [current, histEntries, candleEntries, fredEntries, scraped, overviewApi, browserIfbEffects, intradayFallback, stocksApi, steelApi, navApi, globalApi, productionApi, financialsApi, retailMoneyFlowHistory] =
     await Promise.all([
       fetchTgjuAjax(),
       Promise.all(HIST_KEYS.map(async (k) => [k, await fetchTgjuHistory(k)] as const)),
@@ -1687,6 +1783,7 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
       Promise.all(FRED_SERIES.map(async (s) => [s.mapTo || s.id, await fetchFred(s.id, s.label)] as const)),
       fetchScrapedMarket(),
       fetchOverviewApi(),
+      fetchTsetmcIfbEffectsBrowser(),
       fetchTgjuIntraday(),
       fetchMineralStocksApi(),
       fetchSteelChainApi(),
@@ -1724,6 +1821,11 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
       ...(base.overview.fieldSources || {}),
       impacts: overviewApi?.impactsSource || (overviewApi?.impactsFromRahavard ? 'rahavard365' : 'sourcearena-live'),
     }
+  }
+  if (browserIfbEffects) {
+    base.impacts = { ...base.impacts, ...browserIfbEffects }
+    base.overview.impactsLive = true
+    base.overview.fieldSources = { ...(base.overview.fieldSources || {}), impacts: 'tsetmc-browser-full-ifb' }
   }
   if (overviewApi?.topTrades?.length) {
     base.topTrades = overviewApi.topTrades
@@ -1960,15 +2062,21 @@ export async function loadDashboardBundle(): Promise<LiveBundle> {
  */
 export async function loadOverviewPreview(): Promise<DashboardData> {
   const base: DashboardData = structuredClone(seedDashboard)
-  const [current, overviewApi, intraday] = await Promise.all([
+  const [current, overviewApi, browserIfbEffects, intraday] = await Promise.all([
     fetchTgjuAjax(),
     fetchOverviewApi(),
+    fetchTsetmcIfbEffectsBrowser(),
     fetchTgjuIntraday(),
   ])
   applyLiveQuotes(base, current)
   applyFreshOverview(base, overviewApi, intraday)
   const impacts = normalizeImpacts(overviewApi?.impacts)
   if (impacts) base.impacts = impacts
+  if (browserIfbEffects) {
+    base.impacts = { ...base.impacts, ...browserIfbEffects }
+    base.overview.impactsLive = true
+    base.overview.fieldSources = { ...(base.overview.fieldSources || {}), impacts: 'tsetmc-browser-full-ifb' }
+  }
   if (overviewApi?.topTrades?.length) base.topTrades = overviewApi.topTrades
   if (overviewApi?.marketPulseHistory?.length) {
     base.overview.marketPulseHistory = overviewApi.marketPulseHistory
@@ -1995,3 +2103,4 @@ export async function loadBourseViewPreview(): Promise<DashboardData> {
 }
 
 export const REFRESH_MS = 60 * 1000
+

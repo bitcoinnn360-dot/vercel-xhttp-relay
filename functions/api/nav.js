@@ -56,17 +56,20 @@ const NAV_STATIC = {
   realEstatePremiumMr: 28_652_760,
   equityMr: 746_140_889,
   capitalMr: 570_000_000,
-  prev: {
-    listedPremiumMr: 2_007_342_520,
-    navMr: 3_486_773_052,
-    navPerShare: 6117,
-    sharePrice: 2030,
-    pNavPct: 33.2,
-  },
 }
 
-const CACHE_TTL_MS = 2 * 60 * 1000
-const CACHE_KEY = 'https://cache.local/midco-nav-bv-v6'
+const CACHE_TTL_MS = 10 * 60 * 1000
+const CACHE_KEY = 'https://cache.local/midco-nav-bv-v8'
+
+async function loadStaticSnapshot(origin) {
+  const res = await fetch(`${origin}/data/nav_snapshot.json`, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(4000),
+  })
+  if (!res.ok) return null
+  const json = await res.json()
+  return json?.ok && json?.holdings?.length && json?.nav ? json : null
+}
 
 function normalizeCookie(raw) {
   let c = String(raw || '').trim()
@@ -85,63 +88,81 @@ function round0(n) {
   return Math.round(Number(n))
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 async function bvJson(cookie, idToken, path) {
-  const res = await fetch(`${BV_BASE}${path}`, {
-    headers: {
-      Cookie: cookie,
-      Accept: 'application/json',
-      'User-Agent': UA,
-      Referer: 'https://www.bourseview.com/',
-      Origin: 'https://www.bourseview.com',
-    },
-    redirect: 'follow',
-  })
-  if (!res.ok) throw new Error(`bourseview ${res.status} ${path}`)
-  return res.json()
+  let lastError = null
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const res = await fetch(`${BV_BASE}${path}`, {
+        headers: {
+          Cookie: cookie,
+          Accept: 'application/json',
+          'User-Agent': UA,
+          Referer: 'https://www.bourseview.com/',
+          Origin: 'https://www.bourseview.com',
+        },
+        redirect: 'follow',
+        signal: AbortSignal.timeout(12_000),
+      })
+      if (res.ok) return res.json()
+      lastError = new Error(`bourseview ${res.status} ${path}`)
+      if (![403, 408, 429, 500, 502, 503, 504].includes(res.status)) throw lastError
+    } catch (error) {
+      lastError = error
+    }
+    if (attempt < 2) await sleep(900 * (attempt + 1))
+  }
+  throw lastError || new Error(`bourseview failed ${path}`)
 }
 
 async function fetchStockMeta(cookie, idToken, exchange, isin, symbol = '') {
-  const [meta, quotes] = await Promise.all([
-    bvJson(cookie, idToken, `/api/v2/exchanges/${exchange}/stocks/${isin}`),
-    bvJson(
-      cookie,
-      idToken,
-      `/api/v2/exchanges/${exchange}/stocks/${isin}/quotes?timeFrame=daily&lastN=3&expand=shamsiDate`,
-    ),
-  ])
+  // Quote rows normally contain both price and outstanding shares. Read that
+  // endpoint first and only request stock metadata when the share count is absent.
+  // This halves the request volume and avoids the 403 burst limit on BV.
+  const quotes = await bvJson(
+    cookie,
+    idToken,
+    `/api/v2/exchanges/${exchange}/stocks/${isin}/quotes?timeFrame=daily&lastN=3&expand=shamsiDate`,
+  )
   const items = Array.isArray(quotes?.items) ? quotes.items : []
   const last = items[0] || {}
-  let outstanding =
-    Number(meta?.numberOfOutstandingShares) || Number(last?.numberOfOutstandingShares) || null
+  const quotePrice = (row) => {
+    const vwap = Number(row?.vwap)
+    const close = Number(row?.close)
+    return Number.isFinite(vwap) && vwap > 0
+      ? vwap
+      : Number.isFinite(close) && close > 0
+        ? close
+        : null
+  }
+  const currentDate = last?.shamsiDate || last?.date || null
+  const previous =
+    items.find((row, index) => {
+      if (index === 0 || quotePrice(row) == null) return false
+      const rowDate = row?.shamsiDate || row?.date || null
+      return !currentDate || !rowDate || rowDate !== currentDate
+    }) || null
+  let outstanding = Number(last?.numberOfOutstandingShares) || null
+  if (!outstanding) {
+    await sleep(180)
+    const meta = await bvJson(cookie, idToken, `/api/v2/exchanges/${exchange}/stocks/${isin}`)
+    outstanding = Number(meta?.numberOfOutstandingShares) || null
+  }
   // Capital-increase filings can land on stock meta before quote history catches up.
   const shareOverrides = { فملی: 1_440_000_000_000 }
   if (symbol && shareOverrides[symbol]) outstanding = shareOverrides[symbol]
-  const vwap = Number(last?.vwap)
-  const close = Number(last?.close)
-  const price = Number.isFinite(vwap) && vwap > 0 ? vwap : Number.isFinite(close) && close > 0 ? close : null
+  const price = quotePrice(last)
   return {
     outstanding,
     price,
+    prevPrice: quotePrice(previous),
     capitalMr: outstanding != null ? outstanding / 1000 : null, // par 1000 rial → million rial
-    asOf: last?.shamsiDate || last?.date || null,
+    asOf: currentDate,
+    prevAsOf: previous?.shamsiDate || previous?.date || null,
   }
-}
-
-/** Best-effort ownership from BV (currently broken — returns null). */
-async function tryFetchOwnershipPct(cookie, idToken, exchange, isin, holderNeedles) {
-  try {
-    const data = await bvJson(cookie, idToken, `/api/v2/exchanges/${exchange}/stocks/${isin}/shareholders`)
-    const rows = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
-    for (const row of rows) {
-      const name = String(row?.name || row?.shareholderName || row?.nameFa || '')
-      if (!holderNeedles.some((n) => name.includes(n))) continue
-      const pct = Number(row?.percent || row?.percentage || row?.ownershipPercent)
-      if (Number.isFinite(pct) && pct > 0) return pct
-    }
-  } catch {
-    /* endpoint broken or unauthorized */
-  }
-  return null
 }
 
 async function mapPool(items, concurrency, fn) {
@@ -166,6 +187,9 @@ function buildHoldings(liveRows) {
   const other = {
     ...OTHER_PAPERS,
     unrealizedMr: OTHER_PAPERS.marketValueMr - OTHER_PAPERS.costMr,
+    prevMarketValueMr: OTHER_PAPERS.marketValueMr,
+    prevUnrealizedMr: OTHER_PAPERS.marketValueMr - OTHER_PAPERS.costMr,
+    prevPricePerShare: OTHER_PAPERS.pricePerShare,
     portfolioPct: 0,
   }
   rows.push(other)
@@ -183,11 +207,27 @@ export async function onRequestGet(context) {
   const forceRefresh = url.searchParams.has('refresh') || url.searchParams.has('fresh')
   const cookie = normalizeCookie(env?.BOURSEVIEW_COOKIE || env?.BOURSEVIEW_TOKEN || '')
   const idToken = String(env?.BOURSEVIEW_ID_TOKEN || '').trim()
+  const origin = url.origin
+  let staticSnapshot = null
+  try {
+    staticSnapshot = await loadStaticSnapshot(origin)
+  } catch {
+    /* keep trying live/cache */
+  }
+
+  if (!forceRefresh && staticSnapshot) {
+    return Response.json(
+      { ...staticSnapshot, served: 'static-fast' },
+      { headers: { 'cache-control': 'public, max-age=300', 'access-control-allow-origin': '*' } },
+    )
+  }
 
   const cache = typeof caches !== 'undefined' ? caches.default : null
-  if (cache && !forceRefresh) {
+  let staleHit = null
+  if (cache) {
     const hit = await cache.match(CACHE_KEY)
-    if (hit) {
+    staleHit = hit || null
+    if (!forceRefresh && hit) {
       const cachedAt = Number(hit.headers.get('x-cached-at') || 0)
       if (cachedAt && Date.now() - cachedAt < CACHE_TTL_MS) {
         return new Response(hit.body, {
@@ -204,6 +244,12 @@ export async function onRequestGet(context) {
   }
 
   if (!cookie) {
+    if (staticSnapshot) {
+      return Response.json(
+        { ...staticSnapshot, served: 'static-no-cookie' },
+        { headers: { 'cache-control': 'public, max-age=300', 'access-control-allow-origin': '*' } },
+      )
+    }
     return Response.json(
       { ok: false, error: 'BOURSEVIEW_COOKIE missing', source: 'bourseview' },
       { status: 503, headers: { 'cache-control': 'no-store' } },
@@ -211,12 +257,16 @@ export async function onRequestGet(context) {
   }
 
   const errors = []
-  const holderNeedles = ['معادن و فلزات', 'ومعادن', 'توسعه معادن']
 
-  const liveRows = await mapPool(HOLDINGS, 4, async (h) => {
+  // One symbol at a time. Parallel calls from Cloudflare are answered with
+  // intermittent 403s even while the same cookie is valid.
+  const liveRows = await mapPool(HOLDINGS, 1, async (h) => {
     try {
+      await sleep(220)
       const meta = await fetchStockMeta(cookie, idToken, h.exchange, h.isin, h.symbol)
-      const liveOwn = await tryFetchOwnershipPct(cookie, idToken, h.exchange, h.isin, holderNeedles)
+      // BV's shareholders route is broken and ownership already has a verified
+      // report baseline, so do not spend another request per holding on it.
+      const liveOwn = null
       const outstanding = meta.outstanding
       if (!outstanding || !meta.price) throw new Error('missing outstanding/price')
       // Prefer explicit post-capital-increase share count (e.g. فملی 52.17B → 71.55B).
@@ -231,7 +281,9 @@ export async function onRequestGet(context) {
       // BourseView's quote is already on the post-increase share base.
       // A second adjustment made فملی show 13,300 instead of 18,240.
       const price = meta.price
+      const prevPrice = meta.prevPrice ?? price
       const marketValueMr = round0((shares * price) / 1e6)
+      const prevMarketValueMr = round0((shares * prevPrice) / 1e6)
       const costPerShare = shares > 0 ? round0((h.costMr * 1e6) / shares) : 0
       return {
         symbol: h.symbol,
@@ -243,11 +295,15 @@ export async function onRequestGet(context) {
         ownershipSource: liveOwn != null ? 'bourseview' : h.ownedShares != null ? 'scaled-capital-increase' : 'pdf-baseline',
         costMr: h.costMr,
         marketValueMr,
+        prevMarketValueMr,
         costPerShare,
         pricePerShare: round0(price),
+        prevPricePerShare: round0(prevPrice),
         unrealizedMr: marketValueMr - h.costMr,
+        prevUnrealizedMr: prevMarketValueMr - h.costMr,
         portfolioPct: 0,
         asOf: meta.asOf,
+        prevAsOf: meta.prevAsOf,
         live: true,
       }
     } catch (e) {
@@ -257,30 +313,77 @@ export async function onRequestGet(context) {
   })
 
   let midcoPrice = null
+  let midcoPrevPrice = null
+  let midcoAsOf = null
+  let midcoPrevAsOf = null
   let midcoOutstanding = null
   try {
     const m = await fetchStockMeta(cookie, idToken, MIDCO.exchange, MIDCO.isin)
     midcoPrice = m.price
+    midcoPrevPrice = m.prevPrice
+    midcoAsOf = m.asOf
+    midcoPrevAsOf = m.prevAsOf
     midcoOutstanding = m.outstanding
   } catch (e) {
     errors.push(`ومعادن: ${e}`)
   }
 
   const holdings = buildHoldings(liveRows.filter(Boolean))
+  const currentAsOf = [...liveRows.filter(Boolean).map((h) => h.asOf), midcoAsOf]
+    .filter(Boolean)
+    .sort()
+    .at(-1) || null
+  const previousAsOf = [
+    ...liveRows
+      .filter((h) => h?.asOf === currentAsOf)
+      .map((h) => h.prevAsOf),
+    ...(midcoAsOf === currentAsOf ? [midcoPrevAsOf] : []),
+  ]
+    .filter(Boolean)
+    .sort()
+    .at(-1) || null
+
+  // A suspended or not-yet-refreshed symbol has no quote on the portfolio's
+  // previous trading date. Its value must remain unchanged for that day instead
+  // of being compared with its own (possibly much older) previous trade.
+  for (const h of holdings) {
+    if (!h.live || h.asOf === currentAsOf && h.prevAsOf === previousAsOf) continue
+    h.prevMarketValueMr = h.marketValueMr
+    h.prevUnrealizedMr = h.unrealizedMr
+    h.prevPricePerShare = h.pricePerShare
+    h.prevAsOf = previousAsOf
+  }
   const listedPremiumMr = holdings.reduce((s, h) => s + (Number(h.unrealizedMr) || 0), 0)
-  const capitalMr = NAV_STATIC.capitalMr
-  const navMr = round0(
-    listedPremiumMr +
-      NAV_STATIC.unlistedPremiumMr +
-      NAV_STATIC.impairmentReserveMr +
-      NAV_STATIC.realEstatePremiumMr +
-      NAV_STATIC.equityMr,
+  const prevListedPremiumMr = holdings.reduce(
+    (s, h) => {
+      const previous = Number(h.prevUnrealizedMr)
+      return s + (Number.isFinite(previous) ? previous : Number(h.unrealizedMr) || 0)
+    },
+    0,
   )
+  const capitalMr = NAV_STATIC.capitalMr
+  const staticNavMr =
+    NAV_STATIC.unlistedPremiumMr +
+    NAV_STATIC.impairmentReserveMr +
+    NAV_STATIC.realEstatePremiumMr +
+    NAV_STATIC.equityMr
+  const navMr = round0(
+    listedPremiumMr + staticNavMr,
+  )
+  const prevNavMr = round0(prevListedPremiumMr + staticNavMr)
   const navPerShare = capitalMr > 0 ? round0((navMr * 1000) / capitalMr) : null
+  const prevNavPerShare = capitalMr > 0 ? round0((prevNavMr * 1000) / capitalMr) : null
   const sharePrice = midcoPrice != null ? round0(midcoPrice) : null
+  const prevSharePrice =
+    midcoAsOf === currentAsOf && midcoPrevAsOf === previousAsOf && midcoPrevPrice != null
+      ? round0(midcoPrevPrice)
+      : sharePrice
   const pNavPct =
     navPerShare && sharePrice != null ? Math.round((sharePrice / navPerShare) * 1000) / 10 : null
-
+  const prevPNavPct =
+    prevNavPerShare && prevSharePrice != null
+      ? Math.round((prevSharePrice / prevNavPerShare) * 1000) / 10
+      : null
   const body = {
     ok: holdings.filter((h) => h.live).length >= 8,
     updatedAt: new Date().toISOString(),
@@ -299,7 +402,16 @@ export async function onRequestGet(context) {
       navPerShare,
       sharePrice,
       pNavPct,
-      prev: NAV_STATIC.prev,
+      asOf: currentAsOf,
+      prev: {
+        listedPremiumMr: round0(prevListedPremiumMr),
+        navMr: prevNavMr,
+        navPerShare: prevNavPerShare,
+        sharePrice: prevSharePrice,
+        pNavPct: prevPNavPct,
+        asOf: previousAsOf,
+        source: 'bourseview-previous-trading-day',
+      },
       midcoOutstandingShares: midcoOutstanding,
     },
     liveCount: holdings.filter((h) => h.live).length,
@@ -312,6 +424,25 @@ export async function onRequestGet(context) {
     'content-type': 'application/json; charset=utf-8',
   }
   const payload = JSON.stringify(body)
+  if (!body.ok && staleHit) {
+    try {
+      const stale = await staleHit.json()
+      if (stale?.ok && stale?.holdings?.length >= 8) {
+        return new Response(
+          JSON.stringify({ ...stale, served: 'stale-cache', liveRefreshErrors: errors.slice(0, 12) }),
+          { headers: { ...headers, 'x-cache': 'STALE' } },
+        )
+      }
+    } catch {
+      /* ignore unusable stale response */
+    }
+  }
+  if (!body.ok && staticSnapshot) {
+    return Response.json(
+      { ...staticSnapshot, served: 'static-fallback', liveRefreshErrors: errors.slice(0, 12) },
+      { headers: { ...headers, 'x-cache': 'STATIC' } },
+    )
+  }
   if (cache && body.ok) {
     try {
       const cached = new Response(payload, {
@@ -324,3 +455,4 @@ export async function onRequestGet(context) {
   }
   return new Response(payload, { headers })
 }
+

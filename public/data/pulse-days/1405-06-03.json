@@ -612,32 +612,49 @@
       "flowGoldFunds": 0.0,
       "perCapitaBuy": 111.53,
       "perCapitaSell": 63.76
+    },
+    {
+      "time": "12:15",
+      "positive": 725,
+      "negative": 108,
+      "flat": 85,
+      "orderBuy": 16537.5,
+      "orderSell": 1941.8,
+      "retailFlow": 149.5,
+      "flowStocks": 2617.6,
+      "flowEquityFunds": 329.1,
+      "flowFixedIncome": -2797.1,
+      "flowBasicMetals": 912.0,
+      "flowMetalOres": 546.1,
+      "flowGoldFunds": -411.5,
+      "perCapitaBuy": 111.81,
+      "perCapitaSell": 63.49
     }
   ],
   "current": {
-    "asOf": "2026-08-25T08:40:02.844118+00:00",
-    "time": "12:10",
+    "asOf": "2026-08-25T08:45:03.038898+00:00",
+    "time": "12:15",
     "dateJalali": "1405/06/03",
     "source": "tradersarena",
     "breadth": {
-      "positive": 717,
-      "negative": 114,
+      "positive": 725,
+      "negative": 108,
       "flat": 85,
-      "total": 916
+      "total": 918
     },
-    "orderBuyBillionToman": 16663.6,
-    "orderSellBillionToman": 2034.2,
-    "retailMoneyFlowBillionToman": 125.9,
-    "equityRetailMoneyFlowBillionToman": 2881.3,
-    "flowStocksBillionToman": 2578.0,
-    "flowEquityFundsBillionToman": 303.3,
-    "flowFixedIncomeBillionToman": -2755.5,
-    "flowBasicMetalsBillionToman": 734.9,
-    "flowMetalOresBillionToman": 457.0,
-    "flowGoldFundsBillionToman": 0.0,
-    "perCapitaBuyMillionToman": 111.53,
-    "perCapitaSellMillionToman": 63.76,
+    "orderBuyBillionToman": 16537.5,
+    "orderSellBillionToman": 1941.8,
+    "retailMoneyFlowBillionToman": 149.5,
+    "equityRetailMoneyFlowBillionToman": 2946.7,
+    "flowStocksBillionToman": 2617.6,
+    "flowEquityFundsBillionToman": 329.1,
+    "flowFixedIncomeBillionToman": -2797.1,
+    "flowBasicMetalsBillionToman": 912.0,
+    "flowMetalOresBillionToman": 546.1,
+    "flowGoldFundsBillionToman": -411.5,
+    "perCapitaBuyMillionToman": 111.81,
+    "perCapitaSellMillionToman": 63.49,
     "note": "داده زنده TradersArena · ورود پول بازار + صنایع"
   },
-  "updatedAt": "2026-08-25T08:40:02.846776+00:00"
+  "updatedAt": "2026-08-25T08:45:03.041649+00:00"
 }

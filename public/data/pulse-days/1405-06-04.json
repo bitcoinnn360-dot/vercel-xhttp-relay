@@ -595,32 +595,49 @@
       "flowGoldFunds": 0.0,
       "perCapitaBuy": 107.83,
       "perCapitaSell": 42.96
+    },
+    {
+      "time": "12:15",
+      "positive": 787,
+      "negative": 60,
+      "flat": 81,
+      "orderBuy": 19814.4,
+      "orderSell": 666.1,
+      "retailFlow": 3273.7,
+      "flowStocks": 3611.5,
+      "flowEquityFunds": 807.7,
+      "flowFixedIncome": -1145.5,
+      "flowBasicMetals": 520.6,
+      "flowMetalOres": 273.0,
+      "flowGoldFunds": -182.2,
+      "perCapitaBuy": 108.16,
+      "perCapitaSell": 42.94
     }
   ],
   "current": {
-    "asOf": "2026-08-26T08:40:02.989386+00:00",
-    "time": "12:10",
+    "asOf": "2026-08-26T08:45:03.449436+00:00",
+    "time": "12:15",
     "dateJalali": "1405/06/04",
     "source": "tradersarena",
     "breadth": {
-      "positive": 782,
-      "negative": 59,
-      "flat": 76,
-      "total": 917
+      "positive": 787,
+      "negative": 60,
+      "flat": 81,
+      "total": 928
     },
-    "orderBuyBillionToman": 19997.7,
-    "orderSellBillionToman": 698.9,
-    "retailMoneyFlowBillionToman": 3181.6,
-    "equityRetailMoneyFlowBillionToman": 4341.3,
-    "flowStocksBillionToman": 3589.2,
-    "flowEquityFundsBillionToman": 752.1,
-    "flowFixedIncomeBillionToman": -1159.7,
-    "flowBasicMetalsBillionToman": 383.9,
-    "flowMetalOresBillionToman": 242.1,
-    "flowGoldFundsBillionToman": 0.0,
-    "perCapitaBuyMillionToman": 107.83,
-    "perCapitaSellMillionToman": 42.96,
+    "orderBuyBillionToman": 19814.4,
+    "orderSellBillionToman": 666.1,
+    "retailMoneyFlowBillionToman": 3273.7,
+    "equityRetailMoneyFlowBillionToman": 4419.2,
+    "flowStocksBillionToman": 3611.5,
+    "flowEquityFundsBillionToman": 807.7,
+    "flowFixedIncomeBillionToman": -1145.5,
+    "flowBasicMetalsBillionToman": 520.6,
+    "flowMetalOresBillionToman": 273.0,
+    "flowGoldFundsBillionToman": -182.2,
+    "perCapitaBuyMillionToman": 108.16,
+    "perCapitaSellMillionToman": 42.94,
     "note": "داده زنده TradersArena · ورود پول بازار + صنایع"
   },
-  "updatedAt": "2026-08-26T08:40:02.992457+00:00"
+  "updatedAt": "2026-08-26T08:45:03.452352+00:00"
 }

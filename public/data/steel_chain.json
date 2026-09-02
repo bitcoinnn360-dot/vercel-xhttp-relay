@@ -1,19 +1,19 @@
 {
-  "updatedAt": "2026-09-01T12:46:54.859292+00:00",
+  "updatedAt": "2026-09-02T12:18:25.144133+00:00",
   "ok": true,
   "custeelOk": true,
   "imeOk": false,
   "cnyUsd": 0.14879914,
-  "usdIrr": 2132700.0,
+  "usdIrr": 2188000.0,
   "steel": [
     {
       "id": "seaborne62",
       "name": "CSI Seaborne Index Fe62%",
       "nameFa": "شاخص سنگ‌آهن دریایی ۶۲٪ (CSI)",
-      "value": 100.1,
+      "value": 101.3,
       "unit": "دلار/تن",
-      "change": 0.8,
-      "changePct": 0.81,
+      "change": -0.2,
+      "changePct": -0.2,
       "region": "global",
       "basis": "index",
       "source": "custeel-indicator"
@@ -22,10 +22,10 @@
       "id": "portside62",
       "name": "CSI Portside Index Fe62%",
       "nameFa": "شاخص سنگ‌آهن بندری ۶۲٪",
-      "value": 94.09,
+      "value": 94.18,
       "unit": "دلار/تن",
-      "change": 0.41,
-      "changePct": 0.44,
+      "change": 0.09,
+      "changePct": 0.1,
       "region": "china",
       "basis": "portside",
       "source": "custeel-indicator"
@@ -34,15 +34,15 @@
       "id": "pb61",
       "name": "Australian PB fines 61.5% FOB",
       "nameFa": "نرمه استرالیا PB ۶۱.۵٪ FOB",
-      "value": 86.3,
+      "value": 86.2,
       "unit": "دلار/تن FOB",
       "change": 0.0,
       "changePct": 0.0,
       "region": "global",
       "basis": "FOB",
-      "nativeValue": 86.3,
+      "nativeValue": 86.2,
       "nativeUnit": "دلار/تن FOB",
-      "asOf": "2026-09-01",
+      "asOf": "2026-09-02",
       "source": "custeel-seaborne-fob",
       "note": "Australia seaborne FOB"
     },
@@ -58,7 +58,7 @@
       "basis": "FOB",
       "nativeValue": 69.5,
       "nativeUnit": "دلار/تن FOB",
-      "asOf": "2026-09-01",
+      "asOf": "2026-09-02",
       "source": "custeel-seaborne-fob",
       "note": "Brazil seaborne FOB"
     },
@@ -74,7 +74,7 @@
       "basis": "FOB",
       "nativeValue": 96.3,
       "nativeUnit": "دلار/تن FOB",
-      "asOf": "2026-09-01",
+      "asOf": "2026-09-02",
       "source": "custeel-seaborne-fob",
       "note": "Brazil seaborne FOB"
     },
@@ -82,15 +82,15 @@
       "id": "chile_conc",
       "name": "Chilean concentrates 67% FOB",
       "nameFa": "کنسانتره شیلی ۶۷٪ FOB",
-      "value": 82.2,
+      "value": 82.3,
       "unit": "دلار/تن FOB",
       "change": 0.0,
       "changePct": 0.0,
       "region": "global",
       "basis": "FOB",
-      "nativeValue": 82.2,
+      "nativeValue": 82.3,
       "nativeUnit": "دلار/تن FOB",
-      "asOf": "2026-09-01",
+      "asOf": "2026-09-02",
       "source": "custeel-seaborne-fob",
       "note": "Chile seaborne FOB"
     },
@@ -98,15 +98,15 @@
       "id": "iran_conc",
       "name": "Iranian concentrates 67% FOB",
       "nameFa": "کنسانتره ایران ۶۷٪ FOB",
-      "value": 101.5,
+      "value": 101.6,
       "unit": "دلار/تن FOB",
       "change": 0.0,
       "changePct": 0.0,
       "region": "iran",
       "basis": "FOB",
-      "nativeValue": 101.5,
+      "nativeValue": 101.6,
       "nativeUnit": "دلار/تن FOB",
-      "asOf": "2026-09-01",
+      "asOf": "2026-09-02",
       "source": "custeel-seaborne-fob",
       "note": "Iran seaborne FOB"
     },
@@ -122,7 +122,7 @@
       "basis": "FOB",
       "nativeValue": 66.5,
       "nativeUnit": "دلار/تن FOB",
-      "asOf": "2026-09-01",
+      "asOf": "2026-09-02",
       "source": "custeel-seaborne-fob",
       "note": "Iran seaborne FOB"
     },
@@ -130,15 +130,15 @@
       "id": "tangshan_billet",
       "name": "Tangshan Billet 150×150",
       "nameFa": "بیلت تانگشان",
-      "value": 453.84,
+      "value": 450.86,
       "unit": "دلار/تن",
-      "change": -1.49,
-      "changePct": -0.33,
+      "change": -2.98,
+      "changePct": -0.66,
       "region": "china",
       "basis": "market",
-      "nativeValue": 3050.0,
+      "nativeValue": 3030.0,
       "nativeUnit": "یوان/تن",
-      "asOf": "2026-09-01",
+      "asOf": "2026-09-02",
       "source": "custeel-steel-market",
       "note": "Common Carbon Square Billet(150*150)"
     },
@@ -162,15 +162,15 @@
       "id": "rebar_beijing",
       "name": "Beijing Rebar 16mm HRB400E",
       "nameFa": "میلگرد پکن ۱۶ میل",
-      "value": 491.04,
+      "value": 488.06,
       "unit": "دلار/تن",
       "change": 0.0,
       "changePct": 0.0,
       "region": "china",
       "basis": "market",
-      "nativeValue": 3300.0,
+      "nativeValue": 3280.0,
       "nativeUnit": "یوان/تن",
-      "asOf": "2026-09-01",
+      "asOf": "2026-09-02",
       "source": "custeel-steel-market",
       "note": "Hebei Steel"
     }
@@ -333,6 +333,10 @@
       {
         "date": "2026-09-01",
         "value": 86.3
+      },
+      {
+        "date": "2026-09-02",
+        "value": 86.2
       }
     ],
     "brbf": [
@@ -463,6 +467,10 @@
       {
         "date": "2026-09-01",
         "value": 69.5
+      },
+      {
+        "date": "2026-09-02",
+        "value": 69.5
       }
     ],
     "br_pellet": [
@@ -592,6 +600,10 @@
       },
       {
         "date": "2026-09-01",
+        "value": 96.3
+      },
+      {
+        "date": "2026-09-02",
         "value": 96.3
       }
     ],
@@ -727,6 +739,10 @@
       {
         "date": "2026-09-01",
         "value": 101.5
+      },
+      {
+        "date": "2026-09-02",
+        "value": 101.6
       }
     ],
     "iran_hem": [
@@ -861,6 +877,10 @@
       {
         "date": "2026-09-01",
         "value": 66.5
+      },
+      {
+        "date": "2026-09-02",
+        "value": 66.5
       }
     ],
     "chile_conc": [
@@ -991,6 +1011,10 @@
       {
         "date": "2026-09-01",
         "value": 82.2
+      },
+      {
+        "date": "2026-09-02",
+        "value": 82.3
       }
     ],
     "rebar_beijing": [
@@ -1049,6 +1073,10 @@
       {
         "date": "2026-09-01",
         "value": 491.037
+      },
+      {
+        "date": "2026-09-02",
+        "value": 488.061
       }
     ],
     "tangshan_billet": [
@@ -1091,6 +1119,10 @@
       {
         "date": "2026-09-01",
         "value": 453.837
+      },
+      {
+        "date": "2026-09-02",
+        "value": 450.861
       }
     ],
     "hr_shanghai": [
@@ -1111,8 +1143,8 @@
   "indicators": [
     {
       "label": "CUSPI",
-      "latest": "3587.82",
-      "change": "2.78"
+      "latest": "3585.33",
+      "change": "-2.49"
     },
     {
       "label": "CSPI",
@@ -1121,13 +1153,13 @@
     },
     {
       "label": "CSI Seaborne Index Fe62%",
-      "latest": "100.10",
-      "change": "0.80"
+      "latest": "101.30",
+      "change": "-0.20"
     },
     {
       "label": "CSI Portside Index Fe62%",
-      "latest": "94.09",
-      "change": "0.41"
+      "latest": "94.18",
+      "change": "0.09"
     },
     {
       "label": "China's BF Operating Rate",

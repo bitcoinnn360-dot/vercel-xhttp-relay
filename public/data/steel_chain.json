@@ -1,10 +1,10 @@
 {
-  "updatedAt": "2026-09-30T14:15:42.968805+00:00",
+  "updatedAt": "2026-10-01T14:47:55.987536+00:00",
   "ok": true,
   "custeelOk": true,
   "imeOk": false,
-  "cnyUsd": 0.14908054,
-  "usdIrr": 2547000.0,
+  "cnyUsd": 0.14913367,
+  "usdIrr": 2584650.0,
   "steel": [
     {
       "id": "seaborne62",
@@ -42,7 +42,7 @@
       "basis": "FOB",
       "nativeValue": 81.8,
       "nativeUnit": "دلار/تن FOB",
-      "asOf": "2026-09-30",
+      "asOf": "2026-10-01",
       "source": "custeel-seaborne-fob",
       "note": "Australia seaborne FOB"
     },
@@ -50,15 +50,15 @@
       "id": "brbf",
       "name": "Brazilian BRBF fines 62.5% FOB",
       "nameFa": "نرمه BRBF برزیل ۶۲.۵٪ FOB",
-      "value": 60.0,
+      "value": 59.7,
       "unit": "دلار/تن FOB",
       "change": 0.0,
       "changePct": 0.0,
       "region": "global",
       "basis": "FOB",
-      "nativeValue": 60.0,
+      "nativeValue": 59.7,
       "nativeUnit": "دلار/تن FOB",
-      "asOf": "2026-09-30",
+      "asOf": "2026-10-01",
       "source": "custeel-seaborne-fob",
       "note": "Brazil seaborne FOB"
     },
@@ -74,7 +74,7 @@
       "basis": "FOB",
       "nativeValue": 86.3,
       "nativeUnit": "دلار/تن FOB",
-      "asOf": "2026-09-30",
+      "asOf": "2026-10-01",
       "source": "custeel-seaborne-fob",
       "note": "Brazil seaborne FOB"
     },
@@ -82,15 +82,15 @@
       "id": "chile_conc",
       "name": "Chilean concentrates 67% FOB",
       "nameFa": "کنسانتره شیلی ۶۷٪ FOB",
-      "value": 72.3,
+      "value": 72.0,
       "unit": "دلار/تن FOB",
       "change": 0.0,
       "changePct": 0.0,
       "region": "global",
       "basis": "FOB",
-      "nativeValue": 72.3,
+      "nativeValue": 72.0,
       "nativeUnit": "دلار/تن FOB",
-      "asOf": "2026-09-30",
+      "asOf": "2026-10-01",
       "source": "custeel-seaborne-fob",
       "note": "Chile seaborne FOB"
     },
@@ -98,15 +98,15 @@
       "id": "iran_conc",
       "name": "Iranian concentrates 67% FOB",
       "nameFa": "کنسانتره ایران ۶۷٪ FOB",
-      "value": 93.8,
+      "value": 93.5,
       "unit": "دلار/تن FOB",
       "change": 0.0,
       "changePct": 0.0,
       "region": "iran",
       "basis": "FOB",
-      "nativeValue": 93.8,
+      "nativeValue": 93.5,
       "nativeUnit": "دلار/تن FOB",
-      "asOf": "2026-09-30",
+      "asOf": "2026-10-01",
       "source": "custeel-seaborne-fob",
       "note": "Iran seaborne FOB"
     },
@@ -122,7 +122,7 @@
       "basis": "FOB",
       "nativeValue": 59.2,
       "nativeUnit": "دلار/تن FOB",
-      "asOf": "2026-09-30",
+      "asOf": "2026-10-01",
       "source": "custeel-seaborne-fob",
       "note": "Iran seaborne FOB"
     },
@@ -130,7 +130,7 @@
       "id": "tangshan_billet",
       "name": "Tangshan Billet 150×150",
       "nameFa": "بیلت تانگشان",
-      "value": 445.75,
+      "value": 445.91,
       "unit": "دلار/تن",
       "change": 0.0,
       "changePct": 0.0,
@@ -162,7 +162,7 @@
       "id": "rebar_beijing",
       "name": "Beijing Rebar 16mm HRB400E",
       "nameFa": "میلگرد پکن ۱۶ میل",
-      "value": 483.02,
+      "value": 483.19,
       "unit": "دلار/تن",
       "change": 0.0,
       "changePct": 0.0,
@@ -409,6 +409,10 @@
       {
         "date": "2026-09-30",
         "value": 81.8
+      },
+      {
+        "date": "2026-10-01",
+        "value": 81.8
       }
     ],
     "brbf": [
@@ -615,6 +619,10 @@
       {
         "date": "2026-09-30",
         "value": 60.0
+      },
+      {
+        "date": "2026-10-01",
+        "value": 59.7
       }
     ],
     "br_pellet": [
@@ -820,6 +828,10 @@
       },
       {
         "date": "2026-09-30",
+        "value": 86.3
+      },
+      {
+        "date": "2026-10-01",
         "value": 86.3
       }
     ],
@@ -1035,6 +1047,10 @@
       {
         "date": "2026-09-30",
         "value": 93.8
+      },
+      {
+        "date": "2026-10-01",
+        "value": 93.5
       }
     ],
     "iran_hem": [
@@ -1249,6 +1265,10 @@
       {
         "date": "2026-09-30",
         "value": 59.2
+      },
+      {
+        "date": "2026-10-01",
+        "value": 59.2
       }
     ],
     "chile_conc": [
@@ -1455,6 +1475,10 @@
       {
         "date": "2026-09-30",
         "value": 72.3
+      },
+      {
+        "date": "2026-10-01",
+        "value": 72.0
       }
     ],
     "rebar_beijing": [
@@ -1588,7 +1612,7 @@
       },
       {
         "date": "2026-09-30",
-        "value": 483.021
+        "value": 483.193
       }
     ],
     "tangshan_billet": [
@@ -1694,7 +1718,7 @@
       },
       {
         "date": "2026-09-30",
-        "value": 445.751
+        "value": 445.91
       }
     ],
     "hr_shanghai": [

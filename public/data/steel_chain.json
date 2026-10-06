@@ -1,10 +1,10 @@
 {
-  "updatedAt": "2026-10-05T16:24:48.838699+00:00",
+  "updatedAt": "2026-10-06T14:31:08.495056+00:00",
   "ok": true,
   "custeelOk": true,
   "imeOk": false,
   "cnyUsd": 0.14913963,
-  "usdIrr": 2688000.0,
+  "usdIrr": 2690050.0,
   "steel": [
     {
       "id": "seaborne62",
@@ -34,15 +34,15 @@
       "id": "pb61",
       "name": "Australian PB fines 61.5% FOB",
       "nameFa": "نرمه استرالیا PB ۶۱.۵٪ FOB",
-      "value": 78.6,
+      "value": 78.9,
       "unit": "دلار/تن FOB",
       "change": 0.0,
       "changePct": 0.0,
       "region": "global",
       "basis": "FOB",
-      "nativeValue": 78.6,
+      "nativeValue": 78.9,
       "nativeUnit": "دلار/تن FOB",
-      "asOf": "2026-10-05",
+      "asOf": "2026-10-06",
       "source": "custeel-seaborne-fob",
       "note": "Australia seaborne FOB"
     },
@@ -50,15 +50,15 @@
       "id": "brbf",
       "name": "Brazilian BRBF fines 62.5% FOB",
       "nameFa": "نرمه BRBF برزیل ۶۲.۵٪ FOB",
-      "value": 58.5,
+      "value": 58.8,
       "unit": "دلار/تن FOB",
       "change": 0.0,
       "changePct": 0.0,
       "region": "global",
       "basis": "FOB",
-      "nativeValue": 58.5,
+      "nativeValue": 58.8,
       "nativeUnit": "دلار/تن FOB",
-      "asOf": "2026-10-05",
+      "asOf": "2026-10-06",
       "source": "custeel-seaborne-fob",
       "note": "Brazil seaborne FOB"
     },
@@ -66,15 +66,15 @@
       "id": "br_pellet",
       "name": "Brazilian pellets 65% FOB",
       "nameFa": "گندله برزیل ۶۵٪ FOB",
-      "value": 85.1,
+      "value": 85.4,
       "unit": "دلار/تن FOB",
       "change": 0.0,
       "changePct": 0.0,
       "region": "global",
       "basis": "FOB",
-      "nativeValue": 85.1,
+      "nativeValue": 85.4,
       "nativeUnit": "دلار/تن FOB",
-      "asOf": "2026-10-05",
+      "asOf": "2026-10-06",
       "source": "custeel-seaborne-fob",
       "note": "Brazil seaborne FOB"
     },
@@ -82,15 +82,15 @@
       "id": "chile_conc",
       "name": "Chilean concentrates 67% FOB",
       "nameFa": "کنسانتره شیلی ۶۷٪ FOB",
-      "value": 69.8,
+      "value": 70.1,
       "unit": "دلار/تن FOB",
       "change": 0.0,
       "changePct": 0.0,
       "region": "global",
       "basis": "FOB",
-      "nativeValue": 69.8,
+      "nativeValue": 70.1,
       "nativeUnit": "دلار/تن FOB",
-      "asOf": "2026-10-05",
+      "asOf": "2026-10-06",
       "source": "custeel-seaborne-fob",
       "note": "Chile seaborne FOB"
     },
@@ -98,15 +98,15 @@
       "id": "iran_conc",
       "name": "Iranian concentrates 67% FOB",
       "nameFa": "کنسانتره ایران ۶۷٪ FOB",
-      "value": 91.3,
+      "value": 91.6,
       "unit": "دلار/تن FOB",
       "change": 0.0,
       "changePct": 0.0,
       "region": "iran",
       "basis": "FOB",
-      "nativeValue": 91.3,
+      "nativeValue": 91.6,
       "nativeUnit": "دلار/تن FOB",
-      "asOf": "2026-10-05",
+      "asOf": "2026-10-06",
       "source": "custeel-seaborne-fob",
       "note": "Iran seaborne FOB"
     },
@@ -114,15 +114,15 @@
       "id": "iran_hem",
       "name": "Iranian hematite fines 62% FOB",
       "nameFa": "هماتیت ایران ۶۲٪ FOB",
-      "value": 57.0,
+      "value": 57.3,
       "unit": "دلار/تن FOB",
       "change": 0.0,
       "changePct": 0.0,
       "region": "iran",
       "basis": "FOB",
-      "nativeValue": 57.0,
+      "nativeValue": 57.3,
       "nativeUnit": "دلار/تن FOB",
-      "asOf": "2026-10-05",
+      "asOf": "2026-10-06",
       "source": "custeel-seaborne-fob",
       "note": "Iran seaborne FOB"
     },
@@ -421,6 +421,10 @@
       {
         "date": "2026-10-05",
         "value": 78.6
+      },
+      {
+        "date": "2026-10-06",
+        "value": 78.9
       }
     ],
     "brbf": [
@@ -639,6 +643,10 @@
       {
         "date": "2026-10-05",
         "value": 58.5
+      },
+      {
+        "date": "2026-10-06",
+        "value": 58.8
       }
     ],
     "br_pellet": [
@@ -857,6 +865,10 @@
       {
         "date": "2026-10-05",
         "value": 85.1
+      },
+      {
+        "date": "2026-10-06",
+        "value": 85.4
       }
     ],
     "iran_conc": [
@@ -1083,6 +1095,10 @@
       {
         "date": "2026-10-05",
         "value": 91.3
+      },
+      {
+        "date": "2026-10-06",
+        "value": 91.6
       }
     ],
     "iran_hem": [
@@ -1309,6 +1325,10 @@
       {
         "date": "2026-10-05",
         "value": 57.0
+      },
+      {
+        "date": "2026-10-06",
+        "value": 57.3
       }
     ],
     "chile_conc": [
@@ -1527,6 +1547,10 @@
       {
         "date": "2026-10-05",
         "value": 69.8
+      },
+      {
+        "date": "2026-10-06",
+        "value": 70.1
       }
     ],
     "rebar_beijing": [
@@ -1808,68 +1832,7 @@
       }
     ]
   },
-  "indicators": [
-    {
-      "label": "CUSPI",
-      "latest": "3550.24",
-      "change": "0.01"
-    },
-    {
-      "label": "CSPI",
-      "latest": "92.77",
-      "change": "-0.21"
-    },
-    {
-      "label": "CSI Seaborne Index Fe62%",
-      "latest": "92.80",
-      "change": "-1.10"
-    },
-    {
-      "label": "CSI Portside Index Fe62%",
-      "latest": "89.69",
-      "change": "0.12"
-    },
-    {
-      "label": "China's BF Operating Rate",
-      "latest": "79.35%",
-      "change": "-0.24%"
-    },
-    {
-      "label": "China's EAF Operating Rate",
-      "latest": "56.52%",
-      "change": "0.42%"
-    },
-    {
-      "label": "Operating Rate of China's Domestic Mines",
-      "latest": "63.88%",
-      "change": "0.33%"
-    },
-    {
-      "label": "Operating Rate of China's Coking Plants",
-      "latest": "69.25%",
-      "change": "2.25%"
-    },
-    {
-      "label": "Tangshan Billet Stocks (kt)",
-      "latest": "1554",
-      "change": "52"
-    },
-    {
-      "label": "Iron Ore Stocks at Ports (kt)",
-      "latest": "163270",
-      "change": "580"
-    },
-    {
-      "label": "Coke Stocks in Coking Plants (kt)",
-      "latest": "338",
-      "change": "-10"
-    },
-    {
-      "label": "Coke Stocks in Mills (kt)",
-      "latest": "4522",
-      "change": "102"
-    }
-  ],
+  "indicators": [],
   "imeMeta": {},
   "source": "custeel"
 }

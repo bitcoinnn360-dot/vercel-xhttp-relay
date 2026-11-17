@@ -1,19 +1,19 @@
 {
-  "updatedAt": "2026-11-16T17:29:26.194471+00:00",
+  "updatedAt": "2026-11-17T17:06:40.555487+00:00",
   "ok": true,
   "custeelOk": true,
   "imeOk": false,
-  "cnyUsd": 0.14991324,
-  "usdIrr": 2689000.0,
+  "cnyUsd": 0.15001775,
+  "usdIrr": 2669000.0,
   "steel": [
     {
       "id": "seaborne62",
       "name": "CSI Seaborne Index Fe62%",
       "nameFa": "شاخص سنگ‌آهن دریایی ۶۲٪ (CSI)",
-      "value": 92.5,
+      "value": 90.3,
       "unit": "دلار/تن",
-      "change": -1.8,
-      "changePct": -1.91,
+      "change": -2.3,
+      "changePct": -2.48,
       "region": "global",
       "basis": "index",
       "source": "custeel-indicator"
@@ -22,10 +22,10 @@
       "id": "portside62",
       "name": "CSI Portside Index Fe62%",
       "nameFa": "شاخص سنگ‌آهن بندری ۶۲٪",
-      "value": 86.23,
+      "value": 84.38,
       "unit": "دلار/تن",
-      "change": -0.02,
-      "changePct": -0.02,
+      "change": -1.85,
+      "changePct": -2.15,
       "region": "china",
       "basis": "portside",
       "source": "custeel-indicator"
@@ -130,15 +130,15 @@
       "id": "tangshan_billet",
       "name": "Tangshan Billet 150×150",
       "nameFa": "بیلت تانگشان",
-      "value": 427.25,
+      "value": 424.55,
       "unit": "دلار/تن",
       "change": -3.0,
       "changePct": -0.7,
       "region": "china",
       "basis": "market",
-      "nativeValue": 2850.0,
+      "nativeValue": 2830.0,
       "nativeUnit": "یوان/تن",
-      "asOf": "2026-11-16",
+      "asOf": "2026-11-17",
       "source": "custeel-steel-market",
       "note": "Common Carbon Square Billet(150*150)"
     },
@@ -162,15 +162,15 @@
       "id": "rebar_beijing",
       "name": "Beijing Rebar 16mm HRB400E",
       "nameFa": "میلگرد پکن ۱۶ میل",
-      "value": 463.23,
+      "value": 462.05,
       "unit": "دلار/تن",
       "change": 0.0,
       "changePct": 0.0,
       "region": "china",
       "basis": "market",
-      "nativeValue": 3090.0,
+      "nativeValue": 3080.0,
       "nativeUnit": "یوان/تن",
-      "asOf": "2026-11-16",
+      "asOf": "2026-11-17",
       "source": "custeel-steel-market",
       "note": "Hebei Steel"
     }
@@ -2129,6 +2129,10 @@
       {
         "date": "2026-11-16",
         "value": 463.232
+      },
+      {
+        "date": "2026-11-17",
+        "value": 462.055
       }
     ],
     "tangshan_billet": [
@@ -2291,6 +2295,10 @@
       {
         "date": "2026-11-16",
         "value": 427.253
+      },
+      {
+        "date": "2026-11-17",
+        "value": 424.55
       }
     ],
     "hr_shanghai": [
@@ -2359,8 +2367,8 @@
   "indicators": [
     {
       "label": "CUSPI",
-      "latest": "3471.88",
-      "change": "-5.66"
+      "latest": "3454.76",
+      "change": "-17.12"
     },
     {
       "label": "CSPI",
@@ -2369,13 +2377,13 @@
     },
     {
       "label": "CSI Seaborne Index Fe62%",
-      "latest": "92.50",
-      "change": "-1.80"
+      "latest": "90.30",
+      "change": "-2.30"
     },
     {
       "label": "CSI Portside Index Fe62%",
-      "latest": "86.23",
-      "change": "-0.02"
+      "latest": "84.38",
+      "change": "-1.85"
     },
     {
       "label": "China's BF Operating Rate",
@@ -2394,8 +2402,8 @@
     },
     {
       "label": "Operating Rate of China's Coking Plants",
-      "latest": "69.50%",
-      "change": "-0.70%"
+      "latest": "69.00%",
+      "change": "-0.50%"
     },
     {
       "label": "Tangshan Billet Stocks (kt)",
@@ -2409,13 +2417,13 @@
     },
     {
       "label": "Coke Stocks in Coking Plants (kt)",
-      "latest": "360",
-      "change": "-13"
+      "latest": "366",
+      "change": "6"
     },
     {
       "label": "Coke Stocks in Mills (kt)",
-      "latest": "4467",
-      "change": "-128"
+      "latest": "4460",
+      "change": "-7"
     }
   ],
   "imeMeta": {},

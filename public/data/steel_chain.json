@@ -1,19 +1,19 @@
 {
-  "updatedAt": "2026-11-18T16:44:45.927779+00:00",
+  "updatedAt": "2026-11-19T16:50:13.617545+00:00",
   "ok": true,
   "custeelOk": true,
   "imeOk": false,
-  "cnyUsd": 0.15001046,
-  "usdIrr": 2663300.0,
+  "cnyUsd": 0.15000971,
+  "usdIrr": 2699700.0,
   "steel": [
     {
       "id": "seaborne62",
       "name": "CSI Seaborne Index Fe62%",
       "nameFa": "شاخص سنگ‌آهن دریایی ۶۲٪ (CSI)",
-      "value": 89.6,
+      "value": 90.1,
       "unit": "دلار/تن",
-      "change": -0.7,
-      "changePct": -0.78,
+      "change": 0.5,
+      "changePct": 0.56,
       "region": "global",
       "basis": "index",
       "source": "custeel-indicator"
@@ -22,10 +22,10 @@
       "id": "portside62",
       "name": "CSI Portside Index Fe62%",
       "nameFa": "شاخص سنگ‌آهن بندری ۶۲٪",
-      "value": 83.8,
+      "value": 84.2,
       "unit": "دلار/تن",
-      "change": -0.58,
-      "changePct": -0.69,
+      "change": 0.4,
+      "changePct": 0.48,
       "region": "china",
       "basis": "portside",
       "source": "custeel-indicator"
@@ -138,7 +138,7 @@
       "basis": "market",
       "nativeValue": 2830.0,
       "nativeUnit": "یوان/تن",
-      "asOf": "2026-11-18",
+      "asOf": "2026-11-19",
       "source": "custeel-steel-market",
       "note": "Common Carbon Square Billet(150*150)"
     },
@@ -162,15 +162,15 @@
       "id": "rebar_beijing",
       "name": "Beijing Rebar 16mm HRB400E",
       "nameFa": "میلگرد پکن ۱۶ میل",
-      "value": 460.53,
+      "value": 459.03,
       "unit": "دلار/تن",
-      "change": 0.0,
-      "changePct": 0.0,
+      "change": -1.5,
+      "changePct": -0.33,
       "region": "china",
       "basis": "market",
-      "nativeValue": 3070.0,
+      "nativeValue": 3060.0,
       "nativeUnit": "یوان/تن",
-      "asOf": "2026-11-18",
+      "asOf": "2026-11-19",
       "source": "custeel-steel-market",
       "note": "Hebei Steel"
     }
@@ -195,8 +195,8 @@
   },
   "billetStocks": {
     "label": "موجودی بیلت تانگشان",
-    "value": 1751.0,
-    "wowChange": 49.0,
+    "value": 1801.0,
+    "wowChange": 50.0,
     "unit": "هزار تن",
     "source": "custeel-indicator"
   },
@@ -2161,6 +2161,10 @@
       {
         "date": "2026-11-18",
         "value": 460.532
+      },
+      {
+        "date": "2026-11-19",
+        "value": 459.03
       }
     ],
     "tangshan_billet": [
@@ -2331,6 +2335,10 @@
       {
         "date": "2026-11-18",
         "value": 424.53
+      },
+      {
+        "date": "2026-11-19",
+        "value": 424.527
       }
     ],
     "hr_shanghai": [
@@ -2403,8 +2411,8 @@
   "indicators": [
     {
       "label": "CUSPI",
-      "latest": "3446.70",
-      "change": "-8.06"
+      "latest": "3446.01",
+      "change": "-0.69"
     },
     {
       "label": "CSPI",
@@ -2413,13 +2421,13 @@
     },
     {
       "label": "CSI Seaborne Index Fe62%",
-      "latest": "89.60",
-      "change": "-0.70"
+      "latest": "90.10",
+      "change": "0.50"
     },
     {
       "label": "CSI Portside Index Fe62%",
-      "latest": "83.80",
-      "change": "-0.58"
+      "latest": "84.20",
+      "change": "0.40"
     },
     {
       "label": "China's BF Operating Rate",
@@ -2443,8 +2451,8 @@
     },
     {
       "label": "Tangshan Billet Stocks (kt)",
-      "latest": "1751",
-      "change": "49"
+      "latest": "1801",
+      "change": "50"
     },
     {
       "label": "Iron Ore Stocks at Ports (kt)",
